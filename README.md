@@ -73,17 +73,6 @@
 
 #### 批量管理功能
 <div align="center">
-  <img src="docs/images/批量创建课表.png" alt="批量创建" width="180">
-  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
-  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
-</div>
-
-**批量创建** - 一次性创建多节相同课程，大幅提升录入效率  
-**批量编辑** - 选择多个课程同时修改，支持时间、地点等批量操作  
-**时间编辑** - 精确调整课程时间，支持拖拽和手动输入两种方式
-
-#### 高级管理工具
-<div align="center">
   <img src="docs/images/调课日志.png" alt="调课日志" width="180">
   <img src="docs/images/工具界面.png" alt="工具界面" width="180">
   <img src="docs/images/通知自定义关闭.png" alt="通知设置" width="180">
@@ -92,6 +81,17 @@
 **调课日志** - 记录所有调课历史，支持回滚和查看变更轨迹  
 **工具界面** - 集成多种实用工具，包括数据导入导出、备份恢复等  
 **通知设置** - 自定义提醒规则，支持不同课程设置不同提醒时间
+
+#### 高级管理工具
+<div align="center">
+  <img src="docs/images/批量创建课表.png" alt="批量创建" width="180">
+  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
+  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
+</div>
+
+**批量创建** - 一次性创建多节相同课程，大幅提升录入效率  
+**批量编辑** - 选择多个课程同时修改，支持时间、地点等批量操作  
+**时间编辑** - 精确调整课程时间，支持拖拽和手动输入两种方式
 
 ### 桌面小组件
 <div align="center">
