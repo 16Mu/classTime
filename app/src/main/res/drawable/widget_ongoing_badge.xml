@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    小组件"进行中"标签背景
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- 圆角 -->
+    <corners android:radius="6dp" />
+    
+    <!-- 背景色 - 使用课程颜色，此处为默认色 -->
+    <solid android:color="@color/widget_accent" />
+    
+</shape>

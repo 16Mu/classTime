@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    4x4 大尺寸今日课程小组件预览图
+    用于在小组件选择器中显示（兼容 Android 12 以下版本）
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 背景 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    
+    <!-- 顶部区域模拟 -->
+    <item
+        android:top="12dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:bottom="200dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#F5F5F5" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    
+    <!-- 课程项1模拟 -->
+    <item
+        android:top="60dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:bottom="140dp">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#F0F0F0" />
+                    <corners android:radius="8dp" />
+                </shape>
+            </item>
+            <!-- 左侧色条 -->
+            <item android:width="4dp" android:gravity="left|center_vertical">
+                <shape android:shape="rectangle">
+                    <solid android:color="#5C6BC0" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    
+    <!-- 课程项2模拟 -->
+    <item
+        android:top="120dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:bottom="80dp">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#F0F0F0" />
+                    <corners android:radius="8dp" />
+                </shape>
+            </item>
+            <!-- 左侧色条 -->
+            <item android:width="4dp" android:gravity="left|center_vertical">
+                <shape android:shape="rectangle">
+                    <solid android:color="#66BB6A" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    
+    <!-- 课程项3模拟 -->
+    <item
+        android:top="180dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:bottom="20dp">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#F0F0F0" />
+                    <corners android:radius="8dp" />
+                </shape>
+            </item>
+            <!-- 左侧色条 -->
+            <item android:width="4dp" android:gravity="left|center_vertical">
+                <shape android:shape="rectangle">
+                    <solid android:color="#FF7043" />
+                    <corners android:radius="2dp" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</layer-list>

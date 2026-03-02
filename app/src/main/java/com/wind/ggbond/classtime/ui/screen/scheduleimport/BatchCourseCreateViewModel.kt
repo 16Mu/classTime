@@ -51,7 +51,8 @@ data class BatchCourseItem(
     val reminderEnabled: Boolean = true,    // 是否启用提醒
     val reminderMinutes: Int = 10,          // 提前提醒分钟数
     val note: String = "",                  // 备注
-    val isExpanded: Boolean = true          // UI状态：是否展开
+    val isExpanded: Boolean = true,         // UI状态：整体是否展开
+    val isBasicInfoExpanded: Boolean = true // UI状态：基础信息区域是否展开
 )
 
 /**
@@ -234,6 +235,24 @@ class BatchCourseCreateViewModel @Inject constructor(
     fun toggleCourseExpanded(courseId: Long) {
         _courseItems.value = _courseItems.value.map {
             if (it.id == courseId) it.copy(isExpanded = !it.isExpanded) else it
+        }
+    }
+
+    /**
+     * 切换基础信息区域的展开/折叠状态
+     */
+    fun toggleBasicInfoExpanded(courseId: Long) {
+        _courseItems.value = _courseItems.value.map {
+            if (it.id == courseId) it.copy(isBasicInfoExpanded = !it.isBasicInfoExpanded) else it
+        }
+    }
+
+    /**
+     * 收缩基础信息区域（填写完成后自动调用）
+     */
+    fun collapseBasicInfo(courseId: Long) {
+        _courseItems.value = _courseItems.value.map {
+            if (it.id == courseId) it.copy(isBasicInfoExpanded = false) else it
         }
     }
 
@@ -424,12 +443,12 @@ class BatchCourseCreateViewModel @Inject constructor(
 
     /**
      * 为指定课程添加一个时间段
-     * ✅ 修复：新时间段添加到列表末尾，保持时间段顺序
+     * ✅ 新时间段插入到列表头部，最新的时间段显示在最上面
      */
     fun addTimeSlot(courseId: Long) {
         _courseItems.value = _courseItems.value.map { course ->
             if (course.id == courseId) {
-                course.copy(timeSlots = course.timeSlots + TimeSlot())
+                course.copy(timeSlots = listOf(TimeSlot()) + course.timeSlots)
             } else course
         }
     }

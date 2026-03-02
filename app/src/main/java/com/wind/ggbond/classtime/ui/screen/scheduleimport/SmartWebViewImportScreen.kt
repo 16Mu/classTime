@@ -92,6 +92,7 @@ fun SmartWebViewImportScreen(
     val parseState by viewModel.parseState.collectAsState()
     val parsedCourses by viewModel.parsedCourses.collectAsState()
     val debugInfo by viewModel.debugInfo.collectAsState()
+    val importedSemesterInfo by viewModel.importedSemesterInfo.collectAsState()
     val context = LocalContext.current
     var isLoading by remember { mutableStateOf(false) }
     var webView: WebView? by remember { mutableStateOf(null) }
@@ -205,7 +206,8 @@ fun SmartWebViewImportScreen(
                 viewModel.resetParseState()
             },
             fallSemesterStartDate = school?.fallSemesterStartDate,
-            springSemesterStartDate = school?.springSemesterStartDate
+            springSemesterStartDate = school?.springSemesterStartDate,
+            importedSemesterInfo = importedSemesterInfo
         )
     }
     
@@ -762,6 +764,12 @@ private fun copyTextToClipboard(context: Context, text: String) {
 
 /**
  * WebView 中的学期设置对话框
+ * 
+ * @param onDismiss 取消回调
+ * @param onConfirm 确认回调，参数为(课表昵称, 开始日期, 总周数)
+ * @param fallSemesterStartDate 秋季学期的默认开始日期（学校配置）
+ * @param springSemesterStartDate 春季学期的默认开始日期（学校配置）
+ * @param importedSemesterInfo 导入时提取到的学期信息（如果有则不需要用户设置日期）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -769,8 +777,11 @@ fun ScheduleSetupDialogInWebView(
     onDismiss: () -> Unit,
     onConfirm: (String, java.time.LocalDate, Int) -> Unit,
     fallSemesterStartDate: String? = null,  // 秋季学期的默认开始日期
-    springSemesterStartDate: String? = null  // 春季学期的默认开始日期
+    springSemesterStartDate: String? = null,  // 春季学期的默认开始日期
+    importedSemesterInfo: com.wind.ggbond.classtime.data.model.ImportedSemesterInfo? = null  // 导入时提取到的学期信息
 ) {
+    // 检查是否有完整的学期日期信息（如果有则不需要用户设置日期）
+    val hasCompleteDateInfo = importedSemesterInfo?.hasCompleteDateInfo() == true
     // 智能生成默认学期名称
     val currentDate = java.time.LocalDate.now()
     val month = currentDate.monthValue
@@ -781,8 +792,11 @@ fun ScheduleSetupDialogInWebView(
         "${year}-${year + 1}学年第一学期"
     }
     
-    // 智能生成默认开始日期（9月第一个周一或3月第一个周一，或使用学校指定的日期）
-    val defaultStartDate = if (month >= 2 && month <= 7) {
+    // 智能生成默认开始日期：优先使用导入的学期信息，其次使用学校配置，最后使用智能推断
+    val defaultStartDate = if (importedSemesterInfo?.startDate != null) {
+        // 优先使用导入时提取到的开始日期
+        importedSemesterInfo.startDate
+    } else if (month >= 2 && month <= 7) {
         // 春季学期
         if (springSemesterStartDate != null) {
             try {
@@ -830,9 +844,12 @@ fun ScheduleSetupDialogInWebView(
         }
     }
     
+    // 默认总周数：优先使用导入的学期信息
+    val defaultTotalWeeks = importedSemesterInfo?.calculateTotalWeeks() ?: 20
+    
     var semesterName by remember { mutableStateOf(defaultSemesterName) }
     var startDate by remember { mutableStateOf(defaultStartDate) }
-    var totalWeeks by remember { mutableStateOf(20) }
+    var totalWeeks by remember { mutableStateOf(defaultTotalWeeks) }
     var showDatePicker by remember { mutableStateOf(false) }
     
     val datePickerState = rememberDatePickerState(
@@ -841,134 +858,139 @@ fun ScheduleSetupDialogInWebView(
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("设置学期信息") },
+        title = { Text(if (hasCompleteDateInfo) "设置课表昵称" else "设置学期信息") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 学期名称 - 提供快速选择
-                var showSemesterOptions by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = showSemesterOptions,
-                    onExpandedChange = { showSemesterOptions = it }
-                ) {
-                    OutlinedTextField(
-                        value = semesterName,
-                        onValueChange = { semesterName = it },
-                        label = { Text("学期名称") },
-                        trailingIcon = { 
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = showSemesterOptions) 
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = showSemesterOptions,
-                        onDismissRequest = { showSemesterOptions = false }
+                // 如果有完整的日期信息，显示提示
+                if (hasCompleteDateInfo) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        )
                     ) {
-                        val currentYear = java.time.LocalDate.now().year
-                        listOf(
-                            "${currentYear}-${currentYear + 1}学年第一学期",
-                            "${currentYear}-${currentYear + 1}学年第二学期",
-                            "${currentYear - 1}-${currentYear}学年第一学期",
-                            "${currentYear - 1}-${currentYear}学年第二学期"
-                        ).forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = {
-                                    semesterName = option
-                                    showSemesterOptions = false
-                                }
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = "已自动获取学期日期信息",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "开始: ${startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"))}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                            )
+                            Text(
+                                text = "共${totalWeeks}周",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                             )
                         }
                     }
                 }
                 
-                // 开始日期 - 使用日期选择器
+                // 课表昵称输入框（始终显示）
                 OutlinedTextField(
-                    value = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
-                    onValueChange = { },
-                    label = { Text("第一天上课日期") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
-                    readOnly = true,
-                    enabled = false,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { showDatePicker = true }) {
-                            Icon(Icons.Default.CalendarMonth, "选择日期")
-                        }
-                    }
+                    value = semesterName,
+                    onValueChange = { semesterName = it },
+                    label = { Text("课表昵称") },
+                    placeholder = { Text("例如：大三下学期") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
                 
-                // 总周数 - 提供快速选择
-                var showWeeksOptions by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = showWeeksOptions,
-                    onExpandedChange = { showWeeksOptions = it }
-                ) {
+                // 如果没有完整的日期信息，显示日期和周数设置
+                if (!hasCompleteDateInfo) {
+                    // 开始日期 - 使用日期选择器
                     OutlinedTextField(
-                        value = "${totalWeeks}周",
+                        value = startDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
                         onValueChange = { },
-                        label = { Text("学期总周数") },
-                        readOnly = true,
-                        trailingIcon = { 
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = showWeeksOptions) 
-                        },
+                        label = { Text("第一天上课日期") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                            .clickable { showDatePicker = true },
+                        readOnly = true,
+                        enabled = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePicker = true }) {
+                                Icon(Icons.Default.CalendarMonth, "选择日期")
+                            }
+                        }
                     )
-                    ExposedDropdownMenu(
+                    
+                    // 总周数 - 提供快速选择
+                    var showWeeksOptions by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
                         expanded = showWeeksOptions,
-                        onDismissRequest = { showWeeksOptions = false }
+                        onExpandedChange = { showWeeksOptions = it }
                     ) {
-                        listOf(16, 18, 20, 22, 24).forEach { weeks ->
-                            DropdownMenuItem(
-                                text = { Text("${weeks}周") },
-                                onClick = {
-                                    totalWeeks = weeks
-                                    showWeeksOptions = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = "${totalWeeks}周",
+                            onValueChange = { },
+                            label = { Text("学期总周数") },
+                            readOnly = true,
+                            trailingIcon = { 
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = showWeeksOptions) 
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = showWeeksOptions,
+                            onDismissRequest = { showWeeksOptions = false }
+                        ) {
+                            listOf(16, 18, 20, 22, 24).forEach { weeks ->
+                                DropdownMenuItem(
+                                    text = { Text("${weeks}周") },
+                                    onClick = {
+                                        totalWeeks = weeks
+                                        showWeeksOptions = false
+                                    }
+                                )
+                            }
                         }
                     }
-                }
-                
-                // 显示计算的结束日期
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    
+                    // 显示计算的结束日期
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        )
                     ) {
-                        Text(
-                            text = "结束日期",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = startDate.plusWeeks(totalWeeks.toLong()).minusDays(1)
-                                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "结束日期",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = startDate.plusWeeks(totalWeeks.toLong()).minusDays(1)
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }

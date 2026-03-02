@@ -46,7 +46,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CourseSchedule"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
         
@@ -165,6 +165,34 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/next_class_widget_info" />
         </receiver>
+
+        <!-- 4x4 大尺寸今日课程桌面小组件 (RemoteViews 实现) -->
+        <receiver
+            android:name=".widget.LargeTodayCourseWidgetProvider"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/large_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.wind.ggbond.classtime.ACTION_REFRESH_LARGE_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/large_today_course_widget_info" />
+        </receiver>
+
+        <!-- 4x4 大尺寸小组件 ListView 数据服务 -->
+        <service
+            android:name=".widget.LargeTodayCourseWidgetService"
+            android:enabled="true"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 小组件固定回调接收器 -->
+        <receiver
+            android:name=".widget.WidgetPinCallbackReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

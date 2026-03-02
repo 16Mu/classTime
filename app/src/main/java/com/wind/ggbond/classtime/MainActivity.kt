@@ -52,6 +52,7 @@ import com.wind.ggbond.classtime.service.AlarmReminderScheduler
 import com.wind.ggbond.classtime.ui.navigation.NavGraph
 import com.wind.ggbond.classtime.ui.theme.CourseScheduleTheme
 import com.wind.ggbond.classtime.util.ScheduledUpdateManager
+import com.wind.ggbond.classtime.widget.WidgetRefreshHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -156,6 +157,9 @@ class MainActivity : ComponentActivity() {
                 rescheduleRemindersOnStartup()
                 
                 initState = InitializationState.Success
+                
+                // ✅ 刷新小组件数据，确保从小组件进入应用时数据同步
+                WidgetRefreshHelper.refreshAllWidgets(this@MainActivity)
                 
                 // ✅ 检查是否需要自动更新课表
                 checkAndTriggerAutoUpdate()

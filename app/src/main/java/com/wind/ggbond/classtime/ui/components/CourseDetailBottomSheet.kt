@@ -47,6 +47,7 @@ fun CourseDetailBottomSheet(
     onDelete: (Long) -> Unit,
     onRequestAdjustment: ((Long) -> Unit)? = null,  // 请求调课（传courseId，Dialog在上层弹出）
     onRequestAddExam: ((Long) -> Unit)? = null,      // 请求添加考试（传courseId，Dialog在上层弹出）
+    startInEditMode: Boolean = false,                // 是否直接进入编辑模式
     viewModel: CourseDetailViewModel = hiltViewModel()
 ) {
     val haptic = LocalHapticFeedback.current
@@ -64,8 +65,8 @@ fun CourseDetailBottomSheet(
     val currentSchedule by viewModel.currentSchedule.collectAsState()
     val currentWeekNumber by viewModel.currentWeekNumber.collectAsState()
     
-    // 编辑模式状态
-    var isEditMode by remember { mutableStateOf(false) }
+    // 编辑模式状态 - 根据startInEditMode参数决定初始状态
+    var isEditMode by remember { mutableStateOf(startInEditMode) }
     var validationError by remember { mutableStateOf<String?>(null) }
     
     // 编辑状态的临时数据 - 基本信息

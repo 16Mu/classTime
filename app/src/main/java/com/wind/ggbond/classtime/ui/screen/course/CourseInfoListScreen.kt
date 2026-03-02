@@ -289,7 +289,7 @@ fun CourseInfoListScreen(
         }
     }
     
-    // 课程详情 BottomSheet
+    // 课程详情 BottomSheet - 从时间段点击进入时直接进入编辑模式
     selectedCourseId?.let { courseId ->
         com.wind.ggbond.classtime.ui.components.CourseDetailBottomSheet(
             courseId = courseId,
@@ -301,7 +301,8 @@ fun CourseInfoListScreen(
             onDelete = { _ ->
                 selectedCourseId = null
                 viewModel.refresh()
-            }
+            },
+            startInEditMode = true  // 直接进入编辑模式
         )
     }
 }
@@ -810,23 +811,43 @@ private fun TimeSlotCard(
 
 /**
  * 格式化周次显示
- * 将周次列表转换为易读的字符串，如 "1-8周" 或 "1,3,5周"
+ * 将周次列表转换为易读的字符串，如 "1-8周" 或 "1-5,7-9周"
+ * 采用智能连续区间合并算法，确保显示完整的周次信息
  */
 private fun formatWeeksDisplay(weeks: List<Int>): String {
     if (weeks.isEmpty()) return "未设置"
     
     val sortedWeeks = weeks.sorted()
     
-    // 检查是否连续
-    val isConsecutive = sortedWeeks.zipWithNext().all { (a, b) -> b - a == 1 }
+    // 使用区间合并算法，将连续的周次合并为区间
+    val ranges = mutableListOf<Pair<Int, Int>>()
+    var rangeStart = sortedWeeks.first()
+    var rangeEnd = sortedWeeks.first()
     
-    return if (isConsecutive && sortedWeeks.size > 2) {
-        "${sortedWeeks.first()}-${sortedWeeks.last()}周"
-    } else if (sortedWeeks.size <= 5) {
-        sortedWeeks.joinToString(",") + "周"
-    } else {
-        "${sortedWeeks.size}周"
+    for (i in 1 until sortedWeeks.size) {
+        if (sortedWeeks[i] == rangeEnd + 1) {
+            // 连续，扩展当前区间
+            rangeEnd = sortedWeeks[i]
+        } else {
+            // 不连续，保存当前区间并开始新区间
+            ranges.add(Pair(rangeStart, rangeEnd))
+            rangeStart = sortedWeeks[i]
+            rangeEnd = sortedWeeks[i]
+        }
     }
+    // 添加最后一个区间
+    ranges.add(Pair(rangeStart, rangeEnd))
+    
+    // 格式化输出
+    val result = ranges.joinToString(",") { (start, end) ->
+        if (start == end) {
+            "$start"
+        } else {
+            "$start-$end"
+        }
+    }
+    
+    return "${result}周"
 }
 
 /**

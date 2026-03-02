@@ -1,5 +1,6 @@
 package com.wind.ggbond.classtime.util.extractor
 
+import com.wind.ggbond.classtime.data.model.ImportedSemesterInfo
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 
 /**
@@ -59,6 +60,15 @@ interface SchoolScheduleExtractor {
      * 获取课表页面URL（可选）
      */
     fun getScheduleUrl(): String? = null
+    
+    /**
+     * 从JSON数据中解析学期信息（可选）
+     * 如果页面包含学期开始日期、结束日期等信息，可以在此方法中提取
+     * 
+     * @param jsonData JavaScript返回的JSON数据
+     * @return 解析后的学期信息，如果无法解析则返回null
+     */
+    fun parseSemesterInfo(jsonData: String): ImportedSemesterInfo? = null
 }
 
 

@@ -210,31 +210,27 @@ fun BatchCourseCreateScreen(
                     OutlinedButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            // 智能滚动逻辑：根据用户当前位置决定滚动行为
+                            // 优化动画逻辑：收缩卡片与列表下滑同时进行，新课程从顶部插入
                             coroutineScope.launch {
                                 // 记录当前用户位置
                                 val userCurrentPosition = currentFirstVisibleItem.value
                                 
-                                // 第1步：收缩所有已有课程卡片
+                                // 第1步：同时执行 - 收缩所有已有课程卡片 + 添加新课程（折叠态）
+                                // 这样收缩动画和新课程插入导致的列表下滑会同时发生
                                 viewModel.collapseAllCourses()
-                                // 等待收缩动画基本完成（stiffness=100f 约600ms）
-                                kotlinx.coroutines.delay(500)
-                                // 第2步：添加新课程（初始为折叠态，作为卡片入场）
                                 val newCourseId = viewModel.addCourseItemCollapsed()
-                                // 等待列表重组完成
-                                kotlinx.coroutines.delay(100)
-                                // 第3步：智能滚动 - 如果用户在顶部则保持新课程可见，否则保持用户原视野
-                                val targetScrollPosition = if (userCurrentPosition <= 1) {
-                                    // 用户在顶部附近，滚动到新课程位置（第0个）
-                                    0
-                                } else {
-                                    // 用户不在顶部，保持用户原来的视野位置（由于新课程插入到顶部，原位置需要+1）
-                                    userCurrentPosition + 1
-                                }
-                                listState.animateScrollToItem(targetScrollPosition)
-                                // 等待滚动完成后再展开
-                                kotlinx.coroutines.delay(300)
-                                // 第4步：展开新课程卡片
+                                
+                                // 等待列表重组和收缩动画同步进行（stiffness=200f 约300ms）
+                                kotlinx.coroutines.delay(150)
+                                
+                                // 第2步：滚动到顶部（新课程位置）
+                                // 使用动画滚动，与收缩动画形成联动效果
+                                listState.animateScrollToItem(0)
+                                
+                                // 等待滚动完成
+                                kotlinx.coroutines.delay(200)
+                                
+                                // 第3步：展开新课程卡片
                                 viewModel.expandCourse(newCourseId)
                             }
                         },
@@ -257,34 +253,58 @@ fun BatchCourseCreateScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 课程列表
+            // ✅ 显示顺序：最新的课程在最上面，序号从大到小显示
+            val totalCourses = courseItems.size
             itemsIndexed(
                 items = courseItems,
                 key = { _, item -> item.id }
             ) { index, courseItem ->
-                CourseItemCard(
-                    modifier = Modifier,
-                    index = index,
-                    courseItem = courseItem,
-                    canDelete = courseItems.size > 1,
-                    onDelete = { viewModel.removeCourseItem(courseItem.id) },
-                    onToggleExpanded = { viewModel.toggleCourseExpanded(courseItem.id) },
-                    onCourseNameChange = { viewModel.updateCourseName(courseItem.id, it) },
-                    onTeacherChange = { viewModel.updateTeacher(courseItem.id, it) },
-                    onDefaultClassroomChange = { viewModel.updateDefaultClassroom(courseItem.id, it) },
-                    onColorChange = { viewModel.updateCourseColor(courseItem.id, it) },
-                    onCreditChange = { viewModel.updateCredit(courseItem.id, it) },
-                    onReminderEnabledChange = { viewModel.updateReminderEnabled(courseItem.id, it) },
-                    onReminderMinutesChange = { viewModel.updateReminderMinutes(courseItem.id, it) },
-                    onNoteChange = { viewModel.updateNote(courseItem.id, it) },
-                    onShowClipboardImport = { viewModel.showClipboardImport(courseItem.id) },
-                    onAddTimeSlot = { viewModel.addTimeSlot(courseItem.id) },
-                    onRemoveTimeSlot = { slotId -> viewModel.removeTimeSlot(courseItem.id, slotId) },
-                    onSlotDayChange = { slotId, day -> viewModel.updateSlotDayOfWeek(courseItem.id, slotId, day) },
-                    onSlotStartChange = { slotId, start -> viewModel.updateSlotStartSection(courseItem.id, slotId, start) },
-                    onSlotEndChange = { slotId, end -> viewModel.updateSlotEndSection(courseItem.id, slotId, end) },
-                    onSlotClassroomChange = { slotId, room -> viewModel.updateSlotClassroom(courseItem.id, slotId, room) },
-                    onSlotShowWeekSelector = { slotId -> viewModel.showWeekSelector(courseItem.id, slotId) }
-                )
+                // 序号显示：最新的是最大的序号（如：第4门课程在最上面）
+                val displayIndex = totalCourses - index
+                // ✅ 课程卡片入场动画（与时间段动画一致）
+                var isVisible by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) {
+                    isVisible = true
+                }
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { -it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(
+                        animationSpec = tween(durationMillis = 150)
+                    )
+                ) {
+                    CourseItemCard(
+                        modifier = Modifier,
+                        index = displayIndex - 1,
+                        courseItem = courseItem,
+                        canDelete = courseItems.size > 1,
+                        onDelete = { viewModel.removeCourseItem(courseItem.id) },
+                        onToggleExpanded = { viewModel.toggleCourseExpanded(courseItem.id) },
+                        onToggleBasicInfoExpanded = { viewModel.toggleBasicInfoExpanded(courseItem.id) },
+                        onCollapseBasicInfo = { viewModel.collapseBasicInfo(courseItem.id) },
+                        onCourseNameChange = { viewModel.updateCourseName(courseItem.id, it) },
+                        onTeacherChange = { viewModel.updateTeacher(courseItem.id, it) },
+                        onDefaultClassroomChange = { viewModel.updateDefaultClassroom(courseItem.id, it) },
+                        onColorChange = { viewModel.updateCourseColor(courseItem.id, it) },
+                        onCreditChange = { viewModel.updateCredit(courseItem.id, it) },
+                        onReminderEnabledChange = { viewModel.updateReminderEnabled(courseItem.id, it) },
+                        onReminderMinutesChange = { viewModel.updateReminderMinutes(courseItem.id, it) },
+                        onNoteChange = { viewModel.updateNote(courseItem.id, it) },
+                        onShowClipboardImport = { viewModel.showClipboardImport(courseItem.id) },
+                        onAddTimeSlot = { viewModel.addTimeSlot(courseItem.id) },
+                        onRemoveTimeSlot = { slotId -> viewModel.removeTimeSlot(courseItem.id, slotId) },
+                        onSlotDayChange = { slotId, day -> viewModel.updateSlotDayOfWeek(courseItem.id, slotId, day) },
+                        onSlotStartChange = { slotId, start -> viewModel.updateSlotStartSection(courseItem.id, slotId, start) },
+                        onSlotEndChange = { slotId, end -> viewModel.updateSlotEndSection(courseItem.id, slotId, end) },
+                        onSlotClassroomChange = { slotId, room -> viewModel.updateSlotClassroom(courseItem.id, slotId, room) },
+                        onSlotShowWeekSelector = { slotId -> viewModel.showWeekSelector(courseItem.id, slotId) }
+                    )
+                }
             }
         }
     }
@@ -326,6 +346,7 @@ fun BatchCourseCreateScreen(
 
 /**
  * 单门课程卡片
+ * 采用现代化卡片设计，与CourseEditScreen风格统一
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -336,6 +357,8 @@ private fun CourseItemCard(
     canDelete: Boolean,
     onDelete: () -> Unit,
     onToggleExpanded: () -> Unit,
+    onToggleBasicInfoExpanded: () -> Unit,
+    onCollapseBasicInfo: () -> Unit,
     onCourseNameChange: (String) -> Unit,
     onTeacherChange: (String) -> Unit,
     onDefaultClassroomChange: (String) -> Unit,
@@ -360,22 +383,33 @@ private fun CourseItemCard(
     var isPressed by remember { mutableStateOf(false) }
     // 按压缩放动画（弹簧物理）
     val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1f,
+        targetValue = if (isPressed) 0.98f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
         ),
         label = "cardPressScale"
     )
-    // 展开/折叠箭头旋转动画（低刚度弹簧，缓慢优雅旋转）
+    // 展开/折叠箭头旋转动画（参考CourseInfoListScreen，速度更快）
     val arrowRotation by animateFloatAsState(
         targetValue = if (courseItem.isExpanded) 180f else 0f,
         animationSpec = spring(
             dampingRatio = 0.7f,
-            stiffness = 120f
+            stiffness = 200f
         ),
         label = "arrowRotation"
     )
+    
+    // 解析课程颜色
+    val courseColor = remember(courseItem.color) {
+        if (courseItem.color.isNotEmpty()) {
+            try {
+                Color(android.graphics.Color.parseColor(courseItem.color))
+            } catch (_: Exception) {
+                null
+            }
+        } else null
+    }
 
     Card(
         modifier = modifier
@@ -384,8 +418,11 @@ private fun CourseItemCard(
                 scaleX = pressScale
                 scaleY = pressScale
             },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // 课程标题栏（可点击展开/折叠，带按压缩放反馈）
@@ -405,281 +442,486 @@ private fun CourseItemCard(
                             }
                         )
                     },
-                color = if (courseItem.color.isNotEmpty()) {
-                    try {
-                        Color(android.graphics.Color.parseColor(courseItem.color)).copy(alpha = 0.15f)
-                    } catch (_: Exception) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    }
-                } else {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                }
+                color = Color.Transparent,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 序号圆形标识
+                    // 序号圆角方形标识（与CourseEditScreen风格统一）
                     Surface(
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
-                        color = if (courseItem.color.isNotEmpty()) {
-                            try {
-                                Color(android.graphics.Color.parseColor(courseItem.color))
-                            } catch (_: Exception) {
-                                MaterialTheme.colorScheme.primary
-                            }
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
+                        modifier = Modifier.size(44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = courseColor ?: MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 "${index + 1}",
-                                color = Color.White,
+                                color = if (courseColor != null) Color.White 
+                                       else MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.titleMedium
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
 
                     // 课程名称/提示
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = courseItem.courseName.ifEmpty { "第${index + 1}门课程" },
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        Text(
-                            text = "${courseItem.timeSlots.size} 个时间段" +
-                                    if (courseItem.weeks.isNotEmpty()) " | ${courseItem.weeks.size}周" else "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 时间段标签
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                            ) {
+                                Text(
+                                    text = "${courseItem.timeSlots.size} 个时间段",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                            // 周次标签（如果有）
+                            if (courseItem.weeks.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                                ) {
+                                    Text(
+                                        text = "${courseItem.weeks.size}周",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     // 删除按钮
                     if (canDelete) {
-                        IconButton(onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onDelete()
-                        }) {
+                        IconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onDelete()
+                            },
+                            modifier = Modifier.size(40.dp)
+                        ) {
                             Icon(
-                                Icons.Default.Delete,
+                                Icons.Default.DeleteOutline,
                                 "删除课程",
-                                tint = MaterialTheme.colorScheme.error
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
 
                     // 展开/折叠图标（弹簧旋转动画）
-                    Icon(
-                        Icons.Default.ExpandMore,
-                        contentDescription = if (courseItem.isExpanded) "折叠" else "展开",
-                        modifier = Modifier.graphicsLayer {
-                            rotationZ = arrowRotation
+                    Surface(
+                        modifier = Modifier.size(32.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.ExpandMore,
+                                contentDescription = if (courseItem.isExpanded) "折叠" else "展开",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .graphicsLayer {
+                                        rotationZ = arrowRotation
+                                    },
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    )
+                    }
                 }
             }
 
-            // 可折叠的详细内容（低刚度弹簧，PPT级平滑展开/收缩）
+            // 可折叠的详细内容（参考CourseInfoListScreen动画，速度更快）
             AnimatedVisibility(
                 visible = courseItem.isExpanded,
                 enter = expandVertically(
                     animationSpec = spring(
-                        dampingRatio = 0.85f,
-                        stiffness = 80f
+                        dampingRatio = 0.8f,
+                        stiffness = 200f
                     )
                 ) + fadeIn(
                     animationSpec = spring(
-                        dampingRatio = 1f,
-                        stiffness = 100f
+                        dampingRatio = 0.9f,
+                        stiffness = 250f
                     )
                 ),
                 exit = shrinkVertically(
                     animationSpec = spring(
-                        dampingRatio = 1f,
-                        stiffness = 100f
+                        dampingRatio = 0.9f,
+                        stiffness = 250f
                     )
                 ) + fadeOut(
                     animationSpec = spring(
-                        dampingRatio = 1f,
-                        stiffness = 120f
+                        dampingRatio = 0.9f,
+                        stiffness = 300f
                     )
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // ===== 基础信息区域 =====
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            "基础信息",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // 课程名称 - 支持动态扩大，内容过多时可内部滑动
-                    OutlinedTextField(
-                        value = courseItem.courseName,
-                        onValueChange = onCourseNameChange,
-                        label = { Text("课程名称 *") },
-                        placeholder = { Text("例如：Java开发") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Book, null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 1,
-                        maxLines = 3,
-                        shape = RoundedCornerShape(12.dp)
+                    // ===== 基础信息卡片（支持独立展开/收缩） =====
+                    // 基础信息展开箭头旋转动画
+                    val basicInfoArrowRotation by animateFloatAsState(
+                        targetValue = if (courseItem.isBasicInfoExpanded) 180f else 0f,
+                        animationSpec = spring(
+                            dampingRatio = 0.7f,
+                            stiffness = 200f
+                        ),
+                        label = "basicInfoArrowRotation"
                     )
-
-                    // 教师和默认教室
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = courseItem.teacher,
-                            onValueChange = onTeacherChange,
-                            label = { Text("教师") },
-                            placeholder = { Text("张老师") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.secondary)
-                            },
-                            modifier = Modifier.weight(1f),
-                            minLines = 1,
-                            maxLines = 2,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        OutlinedTextField(
-                            value = courseItem.defaultClassroom,
-                            onValueChange = onDefaultClassroomChange,
-                            label = { Text("默认教室") },
-                            placeholder = { Text("4303") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.tertiary)
-                            },
-                            modifier = Modifier.weight(1f),
-                            minLines = 1,
-                            maxLines = 2,
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                    // 判断基础信息是否已填写完成（课程名称不为空）
+                    val isBasicInfoFilled = courseItem.courseName.isNotBlank()
+                    // 基础信息摘要文本
+                    val basicInfoSummary = buildString {
+                        append(courseItem.courseName.ifBlank { "未填写" })
+                        if (courseItem.teacher.isNotBlank()) append(" · ${courseItem.teacher}")
+                        if (courseItem.defaultClassroom.isNotBlank()) append(" · ${courseItem.defaultClassroom}")
                     }
-
-                    // 学分输入框（使用字符串状态管理，避免删除键光标跳动）
-                    var creditText by remember(courseItem.credit) {
-                        mutableStateOf(if (courseItem.credit > 0f) courseItem.credit.toString() else "")
-                    }
-                    OutlinedTextField(
-                        value = creditText,
-                        onValueChange = { newValue ->
-                            // 直接赋值，不做 filter，避免光标位置丢失导致删除键失效
-                            creditText = newValue
-                            newValue.toFloatOrNull()?.let { num -> onCreditChange(num) }
-                        },
-                        label = { Text("学分") },
-                        placeholder = { Text("例如: 3.0") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.secondary)
-                        },
+                    
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        Text(
-                            "课程颜色",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // 快速颜色选择（展示6个常用颜色）
-                        CourseColorPalette.getAllColors().take(6).forEach { colorHex ->
-                            val color = try {
-                                Color(android.graphics.Color.parseColor(colorHex))
-                            } catch (_: Exception) {
-                                Color.Gray
-                            }
-                            Box(
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            // 标题行（可点击展开/收缩）
+                            Surface(
                                 modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(
-                                        width = if (courseItem.color == colorHex) 2.dp else 0.dp,
-                                        color = if (courseItem.color == colorHex)
-                                            MaterialTheme.colorScheme.primary
-                                        else Color.Transparent,
-                                        shape = CircleShape
-                                    )
+                                    .fillMaxWidth()
                                     .clickable {
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        onColorChange(colorHex)
+                                        onToggleBasicInfoExpanded()
                                     },
-                                contentAlignment = Alignment.Center
+                                color = Color.Transparent
                             ) {
-                                if (courseItem.color == colorHex) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(36.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.primaryContainer
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "基础信息",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        // 收缩时显示摘要信息
+                                        if (!courseItem.isBasicInfoExpanded && isBasicInfoFilled) {
+                                            Text(
+                                                text = basicInfoSummary,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                    // 展开/收缩图标
                                     Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "已选中",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(16.dp)
+                                        Icons.Default.ExpandMore,
+                                        contentDescription = if (courseItem.isBasicInfoExpanded) "收缩" else "展开",
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .graphicsLayer {
+                                                rotationZ = basicInfoArrowRotation
+                                            },
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
-                        }
-                        // 更多颜色
-                        IconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                showColorPicker = true
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.MoreHoriz,
-                                "更多颜色",
-                                modifier = Modifier.size(18.dp)
-                            )
+                            
+                            // 可折叠的基础信息内容
+                            AnimatedVisibility(
+                                visible = courseItem.isBasicInfoExpanded,
+                                enter = expandVertically(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.8f,
+                                        stiffness = 200f
+                                    )
+                                ) + fadeIn(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = 250f
+                                    )
+                                ),
+                                exit = shrinkVertically(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = 250f
+                                    )
+                                ) + fadeOut(
+                                    animationSpec = spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = 300f
+                                    )
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // 课程名称
+                                    OutlinedTextField(
+                                        value = courseItem.courseName,
+                                        onValueChange = onCourseNameChange,
+                                        label = { Text("课程名称 *") },
+                                        placeholder = { Text("例如：Java开发") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Book, null, tint = MaterialTheme.colorScheme.primary)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 1,
+                                        maxLines = 3,
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                        )
+                                    )
+
+                                    // 教师和默认教室
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = courseItem.teacher,
+                                            onValueChange = onTeacherChange,
+                                            label = { Text("教师") },
+                                            placeholder = { Text("张老师") },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.secondary)
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            minLines = 1,
+                                            maxLines = 2,
+                                            shape = RoundedCornerShape(16.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                        OutlinedTextField(
+                                            value = courseItem.defaultClassroom,
+                                            onValueChange = onDefaultClassroomChange,
+                                            label = { Text("默认教室") },
+                                            placeholder = { Text("A101") },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.tertiary)
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            minLines = 1,
+                                            maxLines = 2,
+                                            shape = RoundedCornerShape(16.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                    }
+
+                                    // 学分输入框
+                                    var creditText by remember(courseItem.credit) {
+                                        mutableStateOf(if (courseItem.credit > 0f) courseItem.credit.toString() else "")
+                                    }
+                                    OutlinedTextField(
+                                        value = creditText,
+                                        onValueChange = { newValue ->
+                                            creditText = newValue
+                                            newValue.toFloatOrNull()?.let { num -> onCreditChange(num) }
+                                        },
+                                        label = { Text("学分") },
+                                        placeholder = { Text("例如: 3.0") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.secondary)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                    
+                                    // 填写完成后自动收缩按钮
+                                    if (isBasicInfoFilled) {
+                                        TextButton(
+                                            onClick = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onCollapseBasicInfo()
+                                            },
+                                            modifier = Modifier.align(Alignment.End)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("完成基础信息")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    // ===== 课程颜色卡片 =====
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Palette,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Column {
+                                    Text(
+                                        "课程颜色",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "选择喜欢的颜色标识课程",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            // 颜色选择器网格
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CourseColorPalette.getAllColors().take(6).forEach { colorHex ->
+                                    val color = try {
+                                        Color(android.graphics.Color.parseColor(colorHex))
+                                    } catch (_: Exception) {
+                                        Color.Gray
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(color)
+                                            .border(
+                                                width = if (courseItem.color == colorHex) 3.dp else 0.dp,
+                                                color = if (courseItem.color == colorHex)
+                                                    MaterialTheme.colorScheme.primary
+                                                else Color.Transparent,
+                                                shape = RoundedCornerShape(10.dp)
+                                            )
+                                            .clickable {
+                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                onColorChange(colorHex)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (courseItem.color == colorHex) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = "已选中",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 更多颜色按钮
+                            TextButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showColorPicker = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.MoreHoriz, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("查看更多颜色")
+                            }
+                        }
+                    }
 
                     // ===== 剪贴板智能导入 =====
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onShowClipboardImport()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                         )
                     ) {
                         Icon(
@@ -691,144 +933,248 @@ private fun CourseItemCard(
                         Text("从剪贴板智能导入")
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    // ===== 时间安排区域 =====
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // ===== 时间安排卡片 =====
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Schedule,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            "时间安排",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // 添加时间段按钮
-                        TextButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onAddTimeSlot()
-                            }
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("添加时间段")
-                        }
-                    }
-
-                    // 时间段列表（带进入动画）
-                    courseItem.timeSlots.forEachIndexed { slotIndex, slot ->
-                        // ✅ 使用key + remember控制动画状态
-                        key(slot.id) {
-                            var isVisible by remember { mutableStateOf(false) }
-                            LaunchedEffect(Unit) {
-                                isVisible = true
-                            }
-                            AnimatedVisibility(
-                                visible = isVisible,
-                                enter = slideInHorizontally(
-                                    initialOffsetX = { fullWidth -> fullWidth },
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                        stiffness = Spring.StiffnessLow
-                                    )
-                                ) + fadeIn(
-                                    animationSpec = tween(durationMillis = 200)
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                TimeSlotCard(
-                                    slotIndex = slotIndex,
-                                    slot = slot,
-                                    canDelete = courseItem.timeSlots.size > 1,
-                                    onDelete = { onRemoveTimeSlot(slot.id) },
-                                    onDayChange = { day -> onSlotDayChange(slot.id, day) },
-                                    onStartChange = { start -> onSlotStartChange(slot.id, start) },
-                                    onEndChange = { end -> onSlotEndChange(slot.id, end) },
-                                    onClassroomChange = { room -> onSlotClassroomChange(slot.id, room) },
-                                    onShowWeekSelector = { onSlotShowWeekSelector(slot.id) }
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Schedule,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    "时间安排",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                // 添加时间段按钮
+                                FilledTonalButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onAddTimeSlot()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("添加", style = MaterialTheme.typography.labelMedium)
+                                }
+                            }
+
+                            // 时间段列表（带进入动画）
+                            val totalSlots = courseItem.timeSlots.size
+                            courseItem.timeSlots.forEachIndexed { slotIndex, slot ->
+                                val displayIndex = totalSlots - slotIndex
+                                key(slot.id) {
+                                    var isVisible by remember { mutableStateOf(false) }
+                                    LaunchedEffect(Unit) {
+                                        isVisible = true
+                                    }
+                                    AnimatedVisibility(
+                                        visible = isVisible,
+                                        enter = slideInVertically(
+                                            initialOffsetY = { -it },
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        ) + fadeIn(
+                                            animationSpec = tween(durationMillis = 150)
+                                        )
+                                    ) {
+                                        TimeSlotCard(
+                                            slotIndex = displayIndex - 1,
+                                            slot = slot,
+                                            canDelete = courseItem.timeSlots.size > 1,
+                                            onDelete = { onRemoveTimeSlot(slot.id) },
+                                            onDayChange = { day -> onSlotDayChange(slot.id, day) },
+                                            onStartChange = { start -> onSlotStartChange(slot.id, start) },
+                                            onEndChange = { end -> onSlotEndChange(slot.id, end) },
+                                            onClassroomChange = { room -> onSlotClassroomChange(slot.id, room) },
+                                            onShowWeekSelector = { onSlotShowWeekSelector(slot.id) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ===== 提醒设置卡片 =====
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(36.dp),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = if (courseItem.reminderEnabled)
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        else
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                if (courseItem.reminderEnabled) Icons.Default.NotificationsActive
+                                                else Icons.Default.Notifications,
+                                                contentDescription = null,
+                                                tint = if (courseItem.reminderEnabled)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Column {
+                                        Text(
+                                            "课程提醒",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            if (courseItem.reminderEnabled) "将在上课前提醒您" else "开启后可设置提醒时间",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = courseItem.reminderEnabled,
+                                    onCheckedChange = { enabled ->
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onReminderEnabledChange(enabled)
+                                    }
+                                )
+                            }
+
+                            // 提醒分钟数（仅在开启时显示）
+                            AnimatedVisibility(
+                                visible = courseItem.reminderEnabled,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                var minutesText by remember(courseItem.reminderMinutes) {
+                                    mutableStateOf(courseItem.reminderMinutes.toString())
+                                }
+                                OutlinedTextField(
+                                    value = minutesText,
+                                    onValueChange = { newValue ->
+                                        minutesText = newValue
+                                        newValue.toIntOrNull()?.let { num -> onReminderMinutesChange(num) }
+                                    },
+                                    label = { Text("提前提醒") },
+                                    suffix = { Text("分钟") },
+                                    placeholder = { Text("15") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                    )
                                 )
                             }
                         }
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    // ===== 提醒设置区域 =====
-                    Row(
+                    // ===== 备注卡片 =====
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                if (courseItem.reminderEnabled) Icons.Default.NotificationsActive
-                                else Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                "上课提醒",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.Notes,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    "备注",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            OutlinedTextField(
+                                value = courseItem.note,
+                                onValueChange = onNoteChange,
+                                placeholder = { Text("添加课程备注（可选）") },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                                maxLines = 4,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                )
                             )
                         }
-                        Switch(
-                            checked = courseItem.reminderEnabled,
-                            onCheckedChange = onReminderEnabledChange
-                        )
                     }
-
-                    // 提醒分钟数（仅在开启时显示）
-                    if (courseItem.reminderEnabled) {
-                        var minutesText by remember(courseItem.reminderMinutes) {
-                            mutableStateOf(courseItem.reminderMinutes.toString())
-                        }
-                        OutlinedTextField(
-                            value = minutesText,
-                            onValueChange = { newValue ->
-                                minutesText = newValue
-                                newValue.toIntOrNull()?.let { num -> onReminderMinutesChange(num) }
-                            },
-                            label = { Text("提前提醒") },
-                            suffix = { Text("分钟") },
-                            placeholder = { Text("10") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                    // ===== 备注区域 =====
-                    OutlinedTextField(
-                        value = courseItem.note,
-                        onValueChange = onNoteChange,
-                        label = { Text("备注") },
-                        placeholder = { Text("添加课程备注（可选）") },
-                        leadingIcon = {
-                            Icon(Icons.Default.Notes, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
-                        shape = RoundedCornerShape(12.dp)
-                    )
                 }
             }
         }
@@ -849,6 +1195,7 @@ private fun CourseItemCard(
 
 /**
  * 时间段卡片
+ * 采用现代化设计，与整体风格统一
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -865,44 +1212,65 @@ private fun TimeSlotCard(
 ) {
     val haptic = LocalHapticFeedback.current
 
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        )
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 标题行
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 序号标识
+                Surface(
+                    modifier = Modifier.size(28.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "${slotIndex + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     "时间段 ${slotIndex + 1}",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 if (canDelete) {
-                    IconButton(
+                    Surface(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onDelete()
                         },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(32.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
                     ) {
-                        Icon(
-                            Icons.Default.Close,
-                            "删除时间段",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Close,
+                                "删除时间段",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -918,11 +1286,19 @@ private fun TimeSlotCard(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("星期 *") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.CalendarToday,
+                            null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDay) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -945,27 +1321,34 @@ private fun TimeSlotCard(
                 }
             }
 
-            // 节次选择（使用字符串状态管理，避免删除键光标跳动）
+            // 节次选择
             var startSectionText by remember(slot.startSection) { mutableStateOf(slot.startSection.toString()) }
             var sectionCountText by remember(slot.sectionCount) { mutableStateOf(slot.sectionCount.toString()) }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
                     value = startSectionText,
                     onValueChange = { newValue ->
-                        // 直接赋值，不做 filter，避免光标位置丢失导致删除键失效
                         startSectionText = newValue
                         newValue.toIntOrNull()?.let { num -> onStartChange(num) }
                     },
                     label = { Text("起始节次 *") },
                     placeholder = { Text("1") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -974,16 +1357,23 @@ private fun TimeSlotCard(
                 OutlinedTextField(
                     value = sectionCountText,
                     onValueChange = { newValue ->
-                        // 直接赋值，不做 filter，避免光标位置丢失导致删除键失效
                         sectionCountText = newValue
                         newValue.toIntOrNull()?.let { num -> onEndChange(num) }
                     },
-                    label = { Text("持续节次 *") },
+                    label = { Text("持续节数 *") },
                     placeholder = { Text("2") },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Timer,
+                            null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -991,51 +1381,73 @@ private fun TimeSlotCard(
                 )
             }
 
-            // 该时间段专属教室（可选）
+            // 教室（可选）
             OutlinedTextField(
                 value = slot.classroom,
                 onValueChange = { onClassroomChange(it) },
-                label = { Text("教室（留空使用全局教室）") },
-                placeholder = { Text("留空则使用全局教室") },
+                label = { Text("教室") },
+                placeholder = { Text("留空使用默认教室") },
                 leadingIcon = {
-                    Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.tertiary)
+                    Icon(
+                        Icons.Default.Place,
+                        null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 1,
-                maxLines = 2,
-                shape = RoundedCornerShape(10.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                 )
             )
 
-            // 周次选择（每个时间段独立设置）
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onShowWeekSelector()
-                    }
+            // 周次选择
+            Surface(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onShowWeekSelector()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                ),
+                color = Color.Transparent
             ) {
-                OutlinedTextField(
-                    value = if (slot.customWeeks.isEmpty()) "点击选择周次"
-                    else "已选择 ${slot.customWeeks.size} 周 (${formatWeeksShort(slot.customWeeks)})",
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = false,
-                    label = { Text("周次 *") },
-                    trailingIcon = { Icon(Icons.Default.ChevronRight, null) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.DateRange,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(18.dp)
                     )
-                )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "上课周次 *",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            if (slot.customWeeks.isEmpty()) "点击选择"
+                            else "已选择 ${slot.customWeeks.size} 周 (${formatWeeksShort(slot.customWeeks)})",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
