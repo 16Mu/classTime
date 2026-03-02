@@ -89,7 +89,7 @@
 **工具界面** - 集成多种实用工具，包括数据导入导出、备份恢复等  
 **通知设置** - 自定义提醒规则，支持不同课程设置不同提醒时间
 
-#### 高级管理工具
+#### 调课与工具界面
 <div align="center">
   <img src="docs/images/调课记录.png" alt="调课记录" width="180">
   <img src="docs/images/工具界面.png" alt="工具界面" width="180">
