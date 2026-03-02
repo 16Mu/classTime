@@ -54,16 +54,23 @@
 
 ### 主要界面
 <div align="center">
-  <img src="docs/images/main_screen.png" alt="主界面" width="200">
-  <img src="docs/images/course_detail.png" alt="课程详情" width="200">
-  <img src="docs/images/settings_screen.png" alt="设置界面" width="200">
+  <img src="docs/images/首页.png" alt="主界面" width="200">
+  <img src="docs/images/课程详情卡片.png" alt="课程详情" width="200">
+  <img src="docs/images/我的界面.png" alt="设置界面" width="200">
 </div>
 
 ### 核心功能
 <div align="center">
-  <img src="docs/images/course_conflict.png" alt="课程冲突检测" width="200">
-  <img src="docs/images/multi_classroom.png" alt="多教室管理" width="200">
-  <img src="docs/images/widget_preview.png" alt="桌面小组件" width="200">
+  <img src="docs/images/快速调课.png" alt="快速调课" width="200">
+  <img src="docs/images/批量创建课表.png" alt="批量创建" width="200">
+  <img src="docs/images/小组件1.png" alt="桌面小组件" width="200">
+</div>
+
+### 高级功能
+<div align="center">
+  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="200">
+  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="200">
+  <img src="docs/images/通知自定义关闭.png" alt="通知设置" width="200">
 </div>
 
 ## 🏗️ 技术架构
