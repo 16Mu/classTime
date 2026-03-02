@@ -31,8 +31,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.course.components.WeekSelectorDialog
+import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
+import com.wind.ggbond.classtime.ui.components.ScheduleExpiredDialog
+import com.wind.ggbond.classtime.ui.components.CreateScheduleDialog
 import com.wind.ggbond.classtime.util.CourseColorPalette
 import com.wind.ggbond.classtime.util.DateUtils
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,6 +61,7 @@ fun BatchCourseCreateScreen(
     val saveState by viewModel.saveState.collectAsState()
     val showWeekSelectorState by viewModel.showWeekSelector.collectAsState()
     val showClipboardImport by viewModel.showClipboardImport.collectAsState()
+    val scheduleState by viewModel.scheduleState.collectAsState()
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
     val clipboardManager = LocalClipboardManager.current
@@ -67,6 +72,53 @@ fun BatchCourseCreateScreen(
     // 记录当前可见的第一个项目索引，用于智能滚动定位
     val currentFirstVisibleItem = remember { derivedStateOf { listState.firstVisibleItemIndex } }
 
+    // 根据课表状态显示对应对话框
+    when (val state = scheduleState) {
+        // 加载中：显示加载指示器
+        is ScheduleSelectionState.Loading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+            return
+        }
+        // 需要创建课表：显示创建对话框
+        is ScheduleSelectionState.NeedCreate -> {
+            CreateScheduleDialog(
+                onConfirm = { name, startDate, totalWeeks ->
+                    viewModel.createSchedule(name, startDate, totalWeeks)
+                },
+                onDismiss = {
+                    // 取消创建则返回上一页
+                    navController.navigateUp()
+                }
+            )
+            return
+        }
+        // 课表已过期：显示过期提醒对话框
+        is ScheduleSelectionState.Expired -> {
+            ScheduleExpiredDialog(
+                schedule = state.schedule,
+                onContinue = {
+                    viewModel.confirmUseExpiredSchedule()
+                },
+                onCreateNew = {
+                    viewModel.switchToCreateNewSchedule()
+                },
+                onDismiss = {
+                    navController.navigateUp()
+                }
+            )
+            return
+        }
+        // 就绪状态：继续显示正常界面
+        is ScheduleSelectionState.Ready -> {
+            // 继续执行下面的正常界面逻辑
+        }
+    }
+
     // 监听保存状态
     LaunchedEffect(saveState) {
         when (val state = saveState) {
@@ -76,9 +128,9 @@ fun BatchCourseCreateScreen(
                     duration = SnackbarDuration.Short
                 )
                 kotlinx.coroutines.delay(500)
-                // 返回主界面
+                // 返回主界面（使用底部Tab的课表路由，确保导航栈正确清理）
                 navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                    popUpTo(Screen.Main.route) { inclusive = false }
+                    popUpTo(BottomNavItem.Schedule.route) { inclusive = false }
                     launchSingleTop = true
                 }
             }
@@ -671,19 +723,39 @@ private fun CourseItemCard(
                         }
                     }
 
-                    // 时间段列表
+                    // 时间段列表（带进入动画）
                     courseItem.timeSlots.forEachIndexed { slotIndex, slot ->
-                        TimeSlotCard(
-                            slotIndex = slotIndex,
-                            slot = slot,
-                            canDelete = courseItem.timeSlots.size > 1,
-                            onDelete = { onRemoveTimeSlot(slot.id) },
-                            onDayChange = { day -> onSlotDayChange(slot.id, day) },
-                            onStartChange = { start -> onSlotStartChange(slot.id, start) },
-                            onEndChange = { end -> onSlotEndChange(slot.id, end) },
-                            onClassroomChange = { room -> onSlotClassroomChange(slot.id, room) },
-                            onShowWeekSelector = { onSlotShowWeekSelector(slot.id) }
-                        )
+                        // ✅ 使用key + remember控制动画状态
+                        key(slot.id) {
+                            var isVisible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                isVisible = true
+                            }
+                            AnimatedVisibility(
+                                visible = isVisible,
+                                enter = slideInHorizontally(
+                                    initialOffsetX = { fullWidth -> fullWidth },
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessLow
+                                    )
+                                ) + fadeIn(
+                                    animationSpec = tween(durationMillis = 200)
+                                )
+                            ) {
+                                TimeSlotCard(
+                                    slotIndex = slotIndex,
+                                    slot = slot,
+                                    canDelete = courseItem.timeSlots.size > 1,
+                                    onDelete = { onRemoveTimeSlot(slot.id) },
+                                    onDayChange = { day -> onSlotDayChange(slot.id, day) },
+                                    onStartChange = { start -> onSlotStartChange(slot.id, start) },
+                                    onEndChange = { end -> onSlotEndChange(slot.id, end) },
+                                    onClassroomChange = { room -> onSlotClassroomChange(slot.id, room) },
+                                    onShowWeekSelector = { onSlotShowWeekSelector(slot.id) }
+                                )
+                            }
+                        }
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -948,12 +1020,12 @@ private fun TimeSlotCard(
                     }
             ) {
                 OutlinedTextField(
-                    value = if (slot.customWeeks.isEmpty()) "点击选择周次（留空使用全局周次）"
+                    value = if (slot.customWeeks.isEmpty()) "点击选择周次"
                     else "已选择 ${slot.customWeeks.size} 周 (${formatWeeksShort(slot.customWeeks)})",
                     onValueChange = {},
                     readOnly = true,
                     enabled = false,
-                    label = { Text("周次（可选）") },
+                    label = { Text("周次 *") },
                     trailingIcon = { Icon(Icons.Default.ChevronRight, null) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),

@@ -30,6 +30,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.BuildConfig
+import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
 
 /**
@@ -48,24 +49,13 @@ fun SmartWebViewImportScreen(
     viewModel: SmartImportViewModel = hiltViewModel(),
     importViewModel: ImportScheduleViewModel = hiltViewModel()  // 获取ImportScheduleViewModel以传递数据
 ) {
-    val school by viewModel.getSchool(schoolId).collectAsState(initial = null)
-    val parseState by viewModel.parseState.collectAsState()
-    val parsedCourses by viewModel.parsedCourses.collectAsState()
-    val debugInfo by viewModel.debugInfo.collectAsState()
-    val context = LocalContext.current
-    var isLoading by remember { mutableStateOf(false) }
-    var webView: WebView? by remember { mutableStateOf(null) }
-    var pageInspectionResult by remember { mutableStateOf<String?>(null) }
-    
-    
-    // 如果学校数据未加载，显示加载界面
-    if (school == null) {
+    // ✅ 修复：检查schoolId是否为空
+    if (schoolId.isBlank()) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
                     windowInsets = WindowInsets(0, 0, 0, 0),
-                    title = { Text("正在加载...") },
+                    title = { Text("参数错误") },
                     navigationIcon = {
                         IconButton(onClick = { navController.navigateUp() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
@@ -82,10 +72,77 @@ fun SmartWebViewImportScreen(
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator()
+                ) {
+                    Text("学校ID无效，请重新选择学校")
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("正在加载学校信息...")
+                    Button(onClick = { navController.navigateUp() }) {
+                        Text("返回")
+                    }
+                }
+            }
+        }
+        return
+    }
+    
+    // ✅ 修复：使用remember包装Flow，避免重复收集导致的问题
+    val school by remember(schoolId) { 
+        viewModel.getSchool(schoolId) 
+    }.collectAsState(initial = null)
+    
+    val parseState by viewModel.parseState.collectAsState()
+    val parsedCourses by viewModel.parsedCourses.collectAsState()
+    val debugInfo by viewModel.debugInfo.collectAsState()
+    val context = LocalContext.current
+    var isLoading by remember { mutableStateOf(false) }
+    var webView: WebView? by remember { mutableStateOf(null) }
+    var pageInspectionResult by remember { mutableStateOf<String?>(null) }
+    
+    // ✅ 修复：添加加载超时检测
+    var loadTimeout by remember { mutableStateOf(false) }
+    LaunchedEffect(schoolId) {
+        kotlinx.coroutines.delay(5000) // 5秒超时
+        if (school == null) {
+            loadTimeout = true
+        }
+    }
+    
+    // 如果学校数据未加载，显示加载界面
+    if (school == null) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
+                    windowInsets = WindowInsets(0, 0, 0, 0),
+                    title = { Text(if (loadTimeout) "加载失败" else "正在加载...") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.navigateUp() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (loadTimeout) {
+                        // ✅ 超时后显示错误信息和返回按钮
+                        Text("未找到学校信息: $schoolId")
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { navController.navigateUp() }) {
+                            Text("返回重新选择")
+                        }
+                    } else {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("正在加载学校信息...")
+                    }
                 }
             }
         }
@@ -113,9 +170,9 @@ fun SmartWebViewImportScreen(
     // 监听导入状态，成功后跳转到主界面
     LaunchedEffect(importState) {
         if (importState is ImportState.Success) {
-            // 导入成功，跳转到主界面并强制刷新数据
+            // 导入成功，跳转到主界面并强制刷新数据（使用底部Tab的课表路由，确保导航栈正确清理）
             navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                popUpTo(Screen.Main.route) {
+                popUpTo(BottomNavItem.Schedule.route) {
                     inclusive = true
                 }
             }

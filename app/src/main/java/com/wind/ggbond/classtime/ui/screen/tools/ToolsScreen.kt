@@ -105,7 +105,7 @@ fun ToolsScreen(
                             )
                             // 描述
                             Text(
-                                "支持120+所高校，登录后自动获取",
+                                "支持27+所高校，登录后自动获取",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )

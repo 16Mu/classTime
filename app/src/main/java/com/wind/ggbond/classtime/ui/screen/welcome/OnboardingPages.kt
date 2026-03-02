@@ -133,7 +133,7 @@ fun WelcomePage(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OnboardingTag(Icons.Outlined.Lock, "本地存储", surfaceColor, textColor)
-                OnboardingTag(Icons.Outlined.School, "120+高校", surfaceColor, textColor)
+                OnboardingTag(Icons.Outlined.School, "27+高校", surfaceColor, textColor)
                 OnboardingTag(Icons.Outlined.Notifications, "课前提醒", surfaceColor, textColor)
             }
         }
@@ -224,7 +224,7 @@ fun HighlightsPage(
 
         // 三个特性卡片（依次滑入）
         val features = listOf(
-            Triple(Icons.Outlined.CloudDownload, "一键导入", "从教务系统自动获取课表，支持120+所高校"),
+            Triple(Icons.Outlined.CloudDownload, "一键导入", "从教务系统自动获取课表，支持27+所高校"),
             Triple(Icons.Outlined.Sync, "自动更新", "每次打开自动检查课表变化，告别旷课"),
             Triple(Icons.Outlined.EditCalendar, "灵活调课", "临时调课一键记录，自动同步到课表")
         )
@@ -386,7 +386,7 @@ fun GetStartedPage(
 
             // 步骤列表
             val steps = listOf(
-                Triple(Icons.Outlined.School, "选择你的学校", "支持120+所高校的教务系统"),
+                Triple(Icons.Outlined.School, "选择你的学校", "支持27+所高校的教务系统"),
                 Triple(Icons.Outlined.CloudDownload, "导入课表", "登录教务系统后自动获取课表数据"),
                 Triple(Icons.Outlined.Notifications, "开启提醒", "课前自动提醒，不再错过课程")
             )

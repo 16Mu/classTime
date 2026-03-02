@@ -44,6 +44,7 @@ fun CourseEditScreen(
     defaultStartSection: Int? = null,
     defaultSectionCount: Int? = null,
     defaultWeekNumber: Int? = null,
+    defaultCourseName: String? = null,
     viewModel: CourseEditViewModel = hiltViewModel()
 ) {
     LaunchedEffect(courseId) {
@@ -51,13 +52,14 @@ fun CourseEditScreen(
             viewModel.loadCourse(courseId)
         }
     }
-    LaunchedEffect(courseId, defaultDayOfWeek, defaultStartSection, defaultSectionCount, defaultWeekNumber) {
+    LaunchedEffect(courseId, defaultDayOfWeek, defaultStartSection, defaultSectionCount, defaultWeekNumber, defaultCourseName) {
         if (courseId == null) {
             viewModel.applyDefaultsIfNeeded(
                 dayOfWeek = defaultDayOfWeek,
                 startSection = defaultStartSection,
                 sectionCount = defaultSectionCount,
-                weekNumber = defaultWeekNumber
+                weekNumber = defaultWeekNumber,
+                courseName = defaultCourseName
             )
         }
     }
@@ -101,9 +103,9 @@ fun CourseEditScreen(
                     message = state.message,
                     duration = SnackbarDuration.Short
                 )
-                // P3-10: 直接导航回主界面，不再人为延迟
+                // P3-10: 直接导航回主界面，不再人为延迟（使用底部Tab的课表路由，确保导航栈正确清理）
                 navController.navigate(com.wind.ggbond.classtime.ui.navigation.Screen.Main.createRoute(refresh = true)) {
-                    popUpTo(com.wind.ggbond.classtime.ui.navigation.Screen.Main.route) {
+                    popUpTo(com.wind.ggbond.classtime.ui.navigation.BottomNavItem.Schedule.route) {
                         inclusive = false
                     }
                     launchSingleTop = true

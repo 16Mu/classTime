@@ -276,8 +276,21 @@ class MainViewModel @Inject constructor(
         }
     }
     
+    // ✅ 修复：保存课程加载协程的Job，用于取消旧的加载任务
+    private var courseLoadJob: kotlinx.coroutines.Job? = null
+    private var adjustmentLoadJob: kotlinx.coroutines.Job? = null
+    
     private fun loadCourses(scheduleId: Long) {
-        viewModelScope.launch {
+        // ✅ 修复：取消之前的加载任务，避免多个协程同时收集不同scheduleId的数据
+        courseLoadJob?.cancel()
+        adjustmentLoadJob?.cancel()
+        
+        // ✅ 修复：清空旧数据，确保UI不会显示旧课表的数据
+        _courses.value = emptyList()
+        _adjustments.value = emptyList()
+        clearCache()
+        
+        courseLoadJob = viewModelScope.launch {
             android.util.Log.d(TAG, "开始加载课表 ID=$scheduleId 的课程")
             courseRepository.getAllCoursesBySchedule(scheduleId).collect { courseList ->
                 android.util.Log.d(TAG, "✓ 加载到 ${courseList.size} 门课程")
@@ -299,7 +312,7 @@ class MainViewModel @Inject constructor(
         }
         
         // 同时加载调课记录
-        viewModelScope.launch {
+        adjustmentLoadJob = viewModelScope.launch {
             adjustmentRepository.getAdjustmentsBySchedule(scheduleId).collect { adjustmentList ->
                 android.util.Log.d(TAG, "========== 调课记录更新 ==========")
                 android.util.Log.d(TAG, "✓ 加载到 ${adjustmentList.size} 条调课记录")
