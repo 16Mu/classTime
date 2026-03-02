@@ -336,15 +336,17 @@ fun GetStartedPage(
         animStarted = true
     }
 
-    // 读取免责声明摘要（截取前200字）
-    val disclaimerSummary = remember {
+    // 读取完整的免责声明内容
+    val disclaimerContent = remember {
         try {
-            val full = context.assets.open("disclaimer.txt").bufferedReader().use { it.readText() }
-            if (full.length > 120) full.take(120) + "..." else full
+            context.assets.open("disclaimer.txt").bufferedReader().use { it.readText() }
         } catch (_: Exception) {
             "本应用为个人学习项目，仅供参考，不保证课表数据准确性。"
         }
     }
+
+    // 免责声明区域滚动状态
+    val disclaimerScrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
@@ -422,18 +424,22 @@ fun GetStartedPage(
             enter = fadeIn(tween(600, delayMillis = 700))
         ) {
             Column {
-                // 免责声明摘要
+                // 免责声明内容（支持内部滚动）
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 150.dp),
                     shape = RoundedCornerShape(10.dp),
                     color = surfaceColor.copy(alpha = 0.25f)
                 ) {
                     Text(
-                        text = disclaimerSummary,
+                        text = disclaimerContent,
                         fontSize = 11.sp,
                         color = textColor.copy(alpha = 0.4f),
                         lineHeight = 15.sp,
-                        modifier = Modifier.padding(10.dp)
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .verticalScroll(disclaimerScrollState)
                     )
                 }
 

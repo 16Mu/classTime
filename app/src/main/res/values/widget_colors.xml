@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    小组件专用颜色资源
+    支持深色模式适配（通过 values-night 目录覆盖）
+-->
+<resources>
+    
+    <!-- 卡片背景色 -->
+    <color name="widget_card_bg">#FFFAF8F5</color>
+    
+    <!-- 课程项背景色 -->
+    <color name="widget_course_item_bg">#FFF5F0EB</color>
+    
+    <!-- 主文本色 -->
+    <color name="widget_text_primary">#FF1A1A1A</color>
+    
+    <!-- 次要文本色 -->
+    <color name="widget_text_secondary">#FF666666</color>
+    
+    <!-- 第三级文本色 -->
+    <color name="widget_text_tertiary">#FF999999</color>
+    
+    <!-- 分隔线颜色 -->
+    <color name="widget_divider">#1A000000</color>
+    
+    <!-- 强调色背景 -->
+    <color name="widget_accent_bg">#1A5C6BC0</color>
+    
+    <!-- 强调色文本 -->
+    <color name="widget_accent_text">#FF5C6BC0</color>
+    
+    <!-- 强调色 -->
+    <color name="widget_accent">#FF5C6BC0</color>
+    
+    <!-- 空状态主文本色 -->
+    <color name="widget_empty_primary">#FFB0B0B0</color>
+    
+    <!-- 空状态次要文本色 -->
+    <color name="widget_empty_secondary">#FF999999</color>
+    
+    <!-- 警告背景色 -->
+    <color name="widget_warning_bg">#1AFF9800</color>
+    
+    <!-- 警告文本色 -->
+    <color name="widget_warning_text">#FFFF9800</color>
+    
+    <!-- 课程项背景色（预览图用） -->
+    <color name="widget_item_bg">#FFF5F5F5</color>
+    
+    <!-- 标签背景色 -->
+    <color name="widget_badge_bg">#1A5C6BC0</color>
+    
+    <!-- 状态标签背景色（即将上课） -->
+    <color name="widget_status_bg">#FFFFF3E0</color>
+    
+    <!-- 状态标签文本色 -->
+    <color name="widget_status_text">#FFE65100</color>
+    
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    小组件背景 - 圆角矩形
+    支持深色模式适配
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- 圆角 -->
+    <corners android:radius="16dp" />
+    
+    <!-- 背景色 -->
+    <solid android:color="@color/widget_card_bg" />
+    
+</shape>

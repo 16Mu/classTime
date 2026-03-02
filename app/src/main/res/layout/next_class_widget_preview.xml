@@ -6,7 +6,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="@drawable/widget_background"
     android:orientation="vertical"
     android:padding="14dp">
 
@@ -21,11 +21,11 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#FFFFF3E0"
+            android:background="@color/widget_status_bg"
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
             android:text="@string/next_class_widget_preview_status"
-            android:textColor="#FFE65100"
+            android:textColor="@color/widget_status_text"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -39,7 +39,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/next_class_widget_preview_week"
-            android:textColor="#FF9E9E9E"
+            android:textColor="@color/widget_text_tertiary"
             android:textSize="11sp" />
     </LinearLayout>
 
@@ -58,7 +58,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/next_class_widget_preview_countdown"
-            android:textColor="#FF5C6BC0"
+            android:textColor="@color/widget_accent"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -68,7 +68,7 @@
             android:layout_marginStart="6dp"
             android:layout_marginBottom="4dp"
             android:text="@string/next_class_widget_preview_suffix"
-            android:textColor="#FF757575"
+            android:textColor="@color/widget_text_secondary"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -80,7 +80,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#FFEEEEEE" />
+        android:background="@color/widget_divider" />
 
     <View
         android:layout_width="match_parent"
@@ -91,7 +91,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/widget_preview_course1"
-        android:textColor="#FF1A1A1A"
+        android:textColor="@color/widget_text_primary"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -99,6 +99,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/widget_preview_room1"
-        android:textColor="#FF757575"
+        android:textColor="@color/widget_text_secondary"
         android:textSize="12sp" />
 </LinearLayout>

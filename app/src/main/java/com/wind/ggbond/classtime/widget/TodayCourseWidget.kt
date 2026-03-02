@@ -47,8 +47,14 @@ import com.wind.ggbond.classtime.MainActivity
 class TodayCourseWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // 从数据库获取今日课程数据
-        val displayData = WidgetDataProvider.getTodayCourses(context)
+        // 从数据库获取今日课程数据，添加异常处理防止小组件加载失败
+        val displayData = try {
+            WidgetDataProvider.getTodayCourses(context)
+        } catch (e: Exception) {
+            // 异常时返回空数据，避免小组件崩溃
+            android.util.Log.e("TodayCourseWidget", "加载数据失败", e)
+            WidgetDisplayData.empty("数据加载失败")
+        }
         
         provideContent {
             GlanceTheme {

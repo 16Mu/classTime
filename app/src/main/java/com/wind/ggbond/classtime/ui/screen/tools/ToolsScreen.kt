@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
+import com.wind.ggbond.classtime.widget.WidgetPinHelper
 
 /**
  * 工具页面 - 底部导航Tab2
@@ -33,6 +35,10 @@ fun ToolsScreen(
     settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    
+    // 小组件选择对话框状态
+    var showWidgetDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -254,11 +260,41 @@ fun ToolsScreen(
                 )
             }
 
+            // 临时隐藏整个桌面小组件分类
+            // === 桌面小组件 ===
+            // item {
+            //     ToolsSectionTitle("桌面小组件")
+            // }
+
+            // // 添加桌面小组件
+            // item {
+            //     ToolsRowItem(
+            //         icon = Icons.Default.Widgets,
+            //         title = "添加桌面小组件",
+            //         subtitle = "快速将小组件添加到桌面",
+            //         onClick = {
+            //             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            //             showWidgetDialog = true
+            //         }
+            //     )
+            // }
+
             // 底部间距
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    // 小组件选择对话框
+    if (showWidgetDialog) {
+        WidgetSelectionDialog(
+            onDismiss = { showWidgetDialog = false },
+            onSelectWidget = { widgetType ->
+                showWidgetDialog = false
+                WidgetPinHelper.requestPinWidget(context, widgetType)
+            }
+        )
     }
 
     // 导出对话框（复用SettingsViewModel的逻辑）
@@ -368,6 +404,116 @@ private fun ToolsRowItem(
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            )
+        }
+    }
+}
+
+/**
+ * 小组件选择对话框
+ * 
+ * @param onDismiss 关闭对话框回调
+ * @param onSelectWidget 选择小组件回调
+ */
+@Composable
+private fun WidgetSelectionDialog(
+    onDismiss: () -> Unit,
+    onSelectWidget: (WidgetPinHelper.WidgetType) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "选择小组件",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 遍历所有小组件类型
+                WidgetPinHelper.WidgetType.entries.forEach { widgetType ->
+                    WidgetOptionItem(
+                        widgetType = widgetType,
+                        onClick = { onSelectWidget(widgetType) }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+/**
+ * 小组件选项项
+ * 
+ * @param widgetType 小组件类型
+ * @param onClick 点击回调
+ */
+@Composable
+private fun WidgetOptionItem(
+    widgetType: WidgetPinHelper.WidgetType,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 小组件图标
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Widgets,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // 小组件信息
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = WidgetPinHelper.getWidgetDisplayName(widgetType),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = WidgetPinHelper.getWidgetDescription(widgetType),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 添加图标
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "添加",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
     }

@@ -147,7 +147,11 @@ class SchoolRepository @Inject constructor(
         val csrfTokenName: String,
         val jsonMapping: Map<String, String>,
         val description: String,
-        val tips: String
+        val tips: String,
+        // 学期开始日期字段（可选，部分学校配置了这些字段）
+        val defaultSemesterStartDate: String? = null,
+        val fallSemesterStartDate: String? = null,
+        val springSemesterStartDate: String? = null
     ) {
         fun toEntity() = SchoolEntity(
             id = id,
@@ -165,8 +169,11 @@ class SchoolRepository @Inject constructor(
             jsonMapping = jsonMapping,
             description = description,
             tips = tips,
-            isEnabled = true  // 显式设置为true，确保数据可以查询
+            isEnabled = true,  // 显式设置为true，确保数据可以查询
             // createdAt 使用默认值 System.currentTimeMillis()
+            defaultSemesterStartDate = defaultSemesterStartDate,
+            fallSemesterStartDate = fallSemesterStartDate,
+            springSemesterStartDate = springSemesterStartDate
         )
         
         /**

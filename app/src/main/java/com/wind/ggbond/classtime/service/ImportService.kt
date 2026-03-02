@@ -3,8 +3,11 @@ package com.wind.ggbond.classtime.service
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.data.repository.ClassTimeRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
+import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.util.CourseColorPalette
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -15,6 +18,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,10 +32,14 @@ import javax.inject.Singleton
  * 导入服务
  * 支持导入JSON、ICS、CSV等格式的课程表数据
  */
+private const val TAG = "ImportService"
+
 @Singleton
 class ImportService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val courseRepository: CourseRepository
+    private val courseRepository: CourseRepository,
+    private val classTimeRepository: ClassTimeRepository,
+    private val scheduleRepository: ScheduleRepository
 ) {
     
     private val gson = Gson()
@@ -101,6 +115,9 @@ class ImportService @Inject constructor(
             val existingCourses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             Log.d("ImportService", "当前课表中有 ${existingCourses.size} 门课程")
             
+            // 获取已有课程的颜色列表，用于智能分配新颜色
+            val existingColors = existingCourses.map { it.color }.toMutableList()
+            
             courses.forEachIndexed { index, course ->
                 Log.d("ImportService", "处理第 ${index + 1} 门课程: ${course.courseName}")
                 
@@ -113,10 +130,14 @@ class ImportService @Inject constructor(
                 
                 if (!isDuplicate) {
                     // 更新课程的scheduleId和其他必要字段
+                    // 智能分配颜色：传入已有课程颜色列表，避免颜色重复
+                    val assignedColor = CourseColorPalette.getColorForCourse(course.courseName, existingColors)
+                    existingColors.add(assignedColor) // 将新分配的颜色加入列表
+                    
                     val newCourse = course.copy(
                         id = 0, // 重置ID，让数据库自动生成
                         scheduleId = scheduleId,
-                        color = CourseColorPalette.getColorForCourse(course.courseName),
+                        color = assignedColor,
                         // 确保weeks列表不为空，如果为空则使用默认值
                         weeks = if (course.weeks.isEmpty()) {
                             // 如果weekExpression不为空，尝试解析
@@ -165,23 +186,73 @@ class ImportService @Inject constructor(
     }
     
     /**
-     * 从ICS导入（基础实现）
+     * 从ICS导入（完整实现）
+     * 支持解析DTSTART/DTEND时间，自动推断星期和节次
      */
     private suspend fun importFromIcs(content: String, scheduleId: Long): ImportResult {
         return try {
-            val courses = parseIcsContent(content, scheduleId)
+            Log.d(TAG, "开始导入ICS文件，scheduleId: $scheduleId")
             
-            var importedCount = 0
-            courses.forEach { course ->
-                courseRepository.insertCourse(course)
-                importedCount++
+            // 获取课表信息（用于计算周次）
+            val schedule = scheduleRepository.getScheduleById(scheduleId)
+            if (schedule == null) {
+                return ImportResult(
+                    success = false,
+                    errorMessage = "未找到课表信息，请先创建课表"
+                )
             }
+            
+            // 获取课程时间配置（用于匹配节次）
+            val classTimes = classTimeRepository.getClassTimesByConfigSync()
+            Log.d(TAG, "获取到 ${classTimes.size} 个课程时间配置")
+            
+            // 获取已有课程的颜色列表，用于智能分配新颜色
+            val existingCourses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
+            val existingColors = existingCourses.map { it.color }.toMutableList()
+            
+            // 解析ICS内容
+            val courses = parseIcsContentFull(content, scheduleId, schedule.startDate, classTimes, existingColors)
+            Log.d(TAG, "解析出 ${courses.size} 门课程")
+            
+            if (courses.isEmpty()) {
+                return ImportResult(
+                    success = false,
+                    errorMessage = "未能从ICS文件中解析出课程信息"
+                )
+            }
+            
+            // 检查重复并导入
+            var importedCount = 0
+            var duplicateCount = 0
+            
+            courses.forEach { course ->
+                // 检查是否已存在相同课程（课程名+星期+节次+周次）
+                val isDuplicate = existingCourses.any {
+                    it.courseName == course.courseName &&
+                    it.dayOfWeek == course.dayOfWeek &&
+                    it.startSection == course.startSection &&
+                    it.weeks.intersect(course.weeks.toSet()).isNotEmpty()
+                }
+                
+                if (!isDuplicate) {
+                    courseRepository.insertCourse(course)
+                    importedCount++
+                    Log.d(TAG, "导入课程: ${course.courseName}, 周${course.dayOfWeek} 第${course.startSection}节")
+                } else {
+                    duplicateCount++
+                    Log.d(TAG, "跳过重复课程: ${course.courseName}")
+                }
+            }
+            
+            Log.d(TAG, "ICS导入完成: 成功 $importedCount 门，重复 $duplicateCount 门")
             
             ImportResult(
                 success = true,
-                importedCount = importedCount
+                importedCount = importedCount,
+                duplicateCount = duplicateCount
             )
         } catch (e: Exception) {
+            Log.e(TAG, "ICS导入失败", e)
             ImportResult(
                 success = false,
                 errorMessage = "ICS解析失败: ${e.message}"
@@ -199,6 +270,10 @@ class ImportService @Inject constructor(
                 return ImportResult(success = false, errorMessage = "文件为空")
             }
             
+            // 获取已有课程的颜色列表，用于智能分配新颜色
+            val existingCourses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
+            val existingColors = existingCourses.map { it.color }.toMutableList()
+            
             // 跳过表头
             val dataLines = lines.drop(1)
             val courses = mutableListOf<Course>()
@@ -208,6 +283,10 @@ class ImportService @Inject constructor(
                 if (fields.size >= 6) {
                     try {
                         val courseName = fields[0].trim()
+                        // 智能分配颜色：传入已有课程颜色列表，避免颜色重复
+                        val assignedColor = CourseColorPalette.getColorForCourse(courseName, existingColors)
+                        existingColors.add(assignedColor) // 将新分配的颜色加入列表
+                        
                         val course = Course(
                             courseName = courseName,
                             teacher = fields[1].trim(),
@@ -219,7 +298,7 @@ class ImportService @Inject constructor(
                             weeks = parseWeeks(fields[5].trim()),
                             credit = if (fields.size > 6) fields[6].toFloatOrNull() ?: 0f else 0f,
                             note = if (fields.size > 7) fields[7].trim() else "",
-                            color = CourseColorPalette.getColorForCourse(courseName),
+                            color = assignedColor,
                             scheduleId = scheduleId
                         )
                         courses.add(course)
@@ -269,52 +348,431 @@ class ImportService @Inject constructor(
     }
     
     /**
-     * 解析ICS内容（简化版）
+     * 解析ICS内容（完整版）
+     * 支持DTSTART/DTEND时间解析、星期推断、节次匹配、周次计算
+     * 
+     * @param content ICS文件内容
+     * @param scheduleId 课表ID
+     * @param semesterStartDate 学期开始日期（用于计算周次）
+     * @param classTimes 课程时间配置（用于匹配节次）
      */
-    private fun parseIcsContent(content: String, scheduleId: Long): List<Course> {
-        val courses = mutableListOf<Course>()
+    private fun parseIcsContentFull(
+        content: String,
+        scheduleId: Long,
+        semesterStartDate: LocalDate,
+        classTimes: List<ClassTime>,
+        existingColors: MutableList<String>
+    ): List<Course> {
+        val courseMap = mutableMapOf<String, MutableList<IcsEventData>>()
         val events = content.split("BEGIN:VEVENT")
+        
+        Log.d(TAG, "解析ICS文件，共 ${events.size - 1} 个事件")
         
         events.drop(1).forEach { event ->
             try {
-                val summary = extractIcsField(event, "SUMMARY:")
-                val location = extractIcsField(event, "LOCATION:")
-                val description = extractIcsField(event, "DESCRIPTION:")
+                // 提取基本信息
+                val summary = extractIcsField(event, "SUMMARY")
+                val location = extractIcsField(event, "LOCATION")
+                val description = extractIcsField(event, "DESCRIPTION")
+                val dtStart = extractIcsField(event, "DTSTART")
+                val dtEnd = extractIcsField(event, "DTEND")
+                val rrule = extractIcsField(event, "RRULE")
+                
+                if (summary.isEmpty() || dtStart.isEmpty()) {
+                    Log.w(TAG, "跳过无效事件: summary=$summary, dtStart=$dtStart")
+                    return@forEach
+                }
+                
+                // 解析开始时间
+                val startDateTime = parseIcsDateTime(dtStart)
+                val endDateTime = if (dtEnd.isNotEmpty()) parseIcsDateTime(dtEnd) else null
+                
+                if (startDateTime == null) {
+                    Log.w(TAG, "无法解析开始时间: $dtStart")
+                    return@forEach
+                }
                 
                 // 从描述中提取教师信息
-                val teacher = description.split("\\n")
-                    .find { it.contains("教师：") }
-                    ?.substringAfter("教师：") ?: ""
+                val teacher = extractTeacherFromDescription(description)
                 
-                if (summary.isNotEmpty()) {
-                    // 简化处理：创建基础课程，用户需要手动调整时间
-                    val course = Course(
-                        courseName = summary,
-                        teacher = teacher,
-                        classroom = location,
-                        dayOfWeek = 1, // 默认周一
-                        startSection = 1, // 默认第1节
-                        sectionCount = 2,
-                        color = CourseColorPalette.getColorForCourse(summary),
-                        scheduleId = scheduleId
-                    )
-                    courses.add(course)
-                }
+                // 从描述中提取节次信息（如果有）
+                val sectionInfo = extractSectionFromDescription(description)
+                
+                // 从描述中提取周次信息（如果有）
+                val weekInfo = extractWeekFromDescription(description)
+                
+                // 创建事件数据
+                val eventData = IcsEventData(
+                    courseName = summary,
+                    teacher = teacher,
+                    classroom = location,
+                    startDateTime = startDateTime,
+                    endDateTime = endDateTime,
+                    rrule = rrule,
+                    sectionInfo = sectionInfo,
+                    weekInfo = weekInfo
+                )
+                
+                // 按课程名称分组（同一门课可能有多个事件）
+                val key = "$summary|$teacher|$location"
+                courseMap.getOrPut(key) { mutableListOf() }.add(eventData)
+                
             } catch (e: Exception) {
-                // 跳过解析失败的事件
+                Log.w(TAG, "解析事件失败: ${e.message}")
             }
         }
         
-        return courses.distinctBy { "${it.courseName}-${it.teacher}-${it.classroom}" }
+        Log.d(TAG, "分组后共 ${courseMap.size} 门不同课程")
+        
+        // 将事件数据转换为课程
+        val courses = mutableListOf<Course>()
+        
+        courseMap.forEach { (_, eventList) ->
+            // 按星期和时间分组，合并同一时间段的事件
+            val timeSlotMap = mutableMapOf<String, MutableList<IcsEventData>>()
+            
+            eventList.forEach { event ->
+                val dayOfWeek = event.startDateTime.dayOfWeek.value
+                val startTime = event.startDateTime.toLocalTime()
+                val key = "$dayOfWeek|$startTime"
+                timeSlotMap.getOrPut(key) { mutableListOf() }.add(event)
+            }
+            
+            // 为每个时间段创建课程记录
+            timeSlotMap.forEach { (_, events) ->
+                val firstEvent = events.first()
+                
+                // 计算星期几（1=周一，7=周日）
+                val dayOfWeek = firstEvent.startDateTime.dayOfWeek.value
+                
+                // 计算节次
+                val startTime = firstEvent.startDateTime.toLocalTime()
+                val endTime = firstEvent.endDateTime?.toLocalTime()
+                val (startSection, sectionCount) = if (firstEvent.sectionInfo != null) {
+                    // 优先使用描述中的节次信息
+                    firstEvent.sectionInfo
+                } else {
+                    // 根据时间匹配节次
+                    matchSectionByTime(startTime, endTime, classTimes)
+                }
+                
+                // 计算周次列表
+                val weeks = if (firstEvent.weekInfo != null) {
+                    // 优先使用描述中的周次信息
+                    firstEvent.weekInfo
+                } else {
+                    // 根据事件日期计算周次
+                    calculateWeeksFromEvents(events, semesterStartDate)
+                }
+                
+                if (weeks.isEmpty()) {
+                    Log.w(TAG, "课程 ${firstEvent.courseName} 周次为空，跳过")
+                    return@forEach
+                }
+                
+                // 生成周次表达式
+                val weekExpression = formatWeekExpression(weeks)
+                
+                // 智能分配颜色：传入已有课程颜色列表，避免颜色重复
+                val assignedColor = CourseColorPalette.getColorForCourse(firstEvent.courseName, existingColors)
+                existingColors.add(assignedColor) // 将新分配的颜色加入列表
+                
+                val course = Course(
+                    courseName = firstEvent.courseName,
+                    teacher = firstEvent.teacher,
+                    classroom = firstEvent.classroom,
+                    dayOfWeek = dayOfWeek,
+                    startSection = startSection,
+                    sectionCount = sectionCount,
+                    weeks = weeks,
+                    weekExpression = weekExpression,
+                    color = assignedColor,
+                    scheduleId = scheduleId,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+                
+                courses.add(course)
+                Log.d(TAG, "创建课程: ${course.courseName}, 周${course.dayOfWeek} 第${course.startSection}-${course.startSection + course.sectionCount - 1}节, ${course.weekExpression}")
+            }
+        }
+        
+        return courses
     }
     
     /**
-     * 从ICS事件中提取字段
+     * ICS事件数据类
+     */
+    private data class IcsEventData(
+        val courseName: String,
+        val teacher: String,
+        val classroom: String,
+        val startDateTime: LocalDateTime,
+        val endDateTime: LocalDateTime?,
+        val rrule: String,
+        val sectionInfo: Pair<Int, Int>?,  // (startSection, sectionCount)
+        val weekInfo: List<Int>?           // 周次列表
+    )
+    
+    /**
+     * 从ICS事件中提取字段（支持多行折叠）
      */
     private fun extractIcsField(event: String, fieldName: String): String {
         val lines = event.lines()
-        val line = lines.find { it.trim().startsWith(fieldName) }
-        return line?.substringAfter(fieldName)?.trim() ?: ""
+        var result = StringBuilder()
+        var isCapturing = false
+        
+        for (line in lines) {
+            val trimmedLine = line.trim()
+            
+            // 检查是否是目标字段的开始
+            if (trimmedLine.startsWith("$fieldName:") || trimmedLine.startsWith("$fieldName;")) {
+                isCapturing = true
+                // 提取冒号后的内容
+                val colonIndex = trimmedLine.indexOf(':')
+                if (colonIndex >= 0) {
+                    result.append(trimmedLine.substring(colonIndex + 1))
+                }
+            } else if (isCapturing) {
+                // ICS规范：续行以空格或制表符开头
+                if (line.startsWith(" ") || line.startsWith("\t")) {
+                    result.append(line.substring(1))
+                } else {
+                    // 遇到新字段，停止捕获
+                    break
+                }
+            }
+        }
+        
+        return result.toString()
+            .replace("\\n", "\n")  // 处理转义换行
+            .replace("\\,", ",")   // 处理转义逗号
+            .replace("\\\\", "\\") // 处理转义反斜杠
+            .trim()
+    }
+    
+    /**
+     * 解析ICS日期时间格式
+     * 支持格式：
+     * - 20260302T080000Z (UTC时间)
+     * - 20260302T080000 (本地时间)
+     * - TZID=Asia/Shanghai:20260302T080000 (带时区)
+     */
+    private fun parseIcsDateTime(dtString: String): LocalDateTime? {
+        return try {
+            var dateTimeStr = dtString
+            
+            // 处理带时区的格式
+            if (dateTimeStr.contains(":")) {
+                dateTimeStr = dateTimeStr.substringAfter(":")
+            }
+            
+            // 移除Z后缀（UTC标记）
+            val isUtc = dateTimeStr.endsWith("Z")
+            dateTimeStr = dateTimeStr.removeSuffix("Z")
+            
+            // 解析日期时间
+            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
+            var dateTime = LocalDateTime.parse(dateTimeStr, formatter)
+            
+            // 如果是UTC时间，转换为本地时间
+            if (isUtc) {
+                val utcZone = ZoneId.of("UTC")
+                val localZone = ZoneId.systemDefault()
+                dateTime = dateTime.atZone(utcZone).withZoneSameInstant(localZone).toLocalDateTime()
+            }
+            
+            dateTime
+        } catch (e: Exception) {
+            Log.w(TAG, "解析日期时间失败: $dtString, ${e.message}")
+            null
+        }
+    }
+    
+    /**
+     * 从描述中提取教师信息
+     */
+    private fun extractTeacherFromDescription(description: String): String {
+        // 尝试多种格式
+        val patterns = listOf(
+            Regex("教师[：:](\\S+)"),
+            Regex("Teacher[：:](\\S+)"),
+            Regex("任课教师[：:](\\S+)"),
+            Regex("授课教师[：:](\\S+)")
+        )
+        
+        for (pattern in patterns) {
+            val match = pattern.find(description)
+            if (match != null) {
+                return match.groupValues[1].trim()
+            }
+        }
+        
+        return ""
+    }
+    
+    /**
+     * 从描述中提取节次信息
+     * @return Pair(startSection, sectionCount) 或 null
+     */
+    private fun extractSectionFromDescription(description: String): Pair<Int, Int>? {
+        // 尝试多种格式：第1-2节、1-2节、节次：1-2
+        val patterns = listOf(
+            Regex("第(\\d+)-(\\d+)节"),
+            Regex("(\\d+)-(\\d+)节"),
+            Regex("节次[：:](\\d+)-(\\d+)"),
+            Regex("Section[：:](\\d+)-(\\d+)")
+        )
+        
+        for (pattern in patterns) {
+            val match = pattern.find(description)
+            if (match != null) {
+                val start = match.groupValues[1].toIntOrNull() ?: continue
+                val end = match.groupValues[2].toIntOrNull() ?: continue
+                return Pair(start, end - start + 1)
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * 从描述中提取周次信息
+     * @return 周次列表 或 null
+     */
+    private fun extractWeekFromDescription(description: String): List<Int>? {
+        // 尝试多种格式：1-16周、周次：1-16、第1-8周(单)
+        val patterns = listOf(
+            Regex("(\\d+)-(\\d+)周(?:\\(([单双])\\))?"),
+            Regex("周次[：:](\\d+)-(\\d+)"),
+            Regex("Week[：:](\\d+)-(\\d+)")
+        )
+        
+        for (pattern in patterns) {
+            val match = pattern.find(description)
+            if (match != null) {
+                val start = match.groupValues[1].toIntOrNull() ?: continue
+                val end = match.groupValues[2].toIntOrNull() ?: continue
+                val oddEven = match.groupValues.getOrNull(3)
+                
+                val weeks = mutableListOf<Int>()
+                for (week in start..end) {
+                    when (oddEven) {
+                        "单" -> if (week % 2 == 1) weeks.add(week)
+                        "双" -> if (week % 2 == 0) weeks.add(week)
+                        else -> weeks.add(week)
+                    }
+                }
+                return weeks
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * 根据时间匹配节次
+     * @return Pair(startSection, sectionCount)
+     */
+    private fun matchSectionByTime(
+        startTime: LocalTime,
+        endTime: LocalTime?,
+        classTimes: List<ClassTime>
+    ): Pair<Int, Int> {
+        if (classTimes.isEmpty()) {
+            // 没有时间配置，使用默认值
+            return Pair(1, 2)
+        }
+        
+        // 查找最接近的开始节次
+        var startSection = 1
+        var minDiff = Long.MAX_VALUE
+        
+        for (classTime in classTimes) {
+            val diff = kotlin.math.abs(ChronoUnit.MINUTES.between(startTime, classTime.startTime))
+            if (diff < minDiff) {
+                minDiff = diff
+                startSection = classTime.sectionNumber
+            }
+        }
+        
+        // 计算持续节数
+        var sectionCount = 2 // 默认2节
+        
+        if (endTime != null) {
+            // 查找最接近的结束节次
+            var endSection = startSection
+            minDiff = Long.MAX_VALUE
+            
+            for (classTime in classTimes) {
+                val diff = kotlin.math.abs(ChronoUnit.MINUTES.between(endTime, classTime.endTime))
+                if (diff < minDiff) {
+                    minDiff = diff
+                    endSection = classTime.sectionNumber
+                }
+            }
+            
+            sectionCount = maxOf(1, endSection - startSection + 1)
+        }
+        
+        return Pair(startSection, sectionCount)
+    }
+    
+    /**
+     * 根据事件日期计算周次列表
+     */
+    private fun calculateWeeksFromEvents(
+        events: List<IcsEventData>,
+        semesterStartDate: LocalDate
+    ): List<Int> {
+        val weeks = mutableSetOf<Int>()
+        
+        // 计算学期开始日期所在周的周一
+        val semesterStartMonday = semesterStartDate.with(DayOfWeek.MONDAY)
+        
+        events.forEach { event ->
+            val eventDate = event.startDateTime.toLocalDate()
+            val eventMonday = eventDate.with(DayOfWeek.MONDAY)
+            
+            // 计算周次（从1开始）
+            val weeksBetween = ChronoUnit.WEEKS.between(semesterStartMonday, eventMonday).toInt() + 1
+            
+            if (weeksBetween in 1..25) { // 合理的周次范围
+                weeks.add(weeksBetween)
+            }
+        }
+        
+        return weeks.sorted()
+    }
+    
+    /**
+     * 格式化周次表达式
+     * 例如：[1,2,3,4,6,7,8] -> "1-4,6-8周"
+     */
+    private fun formatWeekExpression(weeks: List<Int>): String {
+        if (weeks.isEmpty()) return ""
+        
+        val sortedWeeks = weeks.sorted()
+        val ranges = mutableListOf<String>()
+        var rangeStart = sortedWeeks[0]
+        var rangeEnd = sortedWeeks[0]
+        
+        for (i in 1 until sortedWeeks.size) {
+            if (sortedWeeks[i] == rangeEnd + 1) {
+                // 连续，扩展范围
+                rangeEnd = sortedWeeks[i]
+            } else {
+                // 不连续，保存当前范围
+                ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd")
+                rangeStart = sortedWeeks[i]
+                rangeEnd = sortedWeeks[i]
+            }
+        }
+        
+        // 保存最后一个范围
+        ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd")
+        
+        return ranges.joinToString(",") + "周"
     }
     
     /**

@@ -42,8 +42,17 @@ import com.wind.ggbond.classtime.MainActivity
 class NextClassWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // 获取下节课数据
-        val data = WidgetDataProvider.getNextClass(context)
+        // 获取下节课数据，添加异常处理防止小组件加载失败
+        val data = try {
+            WidgetDataProvider.getNextClass(context)
+        } catch (e: Exception) {
+            // 异常时返回空数据，避免小组件崩溃
+            android.util.Log.e("NextClassWidget", "加载数据失败", e)
+            NextClassDisplayData(
+                hasNextClass = false,
+                message = "数据加载失败"
+            )
+        }
 
         provideContent {
             GlanceTheme {
@@ -270,29 +279,95 @@ private fun NextClassInfo(data: NextClassDisplayData) {
 }
 
 /**
- * 无课程空状态展示
+ * 无课程空状态展示 - 休息提示式设计
+ * 
+ * 显示友好的休息提示，配合明日课程预告
  */
 @Composable
 private fun NextClassEmpty(message: String) {
-    Box(
+    // 解析消息，判断是否包含明日课程信息
+    val hasTomorrowInfo = message.contains("明日")
+    val tomorrowCount = if (hasTomorrowInfo) {
+        // 从消息中提取明日课程数量
+        val regex = Regex("明日(\\d+)节课")
+        regex.find(message)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+    } else 0
+    
+    Column(
         modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
+        // 主标题：休息提示
+        Text(
+            text = "今日课程已结束",
+            style = TextStyle(
+                color = dayNightColorProvider(day = WidgetColors.textPrimaryDay, night = WidgetColors.textPrimaryNight),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = GlanceModifier.height(6.dp))
+        )
+        
+        Spacer(modifier = GlanceModifier.height(4.dp))
+        
+        // 副标题：休息语
+        Text(
+            text = "好好休息",
+            style = TextStyle(
+                color = dayNightColorProvider(day = WidgetColors.textSecondaryDay, night = WidgetColors.textSecondaryNight),
+                fontSize = 13.sp
+            )
+        )
+        
+        // 如果有明日课程信息，显示预告
+        if (tomorrowCount > 0) {
+            Spacer(modifier = GlanceModifier.height(12.dp))
+            
+            // 分隔线
+            Box(
+                modifier = GlanceModifier
+                    .width(40.dp)
+                    .height(1.dp)
+                    .background(dayNightColorProvider(day = WidgetColors.dividerDay, night = WidgetColors.dividerNight))
+            ) {}
+            
+            Spacer(modifier = GlanceModifier.height(12.dp))
+            
+            // 明日预告标签
+            Box(
+                modifier = GlanceModifier
+                    .background(dayNightColorProvider(day = WidgetColors.accentBgDay, night = WidgetColors.accentBgNight))
+                    .cornerRadius(8.dp)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "明日 ${tomorrowCount} 节课",
+                    style = TextStyle(
+                        color = dayNightColorProvider(day = WidgetColors.accentTextDay, night = WidgetColors.accentTextNight),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        } else if (message.contains("明日无课")) {
+            Spacer(modifier = GlanceModifier.height(12.dp))
+            
+            // 分隔线
+            Box(
+                modifier = GlanceModifier
+                    .width(40.dp)
+                    .height(1.dp)
+                    .background(dayNightColorProvider(day = WidgetColors.dividerDay, night = WidgetColors.dividerNight))
+            ) {}
+            
+            Spacer(modifier = GlanceModifier.height(12.dp))
+            
+            // 明日无课提示
             Text(
-                text = message,
+                text = "明日无课",
                 style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 14.sp
+                    color = dayNightColorProvider(day = WidgetColors.textTertiaryDay, night = WidgetColors.textTertiaryNight),
+                    fontSize = 12.sp
                 )
             )
         }

@@ -3,6 +3,7 @@ package com.wind.ggbond.classtime.ui.screen.main
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -78,6 +79,9 @@ fun MainScreen(
     // 周次选择器对话框状态
     var showWeekPicker by remember { mutableStateOf(false) }
     
+    // 课表快速编辑对话框状态
+    var showScheduleQuickEdit by remember { mutableStateOf(false) }
+    
     // 临时调课对话框状态
     var adjustmentCourseId by remember { mutableStateOf<Long?>(null) }
     
@@ -89,9 +93,17 @@ fun MainScreen(
     // 总周数
     val totalWeeks = currentSchedule?.totalWeeks ?: 20
     
-    // ✅ 优化：等待学期数据加载完成后再初始化 Pager
+    // 课程数据
+    val allCourses by viewModel.courses.collectAsState()
+    // 调课记录（用于触发重组）
+    val adjustments by viewModel.adjustments.collectAsState()
+    
+    // ✅ 优化：等待学期数据和课程数据加载完成后再初始化 Pager
     // 这样可以确保 initialPage 是正确的当前周次，避免先显示第1周再跳转的问题
-    val isDataReady = currentSchedule != null && currentWeekNumber > 0
+    // ✅ 修复：添加课程数据加载状态检查，避免从小组件进入时显示空课表
+    val isScheduleReady = currentSchedule != null && currentWeekNumber > 0
+    val isCoursesLoading = isScheduleReady && allCourses.isEmpty()
+    val isDataReady = isScheduleReady
     
     // 创建 Pager 状态，初始页面为当前周次
     // ✅ 优化：预加载相邻页面，提升滑动流畅度
@@ -159,12 +171,31 @@ fun MainScreen(
                     // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
                     windowInsets = WindowInsets(0, 0, 0, 0),
                     title = {
-                        Column {
-                            Text(
-                                text = currentSchedule?.name ?: "未设置课表",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Column(
+                            modifier = Modifier.clickable {
+                                // 点击标题区域弹出课表快速编辑对话框
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                showScheduleQuickEdit = true
+                            }
+                        ) {
+                            // 课表名称 - 可点击编辑
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = currentSchedule?.name ?: "未设置课表",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "编辑课表",
+                                    modifier = Modifier
+                                        .padding(start = 4.dp)
+                                        .size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             // 周次指示器 - 可点击弹出周次选择器
                             androidx.compose.material3.AssistChip(
                                 onClick = { showWeekPicker = true },
@@ -197,6 +228,48 @@ fun MainScreen(
                             label = "button_scale"
                         )
                         
+                        // 紧凑模式快捷切换按钮
+                        FilledTonalIconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                settingsViewModel.updateCompactModeEnabled(!compactModeEnabled)
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = if (compactModeEnabled) 
+                                    MaterialTheme.colorScheme.primaryContainer 
+                                else 
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            }
+                        ) {
+                            // 紧凑模式图标：使用 UnfoldLess 表示紧凑，UnfoldMore 表示展开
+                            AnimatedContent(
+                                targetState = compactModeEnabled,
+                                transitionSpec = {
+                                    scaleIn(
+                                        initialScale = 0.6f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessHigh
+                                        )
+                                    ) + fadeIn() togetherWith scaleOut(
+                                        targetScale = 0.6f,
+                                        animationSpec = tween(150)
+                                    ) + fadeOut()
+                                },
+                                label = "compact_icon_transition"
+                            ) { isCompact ->
+                                Icon(
+                                    imageVector = if (isCompact) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                                    contentDescription = if (isCompact) "关闭紧凑模式" else "开启紧凑模式"
+                                )
+                            }
+                        }
+                        
+                        // 视图模式切换按钮（列表/网格）
                         FilledTonalIconButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -233,8 +306,6 @@ fun MainScreen(
                                 )
                             }
                         }
-                        
-                        // 紧凑模式和设置按钮已移至底部Tab3"我的"页面
                     }
                 )
                 HorizontalDivider(
@@ -256,12 +327,13 @@ fun MainScreen(
                 key = { it }  // 使用页码作为key，优化重组性能
             ) { page ->
                 val weekNumber = page + 1
-                // 🔧 修复：监听课程数据变化，确保导入后能正确显示
-                val allCourses by viewModel.courses.collectAsState()
                 val examsForWeek by viewModel.examsForCurrentWeek.collectAsState()
                 
-                // ✅ 修复：直接获取课程数据，确保数据变化时能正确更新
-                val coursesForWeek = viewModel.getCoursesForWeek(weekNumber)
+                // ✅ 修复：使用 allCourses.size 和 adjustments.size 作为 key
+                // 确保课程数据加载后或调课记录变化时能触发重组
+                val coursesForWeek = remember(allCourses.size, adjustments.size, weekNumber) {
+                    viewModel.getCoursesForWeek(weekNumber)
+                }
                 
                 // 使用 AnimatedContent 实现视图切换的 Q 弹动画
                 AnimatedContent(
@@ -510,5 +582,17 @@ fun MainScreen(
     }
     
     // P0-2: 剪贴板智能导入功能尚未实现，暂时移除入口，待功能完成后恢复
+    
+    // 课表快速编辑对话框
+    if (showScheduleQuickEdit && currentSchedule != null) {
+        com.wind.ggbond.classtime.ui.components.ScheduleQuickEditDialog(
+            schedule = currentSchedule!!,
+            onConfirm = { name, startDate, totalWeeks ->
+                viewModel.updateCurrentSchedule(name, startDate, totalWeeks)
+                showScheduleQuickEdit = false
+            },
+            onDismiss = { showScheduleQuickEdit = false }
+        )
+    }
 }
 }

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    下节课倒计时小组件预览图（3x2）
+    用于在小组件选择器中显示（兼容 Android 12 以下版本）
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 背景 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    
+    <!-- 顶部状态区域 -->
+    <item
+        android:top="10dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:bottom="60dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#E3F2FD" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+    
+    <!-- 倒计时数字区域 -->
+    <item
+        android:top="35dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:bottom="25dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#BBDEFB" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    
+    <!-- 课程信息区域 -->
+    <item
+        android:top="65dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:bottom="10dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#F5F5F5" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+</layer-list>

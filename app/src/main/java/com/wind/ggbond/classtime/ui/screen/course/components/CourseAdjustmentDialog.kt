@@ -20,7 +20,8 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.util.DateUtils
 
 /**
- * 临时调课对话框
+ * 临时调课对话框 - 紧凑布局版本
+ * 重构目标：避免页面滚动，所有内容在一屏内显示
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,11 +47,14 @@ fun CourseAdjustmentDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    // 周次选择器状态
+    var showWeekPicker by remember { mutableStateOf(false) }
+    
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
+                .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
@@ -59,158 +63,197 @@ fun CourseAdjustmentDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 600.dp)
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
-                // 标题
+                // 标题栏 - 紧凑设计
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "临时调课",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // 课程信息
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Text(
-                            text = course.courseName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "教师: ${course.teacher}  |  教室: ${course.classroom}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 原始时间信息
-                Text(
-                    text = "原始安排",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        InfoRow("周次", "第 $currentWeekNumber 周")
-                        InfoRow("时间", "${DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}-${course.startSection + course.sectionCount - 1}节")
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 新时间设置
-                Text(
-                    text = "调整后安排",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // 周次选择
-                var showWeekPicker by remember { mutableStateOf(false) }
-                OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showWeekPicker = true }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "周次",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "第 $newWeekNumber 周",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.KeyboardArrowRight,
+                            Icons.Default.SwapHoriz,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "临时调课",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
                     }
-                }
-                
-                if (showWeekPicker) {
-                    WeekPickerDialog(
-                        currentWeek = newWeekNumber,
-                        totalWeeks = totalWeeks,
-                        onWeekSelected = {
-                            onNewWeekNumberChange(it)
-                            showWeekPicker = false
-                        },
-                        onDismiss = { showWeekPicker = false }
-                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close, 
+                            contentDescription = "关闭",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // 星期选择
+                // 课程信息 - 单行紧凑显示
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Book,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = course.courseName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        // 原始时间信息
+                        Text(
+                            text = "第${currentWeekNumber}周 ${DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}节",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // 调整后安排 - 紧凑布局
                 Text(
-                    text = "星期",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "调整至",
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary
                 )
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // 周一到周五
+                // 第一行：周次 + 节次选择（横向排列）
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("一", "二", "三", "四", "五").forEachIndexed { index, day ->
+                    // 周次选择 - 紧凑按钮
+                    OutlinedCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showWeekPicker = true }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "周次",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "第 $newWeekNumber 周",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Icon(
+                                Icons.Default.ArrowDropDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    
+                    // 开始节次 - 下拉选择
+                    var expandedStart by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = expandedStart,
+                        onExpandedChange = { expandedStart = it },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        OutlinedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "节次",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "第${newStartSection}-${newStartSection + newSectionCount - 1}节",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        ExposedDropdownMenu(
+                            expanded = expandedStart,
+                            onDismissRequest = { expandedStart = false }
+                        ) {
+                            (1..12).forEach { section ->
+                                DropdownMenuItem(
+                                    text = { Text("第 $section 节开始") },
+                                    onClick = {
+                                        onNewStartSectionChange(section)
+                                        expandedStart = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // 星期选择 - 单行7天
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("一", "二", "三", "四", "五", "六", "日").forEachIndexed { index, day ->
                         val dayOfWeek = index + 1
                         val isSelected = newDayOfWeek == dayOfWeek
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .height(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(
                                     if (isSelected)
                                         MaterialTheme.colorScheme.primary
@@ -222,8 +265,8 @@ fun CourseAdjustmentDialog(
                         ) {
                             Text(
                                 text = day,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected)
                                     MaterialTheme.colorScheme.onPrimary
                                 else
@@ -233,243 +276,110 @@ fun CourseAdjustmentDialog(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 
-                // 周六周日
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf("六", "日").forEachIndexed { index, day ->
-                        val dayOfWeek = index + 6
-                        val isSelected = newDayOfWeek == dayOfWeek
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .clickable { onNewDayOfWeekChange(dayOfWeek) },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = day,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected)
-                                    MaterialTheme.colorScheme.onPrimary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    // 填充空白使其和上面对齐
-                    Spacer(modifier = Modifier.weight(3f))
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 节次选择
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // 开始节次
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "开始节次",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        var expandedStart by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = expandedStart,
-                            onExpandedChange = { expandedStart = it }
-                        ) {
-                            OutlinedTextField(
-                                value = "第 $newStartSection 节",
-                                onValueChange = {},
-                                readOnly = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedStart) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expandedStart,
-                                onDismissRequest = { expandedStart = false }
-                            ) {
-                                (1..12).forEach { section ->
-                                    DropdownMenuItem(
-                                        text = { Text("第 $section 节") },
-                                        onClick = {
-                                            onNewStartSectionChange(section)
-                                            expandedStart = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
-                    // 持续节数
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "持续节数",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        var expandedCount by remember { mutableStateOf(false) }
-                        ExposedDropdownMenuBox(
-                            expanded = expandedCount,
-                            onExpandedChange = { expandedCount = it }
-                        ) {
-                            OutlinedTextField(
-                                value = "$newSectionCount 节",
-                                onValueChange = {},
-                                readOnly = true,
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCount) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expandedCount,
-                                onDismissRequest = { expandedCount = false }
-                            ) {
-                                (1..6).forEach { count ->
-                                    DropdownMenuItem(
-                                        text = { Text("$count 节") },
-                                        onClick = {
-                                            onNewSectionCountChange(count)
-                                            expandedCount = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 教室（调课时可能换教室）
+                // 教室输入 - 单行紧凑
                 OutlinedTextField(
                     value = newClassroom,
                     onValueChange = onNewClassroomChange,
-                    label = { Text("教室") },
-                    placeholder = { Text("调课后的教室（不填则不变）") },
+                    label = { Text("教室（可选）") },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Place,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            modifier = Modifier.size(18.dp)
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium
                 )
                 
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                // 调课原因
-                OutlinedTextField(
-                    value = reason,
-                    onValueChange = onReasonChange,
-                    label = { Text("调课原因（可选）") },
-                    placeholder = { Text("例如：教师临时有事") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    maxLines = 2,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                
-                // 冲突提示
+                // 冲突提示 - 仅在有冲突时显示
                 if (hasConflict) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Card(
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer
                     ) {
                         Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Default.Warning,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(18.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = conflictMessage,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                // 按钮
+                // 按钮 - 紧凑设计
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
+                            .height(48.dp),
                         enabled = !isSaving,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text(
-                            "取消",
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        Text("取消")
                     }
                     Button(
                         onClick = onConfirm,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
+                            .height(48.dp),
                         enabled = !hasConflict && !isSaving,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                         }
                         Text(
-                            if (isSaving) "保存中..." else "确认调课",
-                            style = MaterialTheme.typography.titleMedium,
+                            if (isSaving) "保存中" else "确认",
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
         }
+    }
+    
+    // 周次选择对话框
+    if (showWeekPicker) {
+        WeekPickerDialog(
+            currentWeek = newWeekNumber,
+            totalWeeks = totalWeeks,
+            onWeekSelected = {
+                onNewWeekNumberChange(it)
+                showWeekPicker = false
+            },
+            onDismiss = { showWeekPicker = false }
+        )
     }
 }
 

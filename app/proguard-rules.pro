@@ -56,6 +56,12 @@
 -keep class com.wind.ggbond.classtime.ui.screen.scheduleimport.JsonCourse { *; }
 -keep class com.wind.ggbond.classtime.ui.screen.scheduleimport.SmartImportViewModel$JsonCourse { *; }
 
+# 保留 SchoolRepository 内部的 SchoolData 类（Gson 反序列化 schools.json 需要）
+-keep class com.wind.ggbond.classtime.data.repository.SchoolRepository$SchoolData { *; }
+-keepclassmembers class com.wind.ggbond.classtime.data.repository.SchoolRepository$SchoolData {
+    *;
+}
+
 # 保留自动更新相关数据类（Gson序列化到SharedPreferences）
 -keep class com.wind.ggbond.classtime.util.AutoUpdateConfig { *; }
 -keep class com.wind.ggbond.classtime.util.UpdateLogEntry { *; }

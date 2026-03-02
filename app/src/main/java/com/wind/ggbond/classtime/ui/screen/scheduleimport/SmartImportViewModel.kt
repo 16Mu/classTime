@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.data.local.entity.SchoolEntity
+import com.wind.ggbond.classtime.data.model.ImportedSemesterInfo
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
@@ -61,6 +62,10 @@ class SmartImportViewModel @Inject constructor(
     
     private val _debugInfo = MutableStateFlow<List<String>>(emptyList())
     val debugInfo: StateFlow<List<String>> = _debugInfo.asStateFlow()
+    
+    // 导入时提取到的学期信息（开始日期、结束日期、总周数）
+    private val _importedSemesterInfo = MutableStateFlow<ImportedSemesterInfo?>(null)
+    val importedSemesterInfo: StateFlow<ImportedSemesterInfo?> = _importedSemesterInfo.asStateFlow()
     
     /**
      * 获取学校信息
@@ -122,6 +127,22 @@ class SmartImportViewModel @Inject constructor(
                     _parseState.value = ParseState.Error("未找到课程信息\n请确保已登录并进入课表页面")
                 } else {
                     _parsedCourses.value = courses
+                    
+                    // 尝试解析学期信息（如果提取器支持）
+                    try {
+                        val semesterInfo = extractor.parseSemesterInfo(jsonData)
+                        if (semesterInfo != null) {
+                            _importedSemesterInfo.value = semesterInfo
+                            android.util.Log.d("SmartImportVM", "成功解析学期信息: 开始=${semesterInfo.startDate}, 总周数=${semesterInfo.totalWeeks}")
+                        } else {
+                            _importedSemesterInfo.value = null
+                            android.util.Log.d("SmartImportVM", "未能解析学期信息，将由用户手动设置")
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("SmartImportVM", "解析学期信息失败: ${e.message}")
+                        _importedSemesterInfo.value = null
+                    }
+                    
                     _parseState.value = ParseState.Success()
                 }
             } catch (e: Exception) {
@@ -745,6 +766,7 @@ class SmartImportViewModel @Inject constructor(
         _parseState.value = ParseState.Idle
         _parsedCourses.value = emptyList()
         _debugInfo.value = emptyList()
+        _importedSemesterInfo.value = null
     }
     
     /**

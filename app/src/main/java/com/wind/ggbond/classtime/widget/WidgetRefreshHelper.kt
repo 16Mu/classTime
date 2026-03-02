@@ -39,16 +39,19 @@ object WidgetRefreshHelper {
      * 
      * 使用 Glance API 的 updateAll 方法，
      * 依次刷新今日课程 Widget 和下节课倒计时 Widget。
+     * 同时刷新基于 RemoteViews 的 4x4 大尺寸小组件。
      * 
      * @param context 应用上下文
      */
     fun refreshAllWidgets(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 刷新今日课程 Widget
+                // 刷新今日课程 Widget (Glance)
                 TodayCourseWidget().updateAll(context)
-                // 刷新下节课倒计时 Widget
+                // 刷新下节课倒计时 Widget (Glance)
                 NextClassWidget().updateAll(context)
+                // 刷新 4x4 大尺寸小组件 (RemoteViews)
+                LargeTodayCourseWidgetProvider.refreshAllWidgets(context)
                 Log.d(TAG, "所有 Widget 已刷新")
             } catch (e: Exception) {
                 Log.e(TAG, "刷新 Widget 失败", e)
@@ -64,15 +67,19 @@ object WidgetRefreshHelper {
      */
     fun hasActiveWidgets(context: Context): Boolean {
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        // 检查今日课程 Widget
+        // 检查今日课程 Widget (Glance)
         val todayCourseIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, TodayCourseWidgetReceiver::class.java)
         )
-        // 检查下节课倒计时 Widget
+        // 检查下节课倒计时 Widget (Glance)
         val nextClassIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, NextClassWidgetReceiver::class.java)
         )
-        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty()
+        // 检查 4x4 大尺寸小组件 (RemoteViews)
+        val largeWidgetIds = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, LargeTodayCourseWidgetProvider::class.java)
+        )
+        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty() || largeWidgetIds.isNotEmpty()
     }
 
     /**
@@ -138,8 +145,11 @@ class WidgetRefreshWorker(
 
             // 执行刷新
             runBlocking {
+                // 刷新 Glance 小组件
                 TodayCourseWidget().updateAll(applicationContext)
                 NextClassWidget().updateAll(applicationContext)
+                // 刷新 RemoteViews 小组件
+                LargeTodayCourseWidgetProvider.refreshAllWidgets(applicationContext)
             }
             Log.d("WidgetRefreshWorker", "Widget 周期刷新完成")
             Result.success()

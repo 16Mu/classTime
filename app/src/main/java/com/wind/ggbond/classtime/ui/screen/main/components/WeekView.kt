@@ -146,52 +146,30 @@ fun DaySchedule(
         
         // 课程列表
         if (courses.isEmpty()) {
-            // 扁平化"无课"状态显示
-            Box(
+            // 简化的"无课"状态显示 - 减少占用高度
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                    .padding(vertical = 32.dp, horizontal = 16.dp)
+                    .padding(vertical = 6.dp, horizontal = 12.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // 扁平图标背景
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.EventAvailable,
-                            contentDescription = "无课程",
-                            modifier = Modifier.size(32.dp),
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        text = "这天没有课哦 ~",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Text(
-                        text = "好好享受休息时光吧",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
+                Icon(
+                    Icons.Default.EventAvailable,
+                    contentDescription = "无课程",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = "这天没有课",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
             }
         } else {
             // 优化：为每个课程卡片指定key，减少不必要的重组
@@ -253,12 +231,12 @@ fun CourseCard(
         }
     }.let { if (it == Color.Unspecified) MaterialTheme.colorScheme.primaryContainer else it }
     
-    // 根据状态调整颜色
+    // 根据状态调整颜色 - 与表格模式保持一致
     val displayColor = remember(baseColor, isPast, isOngoing) {
         when {
-            isPast -> baseColor.copy(alpha = 0.5f)
-            isOngoing -> baseColor
-            else -> baseColor.copy(alpha = 0.95f)
+            isPast -> baseColor.copy(alpha = 0.6f)  // 过去课程适中透明度
+            isOngoing -> baseColor  // 正在上课的课程保持原色
+            else -> baseColor.copy(alpha = 0.9f)  // 未来课程接近原色
         }
     }
     
@@ -285,13 +263,13 @@ fun CourseCard(
             )
             .padding(12.dp)  // 紧凑内边距 10dp
     ) {
-        // 「小爱课程表」风格：统一使用黑/白文字
+        // 「小爱课程表」风格：统一使用黑/白文字 - 与表格模式保持一致
         val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
         val baseTextColor = if (isDarkTheme) Color.White else Color.Black
         
-        val titleColor = if (isPast) baseTextColor.copy(alpha = 0.5f) else baseTextColor
-        val subColor = baseTextColor.copy(alpha = 0.75f)  // 次要信息75%透明度
-        val tertiaryColor = baseTextColor.copy(alpha = 0.6f)  // 第三级信息60%透明度
+        val titleColor = if (isPast) baseTextColor.copy(alpha = 0.7f) else baseTextColor  // 标题文字与表格模式一致
+        val subColor = baseTextColor.copy(alpha = 0.8f)  // 次要信息80%透明度，与表格模式一致
+        val tertiaryColor = baseTextColor.copy(alpha = 0.7f)  // 第三级信息70%透明度，与表格模式一致
         
         Column(
             modifier = Modifier.fillMaxWidth()

@@ -219,8 +219,19 @@ class MainViewModel @Inject constructor(
             weekCoursesCache.clear()
             cacheHits = 0
             cacheMisses = 0
-            // Debug logging removed for compilation compatibility
         }
+    }
+    
+    /**
+     * ✅ 强制刷新课程数据（用于删除/撤销后立即更新UI）
+     * 通过重新加载课程数据触发Flow更新
+     */
+    fun forceRefreshCourses() {
+        val scheduleId = _currentSchedule.value?.id ?: return
+        // 清除缓存
+        clearCache()
+        // 重新加载课程数据
+        loadCourses(scheduleId)
     }
     
     init {
@@ -763,7 +774,8 @@ class MainViewModel @Inject constructor(
                         courseRepository.deleteCourse(course)
                     }
                 }
-                clearCache()
+                // ✅ 修复：强制刷新课程数据，确保UI立即更新
+                forceRefreshCourses()
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "删除课程失败", e)
                 _lastDeletedSnapshot = null
@@ -798,7 +810,8 @@ class MainViewModel @Inject constructor(
                         courseRepository.insertCourse(originalCourse.copy(id = 0))
                     }
                 }
-                clearCache()
+                // ✅ 修复：强制刷新课程数据，确保UI立即更新
+                forceRefreshCourses()
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "撤销删除失败", e)
             }
@@ -956,5 +969,41 @@ class MainViewModel @Inject constructor(
      */
     fun clearClipboardImportResult() {
         _clipboardImportResult.value = null
+    }
+    
+    /**
+     * 更新当前课表信息（名称、起始日期、总周数）
+     * 
+     * @param name 课表名称
+     * @param startDate 起始日期
+     * @param totalWeeks 总周数
+     */
+    fun updateCurrentSchedule(name: String, startDate: LocalDate, totalWeeks: Int) {
+        viewModelScope.launch {
+            try {
+                val schedule = _currentSchedule.value ?: return@launch
+                
+                // 计算结束日期
+                val endDate = startDate.plusWeeks(totalWeeks.toLong()).minusDays(1)
+                
+                // 更新课表
+                val updatedSchedule = schedule.copy(
+                    name = name,
+                    startDate = startDate,
+                    endDate = endDate,
+                    totalWeeks = totalWeeks,
+                    updatedAt = System.currentTimeMillis()
+                )
+                
+                scheduleRepository.updateSchedule(updatedSchedule)
+                
+                // 清除缓存以刷新UI
+                clearCache()
+                
+                android.util.Log.d(TAG, "✅ 课表更新成功: $name, 起始日期=$startDate, 总周数=$totalWeeks")
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "更新课表失败", e)
+            }
+        }
     }
 }

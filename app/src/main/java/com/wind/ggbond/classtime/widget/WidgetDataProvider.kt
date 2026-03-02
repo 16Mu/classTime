@@ -6,6 +6,8 @@ import androidx.room.Room
 import com.wind.ggbond.classtime.data.local.database.CourseDatabase
 import com.wind.ggbond.classtime.data.local.database.Migrations
 import com.wind.ggbond.classtime.util.DateUtils
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -20,6 +22,9 @@ import java.time.format.DateTimeFormatter
 object WidgetDataProvider {
 
     private const val TAG = "WidgetDataProvider"
+    
+    /** 数据库操作超时时间（毫秒） */
+    private const val DATABASE_TIMEOUT_MS = 5000L
 
     /** 日期格式化器：用于显示日期 */
     private val DATE_FORMATTER = DateTimeFormatter.ofPattern("M月d日")
@@ -66,6 +71,24 @@ object WidgetDataProvider {
      * @return 今日课程展示数据
      */
     suspend fun getTodayCourses(context: Context): WidgetDisplayData {
+        return try {
+            // 使用超时机制，防止数据库操作阻塞导致小组件加载失败
+            withTimeoutOrNull(DATABASE_TIMEOUT_MS) {
+                getTodayCoursesInternal(context)
+            } ?: run {
+                Log.w(TAG, "获取今日课程超时")
+                WidgetDisplayData.empty("数据加载超时")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取今日课程失败", e)
+            WidgetDisplayData.empty("数据加载失败")
+        }
+    }
+    
+    /**
+     * 获取今日课程数据（内部实现）
+     */
+    private suspend fun getTodayCoursesInternal(context: Context): WidgetDisplayData {
         val db = getDatabase(context)
         try {
             // 获取当前时间，用于计算课程进度
@@ -174,7 +197,7 @@ object WidgetDataProvider {
                 progressText = progressText
             )
         } catch (e: Exception) {
-            Log.e(TAG, "获取今日课程失败", e)
+            Log.e(TAG, "获取今日课程内部失败", e)
             return WidgetDisplayData.empty("数据加载失败")
         }
     }
@@ -189,9 +212,33 @@ object WidgetDataProvider {
      * @return 下节课展示数据
      */
     suspend fun getNextClass(context: Context): NextClassDisplayData {
+        return try {
+            // 使用超时机制，防止数据库操作阻塞导致小组件加载失败
+            withTimeoutOrNull(DATABASE_TIMEOUT_MS) {
+                getNextClassInternal(context)
+            } ?: run {
+                Log.w(TAG, "获取下节课数据超时")
+                NextClassDisplayData(
+                    hasNextClass = false,
+                    message = "数据加载超时"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "获取下节课数据失败", e)
+            NextClassDisplayData(
+                hasNextClass = false,
+                message = "数据加载失败"
+            )
+        }
+    }
+    
+    /**
+     * 获取下节课数据（内部实现）
+     */
+    private suspend fun getNextClassInternal(context: Context): NextClassDisplayData {
         try {
             // 获取今日课程数据（复用已有逻辑，内部自行管理数据库连接）
-            val todayData = getTodayCourses(context)
+            val todayData = getTodayCoursesInternal(context)
             if (todayData.courseItems.isEmpty()) {
                 return NextClassDisplayData(
                     hasNextClass = false,
@@ -205,8 +252,46 @@ object WidgetDataProvider {
 
             // 查找正在进行的课程
             val ongoingCourse = todayData.courseItems.find { it.isOngoing }
-            if (ongoingCourse != null) {
+            
+            // 查找下一节即将开始的课程（开始时间在当前时间之后）
+            val nextCourse = todayData.courseItems.firstOrNull { item ->
+                if (item.startTimeText.isEmpty()) return@firstOrNull false
+                try {
+                    val startTime = LocalTime.parse(item.startTimeText, TIME_FORMATTER)
+                    startTime.isAfter(now)
+                } catch (e: Exception) { false }
+            }
+
+            // 情况1：正在上课，且有下一节课
+            // 显示下课倒计时 + 下一节课信息
+            if (ongoingCourse != null && nextCourse != null) {
                 // 计算距离下课的剩余分钟数
+                val endTime = try {
+                    LocalTime.parse(ongoingCourse.endTimeText, TIME_FORMATTER)
+                } catch (e: Exception) { null }
+                val minutesRemaining = if (endTime != null) {
+                    java.time.Duration.between(now, endTime).toMinutes().toInt()
+                } else { 0 }
+
+                return NextClassDisplayData(
+                    hasNextClass = true,
+                    isOngoing = true,
+                    courseName = nextCourse.courseName,
+                    classroom = nextCourse.classroom,
+                    teacher = nextCourse.teacher,
+                    timeText = "${nextCourse.startTimeText} - ${nextCourse.endTimeText}",
+                    sectionText = "${nextCourse.startSection}-${nextCourse.startSection + nextCourse.sectionCount - 1}节",
+                    color = nextCourse.color,
+                    minutesRemaining = minutesRemaining,
+                    dayOfWeekText = todayData.dayOfWeekText,
+                    weekNumberText = todayData.weekNumberText,
+                    message = "正在上课"
+                )
+            }
+
+            // 情况2：正在上课，但没有下一节课（今日最后一节）
+            // 显示下课倒计时 + 当前课程信息
+            if (ongoingCourse != null && nextCourse == null) {
                 val endTime = try {
                     LocalTime.parse(ongoingCourse.endTimeText, TIME_FORMATTER)
                 } catch (e: Exception) { null }
@@ -226,21 +311,13 @@ object WidgetDataProvider {
                     minutesRemaining = minutesRemaining,
                     dayOfWeekText = todayData.dayOfWeekText,
                     weekNumberText = todayData.weekNumberText,
-                    message = "正在上课"
+                    message = "今日最后一节"
                 )
             }
 
-            // 查找下一节即将开始的课程（开始时间在当前时间之后）
-            val nextCourse = todayData.courseItems.firstOrNull { item ->
-                if (item.startTimeText.isEmpty()) return@firstOrNull false
-                try {
-                    val startTime = LocalTime.parse(item.startTimeText, TIME_FORMATTER)
-                    startTime.isAfter(now)
-                } catch (e: Exception) { false }
-            }
-
+            // 情况3：没有在上课，有下一节课
+            // 显示上课倒计时 + 下一节课信息
             if (nextCourse != null) {
-                // 计算距离上课的剩余分钟数
                 val startTime = try {
                     LocalTime.parse(nextCourse.startTimeText, TIME_FORMATTER)
                 } catch (e: Exception) { null }
@@ -273,7 +350,7 @@ object WidgetDataProvider {
                 message = tomorrowPreview
             )
         } catch (e: Exception) {
-            Log.e(TAG, "获取下节课数据失败", e)
+            Log.e(TAG, "获取下节课数据内部失败", e)
             return NextClassDisplayData(
                 hasNextClass = false,
                 message = "数据加载失败"
