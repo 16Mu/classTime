@@ -55,6 +55,7 @@
 ### 主要界面
 <div align="center">
   <img src="docs/images/首页.png" alt="主界面" width="200">
+  <img src="docs/images/首页(2).png" alt="主界面2" width="200">
   <img src="docs/images/快捷查看课程信息.png" alt="快捷查看" width="200">
 </div>
 
@@ -84,13 +85,13 @@
   <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
 </div>
 
-**调课日志** - 记录所有调课历史，支持回滚和查看变更轨迹  
+**调课记录** - 记录所有调课历史，支持回滚和查看变更轨迹  
 **工具界面** - 集成多种实用工具，包括数据导入导出、备份恢复等  
 **通知设置** - 自定义提醒规则，支持不同课程设置不同提醒时间
 
 #### 高级管理工具
 <div align="center">
-  <img src="docs/images/调课日志.png" alt="调课日志" width="180">
+  <img src="docs/images/调课记录.png" alt="调课记录" width="180">
   <img src="docs/images/工具界面.png" alt="工具界面" width="180">
  
   <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
