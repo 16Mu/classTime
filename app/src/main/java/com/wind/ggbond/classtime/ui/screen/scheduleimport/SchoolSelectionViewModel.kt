@@ -143,18 +143,43 @@ class SchoolSelectionViewModel @Inject constructor(
     init {
         // 初始化学校数据
         viewModelScope.launch {
+            android.util.Log.d("SchoolSelectionViewModel", "开始初始化学校数据...")
             _isLoading.value = true
             try {
+                // 检查数据库中是否已有数据
+                val initialCount = schoolRepository.getAllSchools().first().size
+                android.util.Log.d("SchoolSelectionViewModel", "初始化前数据库中的学校数量：$initialCount")
+                
+                // 从 assets 加载数据
+                android.util.Log.d("SchoolSelectionViewModel", "开始从 assets 加载学校数据...")
                 schoolRepository.initializeSchoolsFromAssets()
+                
                 // 等待一小段时间确保数据库写入完成
-                kotlinx.coroutines.delay(100)
+                kotlinx.coroutines.delay(200)
+                
                 // 验证数据是否加载成功
                 val schoolCount = schoolRepository.getAllSchools().first().size
                 android.util.Log.d("SchoolSelectionViewModel", "数据加载完成，学校数量：$schoolCount")
+                
+                // 检查省份列表
+                val provinces = schoolRepository.getAllProvinces().first()
+                android.util.Log.d("SchoolSelectionViewModel", "省份列表：$provinces")
+                
+                // 检查是否有启用的学校
+                val enabledSchools = schoolRepository.getAllSchools().first()
+                android.util.Log.d("SchoolSelectionViewModel", "启用的学校数量：${enabledSchools.size}")
+                
+                if (enabledSchools.isNotEmpty()) {
+                    android.util.Log.d("SchoolSelectionViewModel", "第一个启用的学校：${enabledSchools.first().name}")
+                } else {
+                    android.util.Log.w("SchoolSelectionViewModel", "⚠️ 没有启用的学校！")
+                }
+                
             } catch (e: Exception) {
                 android.util.Log.e("SchoolSelectionViewModel", "数据加载失败", e)
             } finally {
                 _isLoading.value = false
+                android.util.Log.d("SchoolSelectionViewModel", "初始化完成，loading状态：${_isLoading.value}")
             }
         }
     }

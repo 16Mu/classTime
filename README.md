@@ -58,7 +58,13 @@
   <img src="docs/images/快捷查看课程信息.png" alt="快捷查看" width="200">
 </div>
 
-### 课程管理功能
+### 桌面小组件
+<div align="center">
+  <img src="docs/images/小组件2.png" alt="小组件样式2" width="180">
+  <img src="docs/images/小组件1.png" alt="小组件样式1" width="180">
+  <img src="docs/images/小组件3.png" alt="小组件样式3" width="180">
+</div>
+
 
 #### 基础课程操作
 <div align="center">
@@ -73,9 +79,9 @@
 
 #### 批量管理功能
 <div align="center">
-  <img src="docs/images/调课日志.png" alt="调课日志" width="180">
-  <img src="docs/images/工具界面.png" alt="工具界面" width="180">
   <img src="docs/images/通知自定义关闭.png" alt="通知设置" width="180">
+  <img src="docs/images/批量创建课表.png" alt="批量创建" width="180">
+  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
 </div>
 
 **调课日志** - 记录所有调课历史，支持回滚和查看变更轨迹  
@@ -84,21 +90,18 @@
 
 #### 高级管理工具
 <div align="center">
-  <img src="docs/images/批量创建课表.png" alt="批量创建" width="180">
-  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
+  <img src="docs/images/调课日志.png" alt="调课日志" width="180">
+  <img src="docs/images/工具界面.png" alt="工具界面" width="180">
+ 
   <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
 </div>
+
+### 课程管理功能
 
 **批量创建** - 一次性创建多节相同课程，大幅提升录入效率  
 **批量编辑** - 选择多个课程同时修改，支持时间、地点等批量操作  
 **时间编辑** - 精确调整课程时间，支持拖拽和手动输入两种方式
 
-### 桌面小组件
-<div align="center">
-  <img src="docs/images/小组件1.png" alt="小组件样式1" width="180">
-  <img src="docs/images/小组件2.png" alt="小组件样式2" width="180">
-  <img src="docs/images/小组件3.png" alt="小组件样式3" width="180">
-</div>
 
 **今日课程小组件** - 显示当天完整课程安排，一目了然查看所有课程  
 **下节课倒计时** - 实时显示下节课时间和倒计时，不错过任何课程  
