@@ -55,22 +55,33 @@
 ### 主要界面
 <div align="center">
   <img src="docs/images/首页.png" alt="主界面" width="200">
-  <img src="docs/images/课程详情卡片.png" alt="课程详情" width="200">
-  <img src="docs/images/我的界面.png" alt="设置界面" width="200">
+  <img src="docs/images/快捷查看课程信息.png" alt="快捷查看" width="200">
 </div>
 
-### 核心功能
+### 课程管理功能
 <div align="center">
-  <img src="docs/images/快速调课.png" alt="快速调课" width="200">
-  <img src="docs/images/批量创建课表.png" alt="批量创建" width="200">
-  <img src="docs/images/小组件1.png" alt="桌面小组件" width="200">
+  <img src="docs/images/创建课程.png" alt="创建课程" width="180">
+  <img src="docs/images/课程详情卡片.png" alt="课程详情" width="180">
+  <img src="docs/images/快速调课.png" alt="快速调课" width="180">
 </div>
 
-### 高级功能
 <div align="center">
-  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="200">
-  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="200">
-  <img src="docs/images/通知自定义关闭.png" alt="通知设置" width="200">
+  <img src="docs/images/批量创建课表.png" alt="批量创建" width="180">
+  <img src="docs/images/课表批量编辑.png" alt="批量编辑" width="180">
+  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
+</div>
+
+<div align="center">
+  <img src="docs/images/调课日志.png" alt="调课日志" width="180">
+  <img src="docs/images/工具界面.png" alt="工具界面" width="180">
+  <img src="docs/images/通知自定义关闭.png" alt="通知设置" width="180">
+</div>
+
+### 桌面小组件
+<div align="center">
+  <img src="docs/images/小组件1.png" alt="小组件样式1" width="180">
+  <img src="docs/images/小组件2.png" alt="小组件样式2" width="180">
+  <img src="docs/images/小组件3.png" alt="小组件样式3" width="180">
 </div>
 
 ## 🏗️ 技术架构
