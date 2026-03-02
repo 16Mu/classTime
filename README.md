@@ -57,6 +57,7 @@
   <img src="docs/images/首页.png" alt="主界面" width="200">
   <img src="docs/images/首页(2).png" alt="主界面2" width="200">
   <img src="docs/images/快捷查看课程信息.png" alt="快捷查看" width="200">
+  <img src="docs/images/我的界面.png" alt="我的界面" width="200">
 </div>
 
 ### 桌面小组件
