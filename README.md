@@ -9,7 +9,7 @@
 
 一个功能完整、界面美观的校园课表管理应用，支持智能导入、自动更新、课程提醒等丰富功能。
 
-[下载 APK](#) | [使用文档](docs/) | [界面预览](#界面预览) | [快速开始](#快速开始)
+[下载 APK](#) | [使用文档](docs/USER_GUIDE.md) | [界面预览](#界面预览) | [快速开始](docs/USER_GUIDE.md#快速开始)
 
 </div>
 
@@ -49,6 +49,22 @@
 - **临时调课** - 灵活的课程时间调整
 - **考试管理** - 考试安排提醒与管理
 - **紧凑模式** - 空间优化的界面布局
+
+## 界面预览
+
+### 主要界面
+<div align="center">
+  <img src="docs/images/main_screen.png" alt="主界面" width="200">
+  <img src="docs/images/course_detail.png" alt="课程详情" width="200">
+  <img src="docs/images/settings_screen.png" alt="设置界面" width="200">
+</div>
+
+### 核心功能
+<div align="center">
+  <img src="docs/images/course_conflict.png" alt="课程冲突检测" width="200">
+  <img src="docs/images/multi_classroom.png" alt="多教室管理" width="200">
+  <img src="docs/images/widget_preview.png" alt="桌面小组件" width="200">
+</div>
 
 ## 🏗️ 技术架构
 
