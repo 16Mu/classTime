@@ -94,7 +94,7 @@
   <img src="docs/images/调课记录.png" alt="调课记录" width="180">
   <img src="docs/images/工具界面.png" alt="工具界面" width="180">
  
-  <img src="docs/images/时间编辑界面.png" alt="时间编辑" width="180">
+  <img src="docs/images/时间编辑界面 (2).png" alt="时间编辑" width="180">
 </div>
 
 ### 课程管理功能
