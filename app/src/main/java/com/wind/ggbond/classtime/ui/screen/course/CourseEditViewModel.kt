@@ -146,15 +146,26 @@ class CourseEditViewModel @Inject constructor(
     
     /**
      * 应用从课表格子传入的默认时间信息（仅用于新建课程，且只应用一次）
+     * @param courseName 预填充的课程名称，用于添加新时间段场景
      */
     fun applyDefaultsIfNeeded(
         dayOfWeek: Int? = null,
         startSection: Int? = null,
         sectionCount: Int? = null,
-        weekNumber: Int? = null
+        weekNumber: Int? = null,
+        courseName: String? = null
     ) {
         if (currentCourseId != null || hasAppliedDefaults) return
         hasAppliedDefaults = true
+        
+        // 预填充课程名称（用于添加新时间段场景）
+        courseName?.let { name ->
+            if (name.isNotBlank()) {
+                _courseName.value = name
+                // 根据课程名称自动分配颜色
+                _selectedColor.value = CourseColorPalette.getColorForCourse(name, existingCoursesColors)
+            }
+        }
         
         dayOfWeek?.let { day ->
             if (day in 1..7) {

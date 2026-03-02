@@ -4,9 +4,12 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
+import com.wind.ggbond.classtime.ui.components.checkScheduleState
 import com.wind.ggbond.classtime.util.CourseColorPalette
 import com.wind.ggbond.classtime.util.TextCourseParser
 import com.wind.ggbond.classtime.util.WeekParser
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -96,23 +100,89 @@ class BatchCourseCreateViewModel @Inject constructor(
     private val _showClipboardImport = MutableStateFlow<Long?>(null) // 正在导入的课程ID
     val showClipboardImport: StateFlow<Long?> = _showClipboardImport.asStateFlow()
 
+    // 课表选择状态（用于检查是否需要创建课表或提示过期）
+    private val _scheduleState = MutableStateFlow<ScheduleSelectionState>(ScheduleSelectionState.Loading)
+    val scheduleState: StateFlow<ScheduleSelectionState> = _scheduleState.asStateFlow()
+
     // 当前课表中已有课程的颜色（用于智能分配）
     private var existingColors: List<String> = emptyList()
 
     init {
-        // 加载已有课程颜色，用于新课程颜色分配时避免重复
+        // 初始化时检查课表状态
+        checkCurrentScheduleState()
+    }
+
+    // ===================== 课表状态检查 =====================
+
+    /**
+     * 检查当前课表状态
+     * 判断是否需要创建课表或提示课表过期
+     */
+    private fun checkCurrentScheduleState() {
         viewModelScope.launch {
             try {
                 val schedule = scheduleRepository.getCurrentSchedule()
+                // 使用统一的检查方法
+                _scheduleState.value = checkScheduleState(schedule)
+                
+                // 如果有课表，加载已有课程颜色
                 if (schedule != null) {
                     existingColors = courseRepository.getAllCoursesBySchedule(schedule.id)
                         .first()
                         .map { it.color }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "加载已有课程颜色失败: ${e.message}")
+                Log.w(TAG, "检查课表状态失败: ${e.message}")
+                _scheduleState.value = ScheduleSelectionState.NeedCreate
             }
         }
+    }
+
+    /**
+     * 创建新课表
+     * @param name 课表名称
+     * @param startDate 开始日期
+     * @param totalWeeks 总周数
+     */
+    fun createSchedule(name: String, startDate: LocalDate, totalWeeks: Int) {
+        viewModelScope.launch {
+            try {
+                val endDate = startDate.plusWeeks(totalWeeks.toLong()).minusDays(1)
+                val schedule = Schedule(
+                    name = name,
+                    startDate = startDate,
+                    endDate = endDate,
+                    totalWeeks = totalWeeks,
+                    isCurrent = true
+                )
+                val scheduleId = scheduleRepository.insertSchedule(schedule)
+                // 设置为当前课表
+                scheduleRepository.setCurrentSchedule(scheduleId)
+                Log.d(TAG, "创建课表成功: $name, ID: $scheduleId")
+                // 更新状态为就绪
+                _scheduleState.value = ScheduleSelectionState.Ready
+            } catch (e: Exception) {
+                Log.e(TAG, "创建课表失败", e)
+                _saveState.value = BatchSaveState.Error("创建课表失败：${e.message}")
+            }
+        }
+    }
+
+    /**
+     * 确认继续使用过期课表
+     */
+    fun confirmUseExpiredSchedule() {
+        _scheduleState.value = ScheduleSelectionState.Ready
+        Log.d(TAG, "用户选择继续使用过期课表")
+    }
+
+    /**
+     * 用户选择创建新课表（从过期提示）
+     * 将状态切换为需要创建
+     */
+    fun switchToCreateNewSchedule() {
+        _scheduleState.value = ScheduleSelectionState.NeedCreate
+        Log.d(TAG, "用户选择创建新课表")
     }
 
     // ===================== 课程级操作 =====================
@@ -354,12 +424,12 @@ class BatchCourseCreateViewModel @Inject constructor(
 
     /**
      * 为指定课程添加一个时间段
-     * 新时间段将插入到列表开头，确保最新的时间段在顶部显示
+     * ✅ 修复：新时间段添加到列表末尾，保持时间段顺序
      */
     fun addTimeSlot(courseId: Long) {
         _courseItems.value = _courseItems.value.map { course ->
             if (course.id == courseId) {
-                course.copy(timeSlots = listOf(TimeSlot()) + course.timeSlots)
+                course.copy(timeSlots = course.timeSlots + TimeSlot())
             } else course
         }
     }
@@ -507,7 +577,10 @@ class BatchCourseCreateViewModel @Inject constructor(
                 if (slot.dayOfWeek !in 1..7) {
                     return "「${course.courseName}」第${slotNum}个时间段的星期设置无效"
                 }
-                // 自定义周次可选，留空则使用全局周次，无需额外验证
+                // ✅ 修复：周次是必选项，不能为空
+                if (slot.customWeeks.isEmpty()) {
+                    return "「${course.courseName}」第${slotNum}个时间段请选择周次"
+                }
             }
         }
         return null
@@ -539,6 +612,10 @@ class BatchCourseCreateViewModel @Inject constructor(
 
                 val coursesToInsert = mutableListOf<Course>()
                 var courseCount = 0 // 统计课程门数
+                
+                //  修复：用于检测同一批次内的时间段冲突
+                // Key: "dayOfWeek_startSection_endSection_week" -> courseName
+                val batchTimeSlots = mutableMapOf<String, String>()
 
                 for (courseItem in _courseItems.value) {
                     courseCount++
@@ -559,21 +636,47 @@ class BatchCourseCreateViewModel @Inject constructor(
                         val classroom = slot.classroom.ifEmpty { courseItem.defaultClassroom }
                         // 计算结束节次
                         val endSection = slot.startSection + slot.sectionCount - 1
+                        
+                        //  修复：如果周次为空，跳过冲突检测（因为没有实际的上课时间）
+                        if (weeks.isEmpty()) {
+                            Log.w(TAG, "课程「${courseItem.courseName}」的时间段周次为空，跳过冲突检测")
+                        } else {
+                            //  修复：先检测同一批次内的时间段冲突
+                            for (week in weeks) {
+                                for (section in slot.startSection..endSection) {
+                                    val key = "${slot.dayOfWeek}_${section}_$week"
+                                    val existingCourse = batchTimeSlots[key]
+                                    if (existingCourse != null && existingCourse != courseItem.courseName) {
+                                        // 同一批次内不同课程的时间段冲突
+                                        _saveState.value = BatchSaveState.Error(
+                                            "「${courseItem.courseName}」与「${existingCourse}」在同一时间段冲突（周$week 星期${slot.dayOfWeek} 第${section}节）"
+                                        )
+                                        return@launch
+                                    }
+                                    // 记录当前时间段（同一门课程的不同时间段不算冲突）
+                                    batchTimeSlots[key] = courseItem.courseName
+                                }
+                            }
 
-                        // 冲突检测
-                        val conflicts = courseRepository.detectConflictWithWeeks(
-                            scheduleId = scheduleId,
-                            dayOfWeek = slot.dayOfWeek,
-                            startSection = slot.startSection,
-                            sectionCount = slot.sectionCount,
-                            weeks = weeks
-                        )
-                        if (conflicts.isNotEmpty()) {
-                            val conflictNames = conflicts.joinToString(", ") { it.courseName }
-                            _saveState.value = BatchSaveState.Error(
-                                "「${courseItem.courseName}」与「${conflictNames}」存在时间冲突"
+                            // 检测与数据库中已有课程的冲突
+                            val conflicts = courseRepository.detectConflictWithWeeks(
+                                scheduleId = scheduleId,
+                                dayOfWeek = slot.dayOfWeek,
+                                startSection = slot.startSection,
+                                sectionCount = slot.sectionCount,
+                                weeks = weeks
                             )
-                            return@launch
+                            if (conflicts.isNotEmpty()) {
+                                //  修复：过滤掉同名课程（同一门课程的不同时间段不算冲突）
+                                val realConflicts = conflicts.filter { it.courseName != courseItem.courseName }
+                                if (realConflicts.isNotEmpty()) {
+                                    val conflictNames = realConflicts.joinToString(", ") { it.courseName }
+                                    _saveState.value = BatchSaveState.Error(
+                                        "「${courseItem.courseName}」与「${conflictNames}」存在时间冲突"
+                                    )
+                                    return@launch
+                                }
+                            }
                         }
 
                         coursesToInsert.add(

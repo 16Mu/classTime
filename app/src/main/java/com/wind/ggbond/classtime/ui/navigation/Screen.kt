@@ -9,13 +9,14 @@ sealed class Screen(val route: String) {
             return if (refresh) "main?refresh=true" else "main"
         }
     }
-    object CourseEdit : Screen("course_edit?courseId={courseId}&dayOfWeek={dayOfWeek}&startSection={startSection}&sectionCount={sectionCount}&weekNumber={weekNumber}") {
+    object CourseEdit : Screen("course_edit?courseId={courseId}&dayOfWeek={dayOfWeek}&startSection={startSection}&sectionCount={sectionCount}&weekNumber={weekNumber}&courseName={courseName}") {
         fun createRoute(
             courseId: Long? = null,
             dayOfWeek: Int? = null,
             startSection: Int? = null,
             sectionCount: Int? = null,
-            weekNumber: Int? = null
+            weekNumber: Int? = null,
+            courseName: String? = null
         ): String {
             val params = mutableListOf<String>()
             if (courseId != null) {
@@ -32,6 +33,10 @@ sealed class Screen(val route: String) {
             }
             if (weekNumber != null) {
                 params += "weekNumber=$weekNumber"
+            }
+            if (courseName != null) {
+                // URL编码课程名称，避免特殊字符问题
+                params += "courseName=${java.net.URLEncoder.encode(courseName, "UTF-8")}"
             }
             return if (params.isEmpty()) {
                 "course_edit"

@@ -17,6 +17,8 @@ import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
+import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
+import com.wind.ggbond.classtime.ui.components.checkScheduleState
 import com.wind.ggbond.classtime.util.CourseColorPalette
 import com.wind.ggbond.classtime.util.HtmlScheduleParser
 import com.wind.ggbond.classtime.util.SecureCookieManager
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import javax.inject.Inject
 
 /**
@@ -58,8 +61,83 @@ class ImportScheduleViewModel @Inject constructor(
     private val _parsedCourses = MutableStateFlow<List<ParsedCourse>>(emptyList())
     val parsedCourses: StateFlow<List<ParsedCourse>> = _parsedCourses.asStateFlow()
     
+    // 课表选择状态（用于检查是否需要创建课表或提示过期）
+    private val _scheduleState = MutableStateFlow<ScheduleSelectionState>(ScheduleSelectionState.Loading)
+    val scheduleState: StateFlow<ScheduleSelectionState> = _scheduleState.asStateFlow()
+    
     // 保存学校ID，用于创建课表时关联学校
     private var currentSchoolId: String = ""
+    
+    init {
+        // 初始化时检查课表状态
+        checkCurrentScheduleState()
+    }
+    
+    // ===================== 课表状态检查 =====================
+    
+    /**
+     * 检查当前课表状态
+     * 判断是否需要创建课表或提示课表过期
+     */
+    private fun checkCurrentScheduleState() {
+        viewModelScope.launch {
+            try {
+                val schedule = scheduleRepository.getCurrentSchedule()
+                // 使用统一的检查方法
+                _scheduleState.value = checkScheduleState(schedule)
+            } catch (e: Exception) {
+                android.util.Log.w("ImportSchedule", "检查课表状态失败: ${e.message}")
+                _scheduleState.value = ScheduleSelectionState.NeedCreate
+            }
+        }
+    }
+    
+    /**
+     * 创建新课表
+     * @param name 课表名称
+     * @param startDate 开始日期
+     * @param totalWeeks 总周数
+     */
+    fun createSchedule(name: String, startDate: LocalDate, totalWeeks: Int) {
+        viewModelScope.launch {
+            try {
+                val endDate = startDate.plusWeeks(totalWeeks.toLong()).minusDays(1)
+                val schedule = Schedule(
+                    name = name,
+                    startDate = startDate,
+                    endDate = endDate,
+                    totalWeeks = totalWeeks,
+                    isCurrent = true
+                )
+                val scheduleId = scheduleRepository.insertSchedule(schedule)
+                // 设置为当前课表
+                scheduleRepository.setCurrentSchedule(scheduleId)
+                android.util.Log.d("ImportSchedule", "创建课表成功: $name, ID: $scheduleId")
+                // 更新状态为就绪
+                _scheduleState.value = ScheduleSelectionState.Ready
+            } catch (e: Exception) {
+                android.util.Log.e("ImportSchedule", "创建课表失败", e)
+                _importState.value = ImportState.Error("创建课表失败：${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * 确认继续使用过期课表
+     */
+    fun confirmUseExpiredSchedule() {
+        _scheduleState.value = ScheduleSelectionState.Ready
+        android.util.Log.d("ImportSchedule", "用户选择继续使用过期课表")
+    }
+    
+    /**
+     * 用户选择创建新课表（从过期提示）
+     * 将状态切换为需要创建
+     */
+    fun switchToCreateNewSchedule() {
+        _scheduleState.value = ScheduleSelectionState.NeedCreate
+        android.util.Log.d("ImportSchedule", "用户选择创建新课表")
+    }
     
     fun previewCourses(courses: List<ParsedCourse>, schoolId: String = "") {
         _parsedCourses.value = courses

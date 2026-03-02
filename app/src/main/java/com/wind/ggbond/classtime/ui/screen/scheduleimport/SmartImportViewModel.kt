@@ -64,10 +64,18 @@ class SmartImportViewModel @Inject constructor(
     
     /**
      * 获取学校信息
+     * ✅ 修复：添加异常处理，避免闪退
      */
     fun getSchool(schoolId: String): Flow<SchoolEntity?> {
         return flow {
-            emit(schoolRepository.getSchoolById(schoolId))
+            try {
+                val school = schoolRepository.getSchoolById(schoolId)
+                android.util.Log.d("SmartImportVM", "获取学校信息: schoolId=$schoolId, result=${school?.name}")
+                emit(school)
+            } catch (e: Exception) {
+                android.util.Log.e("SmartImportVM", "获取学校信息失败: schoolId=$schoolId", e)
+                emit(null)
+            }
         }
     }
     

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
+import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -119,9 +120,9 @@ fun ClassTimeConfigScreen(
                     IconButton(onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) 
                         if (fromImport) {
-                            // 从导入进入，跳转到主界面并强制刷新数据
+                            // 从导入进入，跳转到主界面并强制刷新数据（使用底部Tab的课表路由，确保导航栈正确清理）
                             navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                                popUpTo(Screen.Main.route) {
+                                popUpTo(BottomNavItem.Schedule.route) {
                                     inclusive = true
                                 }
                             }
@@ -138,9 +139,9 @@ fun ClassTimeConfigScreen(
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) 
                         // 保存并返回/跳转
                         if (fromImport) {
-                            // 从导入进入，跳转到主界面并强制刷新数据
+                            // 从导入进入，跳转到主界面并强制刷新数据（使用底部Tab的课表路由，确保导航栈正确清理）
                             navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                                popUpTo(Screen.Main.route) {
+                                popUpTo(BottomNavItem.Schedule.route) {
                                     inclusive = true
                                 }
                             }

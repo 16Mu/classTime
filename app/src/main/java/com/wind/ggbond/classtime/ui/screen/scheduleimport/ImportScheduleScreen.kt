@@ -21,7 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.model.ParsedCourse
+import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
+import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
+import com.wind.ggbond.classtime.ui.components.ScheduleExpiredDialog
+import com.wind.ggbond.classtime.ui.components.CreateScheduleDialog
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
@@ -38,7 +42,55 @@ fun ImportScheduleScreen(
     val parsedCourses by viewModel.parsedCourses.collectAsState()
     val htmlFilePickerTrigger by viewModel.htmlFilePickerTrigger.collectAsState()
     val jsonFilePickerTrigger by viewModel.jsonFilePickerTrigger.collectAsState()
+    val scheduleState by viewModel.scheduleState.collectAsState()
     val haptic = LocalHapticFeedback.current
+    
+    // 根据课表状态显示对应对话框
+    when (val state = scheduleState) {
+        // 加载中：显示加载指示器
+        is ScheduleSelectionState.Loading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+            return
+        }
+        // 需要创建课表：显示创建对话框
+        is ScheduleSelectionState.NeedCreate -> {
+            CreateScheduleDialog(
+                onConfirm = { name, startDate, totalWeeks ->
+                    viewModel.createSchedule(name, startDate, totalWeeks)
+                },
+                onDismiss = {
+                    // 取消创建则返回上一页
+                    navController.navigateUp()
+                }
+            )
+            return
+        }
+        // 课表已过期：显示过期提醒对话框
+        is ScheduleSelectionState.Expired -> {
+            ScheduleExpiredDialog(
+                schedule = state.schedule,
+                onContinue = {
+                    viewModel.confirmUseExpiredSchedule()
+                },
+                onCreateNew = {
+                    viewModel.switchToCreateNewSchedule()
+                },
+                onDismiss = {
+                    navController.navigateUp()
+                }
+            )
+            return
+        }
+        // 就绪状态：继续显示正常界面
+        is ScheduleSelectionState.Ready -> {
+            // 继续执行下面的正常界面逻辑
+        }
+    }
     
     // HTML文件选择器
     val htmlFilePicker = rememberLauncherForActivityResult(
@@ -173,9 +225,9 @@ fun ImportScheduleScreen(
                 
                 ImportState.Success -> {
                     LaunchedEffect(Unit) {
-                        // 导入成功，跳转到主界面并强制刷新数据
+                        // 导入成功，跳转到主界面并强制刷新数据（使用底部Tab的课表路由，确保导航栈正确清理）
                         navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                            popUpTo(Screen.Main.route) {
+                            popUpTo(BottomNavItem.Schedule.route) {
                                 inclusive = true
                             }
                         }
@@ -631,7 +683,7 @@ fun ImportMethodSelection(
                     )
                     // 描述
                     Text(
-                        "支持120+所高校，登录后自动获取课表",
+                        "支持27+所高校，登录后自动获取课表",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )

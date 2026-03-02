@@ -100,6 +100,11 @@ fun NavGraph(
                 navArgument("weekNumber") {
                     type = NavType.IntType
                     defaultValue = 0
+                },
+                navArgument("courseName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                    nullable = true
                 }
             ),
             enterTransition = {
@@ -138,13 +143,23 @@ fun NavGraph(
             val startSection = backStackEntry.arguments?.getInt("startSection")?.takeIf { it > 0 }
             val sectionCount = backStackEntry.arguments?.getInt("sectionCount")?.takeIf { it > 0 }
             val weekNumber = backStackEntry.arguments?.getInt("weekNumber")?.takeIf { it > 0 }
+            // 获取课程名称参数，用于预填充（添加新时间段场景）
+            val courseName = backStackEntry.arguments?.getString("courseName")?.takeIf { it.isNotEmpty() }?.let {
+                // URL解码课程名称
+                try {
+                    java.net.URLDecoder.decode(it, "UTF-8")
+                } catch (_: Exception) {
+                    it
+                }
+            }
             com.wind.ggbond.classtime.ui.screen.course.CourseEditScreen(
                 navController = navController,
                 courseId = courseId,
                 defaultDayOfWeek = dayOfWeek,
                 defaultStartSection = startSection,
                 defaultSectionCount = sectionCount,
-                defaultWeekNumber = weekNumber
+                defaultWeekNumber = weekNumber,
+                defaultCourseName = courseName
             )
         }
         
