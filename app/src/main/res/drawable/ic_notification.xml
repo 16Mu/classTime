@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 简单的课程表图标：日历加时钟 -->
+    <!-- 日历外框 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,4h14c1.1,0 2,0.9 2,2v14c0,1.1 -0.9,2 -2,2H5c-1.1,0 -2,-0.9 -2,-2V6c0,-1.1 0.9,-2 2,-2z" />
+    <!-- 日历头部线条 -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M5,8h14v2H5z" />
+    <!-- 日期网格点 -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 6,12 A 1,1 0 1,1 8,12 A 1,1 0 1,1 6,12" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 11,12 A 1,1 0 1,1 13,12 A 1,1 0 1,1 11,12" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 16,12 A 1,1 0 1,1 18,12 A 1,1 0 1,1 16,12" />
+    <!-- 时钟指针（提醒标识） -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,15 L12,13 L14,13 L14,15 Z"
+        android:strokeWidth="1"
+        android:strokeColor="#000000" />
+</vector>
+
+
+
+
+
+
+
+

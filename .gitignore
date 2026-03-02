@@ -1,0 +1,158 @@
+# ========================================
+# 时课项目 - Git 忽略规则 (TortoiseGit 优化版)
+# ========================================
+
+# 应用程序文件
+*.apk
+*.ap_
+*.aab
+
+# Java/Kotlin 编译文件
+*.class
+*.dex
+
+# 生成文件
+bin/
+gen/
+out/
+
+# Gradle 构建文件
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 本地配置文件 (包含敏感信息)
+local.properties
+
+# Proguard 混淆文件
+proguard/
+
+# 日志文件
+*.log
+build_log.txt
+hs_err_pid*
+replay_pid*
+
+# Android Studio 临时文件
+.navigation/
+captures/
+
+# IntelliJ IDEA 配置文件
+*.iml
+*.iws
+*.ipr
+.idea/
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/dictionaries
+.idea/libraries
+.idea/caches
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/codeStyles/
+
+# 密钥文件 (安全敏感)
+*.keystore
+*.jks
+*.p12
+*.pfx
+
+# Android NDK 文件
+.externalNativeBuild
+.cxx/
+obj/
+
+# 第三方服务配置文件
+google-services.json
+GoogleService-Info.plist
+sentry.properties
+fabric.properties
+twitter4j.properties
+
+# 测试和覆盖率报告
+/test-results/
+/androidTest-results/
+coverage/
+
+# 临时和备份文件
+*.tmp
+*.temp
+*.swp
+*~
+*.bak
+*.backup
+
+# 操作系统生成文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Kotlin 元数据
+*.kt.meta
+
+# Room 数据库架构文件
+schemas/
+
+# 构建缓存
+.buildcache/
+
+# IDE 编辑器文件
+.vscode/
+*.code-workspace
+
+# Freeline 快速构建
+freeline.py
+freeline/
+freeline_project_description.json
+
+# Fastlane CI/CD
+fastlane/
+
+# 版本控制文件
+vcs.xml
+
+# Lint 报告
+lint/
+lint-results.xml
+
+# Android 性能分析
+*.hprof
+
+# 依赖验证
+verification-metadata.xml
+
+# Android Studio 备份规则
+.studio/
+
+# 测试结果
+test-results.xml
+
+# Google App Engine
+appengine-generated/
+
+# Cursor 编辑器
+.cursor/
+.cursorignore
+
+# TortoiseGit 特定文件
+*.tgitconfig
+
+# 项目特定目录 (包含敏感信息或临时文件)
+AppIcons/
+Key/
+temp_aishedule/
+
+# 保留重要文件
+!**/src/main/**/build/
+!**/src/test/**/build/
+!gradlew
+!gradlew.bat
+!settings.gradle.kts
+!build.gradle.kts

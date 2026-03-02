@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 
+        网络安全配置
+        允许应用访问HTTP（明文）网站，用于兼容使用HTTP协议的教务系统
+        注意：仅在必要时使用，生产环境应尽量使用HTTPS
+    -->
+    
+    <!-- 默认配置：禁止明文流量，仅信任系统证书 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- 信任系统证书 -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    
+    <!-- 
+        针对特定域名的配置
+        可以在这里添加特定学校的域名配置
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 重庆地区学校 -->
+        <domain includeSubdomains="true">cqepc.edu.cn</domain>
+        <domain includeSubdomains="true">cqvtu.edu.cn</domain>
+        <domain includeSubdomains="true">cqust.edu.cn</domain>
+        <domain includeSubdomains="true">cqmu.edu.cn</domain>
+        
+        <!-- 常见教务系统域名 -->
+        <domain includeSubdomains="true">jwgl</domain>
+        <domain includeSubdomains="true">jwxt</domain>
+        <domain includeSubdomains="true">eams</domain>
+        <domain includeSubdomains="true">jxgl</domain>
+        
+        <!-- 允许所有IP地址（部分学校使用IP访问） -->
+        <domain includeSubdomains="true">210.42.121.241</domain>
+        <domain includeSubdomains="true">222.179.135.21</domain>
+        <domain includeSubdomains="true">219.140.59.210</domain>
+        <domain includeSubdomains="true">222.243.161.213</domain>
+    </domain-config>
+    
+    <!-- Debug配置（仅在调试时启用） -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

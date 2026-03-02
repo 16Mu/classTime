@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">时课</string>
+    
+    <!-- 主界面 -->
+    <string name="week_view">周视图</string>
+    <string name="day_view">日视图</string>
+    <string name="import_schedule">导入课表</string>
+    <string name="settings">设置</string>
+    
+    <!-- 课程相关 -->
+    <string name="course_name">课程名称</string>
+    <string name="teacher">教师</string>
+    <string name="classroom">教室</string>
+    <string name="week_range">周次</string>
+    <string name="add_course">添加课程</string>
+    <string name="edit_course">编辑课程</string>
+    <string name="delete_course">删除课程</string>
+    
+    <!-- 通知相关 -->
+    <string name="class_reminder">上课提醒</string>
+    <string name="reminder_channel_name">课程提醒</string>
+    <string name="reminder_channel_description">显示即将开始的课程提醒</string>
+    
+    <!-- 通用 -->
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="delete">删除</string>
+    <string name="edit">编辑</string>
+    
+    <!-- 免责声明 -->
+    <string name="disclaimer_title">免责声明</string>
+    <string name="disclaimer_subtitle">查看应用免责声明</string>
+    <string name="disclaimer_acknowledge">我已知晓</string>
+    <string name="disclaimer_agree">我已阅读并同意</string>
+    <string name="disclaimer_disagree">不同意并退出</string>
+    <string name="disclaimer_content">免责声明内容请从assets/disclaimer.txt文件读取</string>
+    
+    <!-- 桌面小组件 - 今日课程 -->
+    <string name="widget_name">今日课程</string>
+    <string name="widget_description">在桌面查看今日课程安排</string>
+    <string name="widget_loading">加载中…</string>
+    <string name="widget_preview_date">2月14日 周五</string>
+    <string name="widget_preview_week">第10周</string>
+    <string name="widget_preview_count">3节课</string>
+    <string name="widget_preview_course1">高等数学</string>
+    <string name="widget_preview_room1">教学楼A301</string>
+    <string name="widget_preview_course2">大学英语</string>
+    <string name="widget_preview_room2">教学楼B205</string>
+
+    <!-- 桌面小组件 - 下节课倒计时 -->
+    <string name="next_class_widget_name">下节课</string>
+    <string name="next_class_widget_description">在桌面查看下节课倒计时</string>
+    <string name="next_class_widget_preview_status">即将上课</string>
+    <string name="next_class_widget_preview_week">周五 · 第10周</string>
+    <string name="next_class_widget_preview_countdown">25分钟</string>
+    <string name="next_class_widget_preview_suffix">后上课</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="sharedpref" path="."/>
+    <include domain="database" path="."/>
+    <include domain="file" path="."/>
+    <!-- 排除加密凭据文件（设备绑定密钥，恢复到新设备会崩溃） -->
+    <exclude domain="sharedpref" path="secure_credentials.xml"/>
+    <exclude domain="sharedpref" path="secure_cookies.xml"/>
+    <exclude domain="sharedpref" path="auto_login_prefs.xml"/>
+    <exclude domain="sharedpref" path="auto_login_secure.xml"/>
+</full-backup-content>
+
+
+

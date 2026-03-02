@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    下节课倒计时桌面小组件配置
+    
+    - minWidth/minHeight: 最小尺寸（3x2 格子）
+    - updatePeriodMillis: 自动刷新间隔（30分钟，系统最低限制）
+    - resizeMode: 支持水平和垂直方向调整大小
+    - widgetCategory: 仅支持主屏幕
+    - targetCellWidth/Height: Android 12+ 的格子尺寸
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_loading"
+    android:previewLayout="@layout/next_class_widget_preview"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/next_class_widget_description" />

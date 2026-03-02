@@ -1,0 +1,404 @@
+package com.wind.ggbond.classtime.ui.screen.main.components
+
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.util.DateUtils
+import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
+import com.wind.ggbond.classtime.ui.theme.secondaryContentColorForBackground
+
+/**
+ * 周视图组件
+ */
+@Composable
+fun WeekView(
+    weekNumber: Int,
+    coursesMap: Map<Int, List<Course>>,
+    showWeekend: Boolean = true,  // 新增：是否显示周末
+    onCourseClick: (Course) -> Unit,
+    onCourseLongClick: ((Course) -> Unit)? = null,  // 新增：长按课程卡片回调
+    modifier: Modifier = Modifier,
+    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null
+) {
+    // 根据是否显示周末动态确定天数范围
+    val dayCount = if (showWeekend) 7 else 5
+    
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp)
+    ) {
+        // 优化：添加key参数提升LazyColumn性能，移除入场动画减少卡顿
+        items(
+            count = dayCount,
+            key = { index -> "day_${index + 1}_week_$weekNumber" }  // 使用更精确的key
+        ) { index ->
+            val dayOfWeek = index + 1
+            val allCourses = coursesMap[dayOfWeek] ?: emptyList()
+            
+            // 优化：使用 remember 缓存过滤结果
+            val coursesForThisWeek = remember(allCourses, weekNumber) {
+                allCourses.filter { course ->
+                    course.weeks.contains(weekNumber)
+                }
+            }
+            
+            DaySchedule(
+                weekNumber = weekNumber,
+                dayOfWeek = dayOfWeek,
+                courses = coursesForThisWeek,
+                onCourseClick = onCourseClick,
+                onCourseLongClick = onCourseLongClick,
+                getAdjustmentInfo = getAdjustmentInfo
+            )
+        }
+        
+        // 底部间距
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+}
+
+/**
+ * 单日课程显示
+ */
+@Composable
+fun DaySchedule(
+    weekNumber: Int,
+    dayOfWeek: Int,
+    courses: List<Course>,
+    onCourseClick: (Course) -> Unit,
+    onCourseLongClick: ((Course) -> Unit)? = null,
+    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        // 星期标题
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = DateUtils.getDayOfWeekShortName(dayOfWeek),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Text(
+                text = DateUtils.getDayOfWeekName(dayOfWeek),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
+            Text(
+                text = "${courses.size} 节课",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        // 课程列表
+        if (courses.isEmpty()) {
+            // 扁平化"无课"状态显示
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .padding(vertical = 32.dp, horizontal = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 扁平图标背景
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.EventAvailable,
+                            contentDescription = "无课程",
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "这天没有课哦 ~",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = "好好享受休息时光吧",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        } else {
+            // 优化：为每个课程卡片指定key，减少不必要的重组
+            courses.forEach { course ->
+                androidx.compose.runtime.key(course.id) {
+                    val adjustmentInfo = getAdjustmentInfo?.invoke(
+                        course.id, 
+                        weekNumber, 
+                        course.dayOfWeek, 
+                        course.startSection
+                    )
+                    CourseCard(
+                        weekNumber = weekNumber,
+                        course = course,
+                        onClick = { onCourseClick(course) },
+                        onLongClick = onCourseLongClick?.let { { it(course) } },
+                        adjustmentInfo = adjustmentInfo
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 课程卡片 -「小爱课程表」风格 - 性能优化版本
+ * 特点：极简高效、文本完全换行、紧凑布局、高对比度
+ * 优化：使用 remember 缓存颜色计算，减少重组开销
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun CourseCard(
+    weekNumber: Int,
+    course: Course,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    adjustmentInfo: com.wind.ggbond.classtime.data.local.entity.CourseAdjustment? = null
+) {
+    // 优化：缓存课程状态判断
+    val courseState = remember(weekNumber, course.dayOfWeek) {
+        val now = java.time.LocalDateTime.now()
+        val currentWeekOfYear = java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()
+        val currentWeek = now.get(currentWeekOfYear)
+        
+        val isPast = weekNumber < currentWeek
+        val isOngoing = weekNumber == currentWeek && now.dayOfWeek.value == course.dayOfWeek
+        
+        Pair(isPast, isOngoing)
+    }
+    val (isPast, isOngoing) = courseState
+    
+    // 优化：缓存颜色解析和计算
+    val baseColor = remember(course.color) {
+        try {
+            Color(android.graphics.Color.parseColor(course.color))
+        } catch (e: Exception) {
+            Color.Unspecified
+        }
+    }.let { if (it == Color.Unspecified) MaterialTheme.colorScheme.primaryContainer else it }
+    
+    // 根据状态调整颜色
+    val displayColor = remember(baseColor, isPast, isOngoing) {
+        when {
+            isPast -> baseColor.copy(alpha = 0.5f)
+            isOngoing -> baseColor
+            else -> baseColor.copy(alpha = 0.95f)
+        }
+    }
+    
+    // 「小爱」风格：极简扁平设计
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(displayColor)
+            .then(
+                if (isOngoing) {
+                    Modifier.border(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                } else {
+                    Modifier
+                }
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(12.dp)  // 紧凑内边距 10dp
+    ) {
+        // 「小爱课程表」风格：统一使用黑/白文字
+        val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+        val baseTextColor = if (isDarkTheme) Color.White else Color.Black
+        
+        val titleColor = if (isPast) baseTextColor.copy(alpha = 0.5f) else baseTextColor
+        val subColor = baseTextColor.copy(alpha = 0.75f)  // 次要信息75%透明度
+        val tertiaryColor = baseTextColor.copy(alpha = 0.6f)  // 第三级信息60%透明度
+        
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 课程名称 + 调课标记 + 节次（同一行）
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                // 课程名称 - 主要信息，大字号18sp，粗体
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = course.courseName,
+                        fontSize = 18.sp,  // 增大到18sp
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 24.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        color = titleColor
+                    )
+                    
+                    // 调课标记
+                    if (adjustmentInfo != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text(
+                                text = "🔄",
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // 节次信息 - 紧凑显示
+                Text(
+                    text = "第${course.startSection}${if (course.sectionCount > 1) "-${course.startSection + course.sectionCount - 1}" else ""}节",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(titleColor.copy(alpha = 0.1f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 教室信息 - 次要信息，小字号12sp（比课程名小6sp）
+            if (course.classroom.isNotEmpty()) {
+                Text(
+                    text = course.classroom,
+                    fontSize = 12.sp,  // 减小到12sp
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 16.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = subColor  // 70%透明度
+                )
+            }
+            
+            // 教师信息 - 次要信息，小字号12sp（与地点同级）
+            if (course.teacher.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = course.teacher,
+                    fontSize = 12.sp,  // 减小到12sp
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 16.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = subColor  // 70%透明度，与地点同级
+                )
+            }
+            
+            // 正在上课的指示标签
+            if (isOngoing) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981))
+                    )
+                    Text(
+                        text = "正在上课",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = titleColor.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+    }
+}

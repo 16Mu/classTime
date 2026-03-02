@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    今日课程桌面小组件配置
+    
+    - minWidth/minHeight: 最小尺寸（4x2 格子）
+    - updatePeriodMillis: 自动刷新间隔（30分钟）
+    - resizeMode: 支持水平和垂直方向调整大小
+    - widgetCategory: 仅支持主屏幕
+    - targetCellWidth/Height: Android 12+ 的格子尺寸
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="420dp"
+    android:maxResizeHeight="500dp"
+    android:updatePeriodMillis="1800000"
+    android:previewLayout="@layout/widget_preview"
+    android:initialLayout="@layout/widget_loading"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_description" />
