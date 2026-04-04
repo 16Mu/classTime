@@ -7,10 +7,11 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
 import com.wind.ggbond.classtime.ui.components.checkScheduleState
 import com.wind.ggbond.classtime.util.CourseColorPalette
+import com.wind.ggbond.classtime.util.CourseColorProvider
 import com.wind.ggbond.classtime.util.TextCourseParser
 import com.wind.ggbond.classtime.util.WeekParser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -77,7 +78,7 @@ sealed class BatchSaveState {
 class BatchCourseCreateViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
-    private val reminderScheduler: AlarmReminderScheduler,
+    private val reminderScheduler: IAlarmScheduler,
     private val textCourseParser: TextCourseParser
 ) : ViewModel() {
 
@@ -202,7 +203,7 @@ class BatchCourseCreateViewModel @Inject constructor(
      */
     fun addCourseItemCollapsed(): Long {
         val newItem = BatchCourseItem(isExpanded = false)
-        _courseItems.value = listOf(newItem) + _courseItems.value
+        _courseItems.value = _courseItems.value + listOf(newItem)
         Log.d(TAG, "添加新课程（折叠态），当前共 ${_courseItems.value.size} 门")
         return newItem.id
     }
@@ -262,14 +263,18 @@ class BatchCourseCreateViewModel @Inject constructor(
     fun updateCourseName(courseId: Long, name: String) {
         _courseItems.value = _courseItems.value.map {
             if (it.id == courseId) {
-                // 自动分配颜色（当颜色为空且名称不为空时）
-                val color = if (it.color.isEmpty() && name.isNotBlank()) {
-                    CourseColorPalette.getColorForCourse(name, existingColors)
-                } else {
-                    it.color
-                }
-                it.copy(courseName = name, color = color)
+                it.copy(courseName = name)
             } else it
+        }
+        if (name.isNotBlank()) {
+            viewModelScope.launch {
+                val color = CourseColorProvider.getColorForCourse(name, existingColors)
+                _courseItems.value = _courseItems.value.map {
+                    if (it.id == courseId && it.color.isEmpty()) {
+                        it.copy(color = color)
+                    } else it
+                }
+            }
         }
     }
 
@@ -297,6 +302,20 @@ class BatchCourseCreateViewModel @Inject constructor(
     fun updateCourseColor(courseId: Long, color: String) {
         _courseItems.value = _courseItems.value.map {
             if (it.id == courseId) it.copy(color = color) else it
+        }
+    }
+
+    fun autoAssignAllColors() {
+        viewModelScope.launch {
+            val usedColors = mutableSetOf<String>()
+            _courseItems.value = _courseItems.value.mapIndexed { index, course ->
+                val assignedColor = CourseColorProvider.getColorForCourse(
+                    course.courseName,
+                    existingColors + usedColors.toList()
+                ).also { usedColors.add(it) }
+                course.copy(color = assignedColor)
+            }
+            Log.d(TAG, "一键分配颜色完成，共 ${_courseItems.value.size} 门课程")
         }
     }
 
@@ -338,22 +357,24 @@ class BatchCourseCreateViewModel @Inject constructor(
         // 更新课程信息
         _courseItems.value = _courseItems.value.map { course ->
             if (course.id == courseId) {
-                // 自动分配颜色
-                val color = if (parsed.courseName.isNotBlank()) {
-                    CourseColorPalette.getColorForCourse(parsed.courseName, existingColors)
-                } else {
-                    course.color
-                }
-
                 course.copy(
                     courseName = parsed.courseName.ifBlank { course.courseName },
                     teacher = parsed.teacher.ifBlank { course.teacher },
                     defaultClassroom = parsed.classroom.ifBlank { course.defaultClassroom },
                     weeks = parsed.weeks.ifEmpty { course.weeks },
-                    credit = parsed.credit.takeIf { it > 0 } ?: course.credit,
-                    color = color
+                    credit = parsed.credit.takeIf { it > 0 } ?: course.credit
                 )
             } else course
+        }
+        if (parsed.courseName.isNotBlank()) {
+            viewModelScope.launch {
+                val color = CourseColorProvider.getColorForCourse(parsed.courseName, existingColors)
+                _courseItems.value = _courseItems.value.map {
+                    if (it.id == courseId && it.color.isEmpty()) {
+                        it.copy(color = color)
+                    } else it
+                }
+            }
         }
 
         // 构建结果描述
@@ -381,24 +402,30 @@ class BatchCourseCreateViewModel @Inject constructor(
 
         // 为每门解析出的课程创建新的课程项
         val newCourses = parsedCourses.map { parsed ->
-            val color = CourseColorPalette.getColorForCourse(
-                parsed.courseName,
-                existingColors + _courseItems.value.map { it.color }
-            )
-
             BatchCourseItem(
                 courseName = parsed.courseName,
                 teacher = parsed.teacher,
                 defaultClassroom = parsed.classroom,
                 weeks = parsed.weeks,
                 credit = parsed.credit,
-                color = color,
                 isExpanded = true
             )
         }
-
-        // 添加到列表开头
         _courseItems.value = newCourses + _courseItems.value
+        viewModelScope.launch {
+            val colorMapping = mutableMapOf<String, String>()
+            for (parsed in parsedCourses) {
+                colorMapping[parsed.courseName] = CourseColorProvider.getColorForCourse(
+                    parsed.courseName,
+                    existingColors + _courseItems.value.map { it.color }
+                )
+            }
+            _courseItems.value = _courseItems.value.map { course ->
+                if (course.color.isEmpty() && colorMapping.containsKey(course.courseName)) {
+                    course.copy(color = colorMapping[course.courseName]!!)
+                } else course
+            }
+        }
 
         return newCourses.size
     }
@@ -640,7 +667,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                     courseCount++
                     // 确定颜色：用户设置 > 自动分配
                     val color = courseItem.color.ifEmpty {
-                        CourseColorPalette.getColorForCourse(courseItem.courseName, existingColors)
+                        CourseColorProvider.getColorForCourse(courseItem.courseName, existingColors)
                     }
 
                     // 为每个时间段创建一条Course记录
