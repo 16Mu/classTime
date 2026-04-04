@@ -4,7 +4,10 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +23,8 @@ fun ImportDialog(
     onDismiss: () -> Unit,
     onImport: (Uri) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    
     var selectedFileUri by remember { mutableStateOf<Uri?>(null) }
     var selectedFileName by remember { mutableStateOf("未选择文件") }
     
@@ -86,7 +91,7 @@ fun ImportDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.InsertDriveFile,
+                                imageVector = Icons.AutoMirrored.Filled.InsertDriveFile,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.size(20.dp)
@@ -179,7 +184,10 @@ fun ImportDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onDismiss()
+            }) {
                 Text("取消")
             }
         }
@@ -197,6 +205,8 @@ fun ImportResultDialog(
     errorMessage: String? = null,
     onDismiss: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -269,7 +279,10 @@ fun ImportResultDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) {
+            Button(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onDismiss()
+            }) {
                 Text("确定")
             }
         }

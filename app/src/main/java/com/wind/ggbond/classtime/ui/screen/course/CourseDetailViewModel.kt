@@ -119,13 +119,13 @@ class CourseDetailViewModel @Inject constructor(
     
     fun deleteExam(examId: Long) {
         viewModelScope.launch {
-            examRepository.deleteExamById(examId)
+            examRepository.deleteById(examId)
         }
     }
-    
+
     fun saveExam(exam: Exam) {
         viewModelScope.launch {
-            examRepository.insertExam(exam)
+            examRepository.insert(exam)
         }
     }
     

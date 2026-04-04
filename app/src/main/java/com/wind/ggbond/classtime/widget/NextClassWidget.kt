@@ -24,10 +24,13 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.wind.ggbond.classtime.MainActivity
+import com.wind.ggbond.classtime.widget.data.NextClassDisplayData
+import com.wind.ggbond.classtime.widget.data.NextClassDataProvider
 
 /**
  * 下节课倒计时桌面小组件
@@ -181,6 +184,39 @@ private fun NextClassInfo(data: NextClassDisplayData) {
     }
 
     Spacer(modifier = GlanceModifier.height(10.dp))
+
+    // 进度条（仅在正在上课时显示）
+    if (data.isOngoing && data.totalMinutes > 0) {
+        val progressPercent = ((data.elapsedMinutes.toFloat() / data.totalMinutes.toFloat()) * 100).toInt().coerceIn(0, 100)
+        
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 进度条背景
+            Box(
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .height(4.dp)
+                    .background(dayNightColorProvider(day = WidgetColors.dividerDay, night = WidgetColors.dividerNight))
+                    .cornerRadius(2.dp)
+            ) {}
+            
+            Spacer(modifier = GlanceModifier.width(8.dp))
+            
+            // 进度百分比文本
+            Text(
+                text = "$progressPercent%",
+                style = TextStyle(
+                    color = dayNightColorProvider(day = courseColor, night = courseColor),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+        
+        Spacer(modifier = GlanceModifier.height(10.dp))
+    }
 
     // 分隔线
     Box(

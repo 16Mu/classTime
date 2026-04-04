@@ -82,23 +82,30 @@ private val DarkColorScheme = darkColorScheme(
  * 
  * @param darkTheme 是否使用深色主题，默认跟随系统
  * @param dynamicColor 是否使用动态颜色（Android 12+），默认关闭以保持一致的品牌色
+ * @param customDynamicColorScheme 自定义的动态配色方案（从背景图片生成）
  * @param content Composable内容
  */
 @Composable
 fun CourseScheduleTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // 默认关闭动态颜色，保持应用一致的视觉风格
+    dynamicColor: Boolean = false,
+    customDynamicColorScheme: androidx.compose.material3.ColorScheme? = null,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
-        // 动态颜色支持（Android 12+）
+        // 优先使用自定义动态配色方案（从背景图片生成）
+        customDynamicColorScheme != null -> customDynamicColorScheme
+        
+        // 动态颜色支持（Android 12+ 系统壁纸）
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        // 深色主题
+        
+        // 深色主题（默认静态配色）
         darkTheme -> DarkColorScheme
-        // 浅色主题（默认）
+        
+        // 浅色主题（默认静态配色）
         else -> LightColorScheme
     }
 
@@ -117,7 +124,21 @@ fun CourseScheduleTheme(
     }
 
     // 根据主题选择课表专用颜色方案
-    val scheduleColors = if (darkTheme) DarkScheduleColors else LightScheduleColors
+    val scheduleColors = when {
+        customDynamicColorScheme != null -> {
+            val cs = customDynamicColorScheme
+            ScheduleColorScheme(
+                background = cs.background,
+                gridLine = cs.outlineVariant,
+                sectionBackground = cs.surfaceContainerLow,
+                todayHighlight = cs.primaryContainer.copy(alpha = 0.5f),
+                textPrimary = cs.onSurface,
+                textSecondary = cs.onSurfaceVariant
+            )
+        }
+        darkTheme -> DarkScheduleColors
+        else -> LightScheduleColors
+    }
 
     CompositionLocalProvider(
         LocalScheduleColors provides scheduleColors

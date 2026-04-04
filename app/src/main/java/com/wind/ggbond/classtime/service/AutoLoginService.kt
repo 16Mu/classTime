@@ -2,16 +2,20 @@ package com.wind.ggbond.classtime.service
 
 import android.content.Context
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.util.Log
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
+import com.wind.ggbond.classtime.service.helper.LoginScriptGenerator
 import com.wind.ggbond.classtime.util.AutoLoginResultCode
 import com.wind.ggbond.classtime.util.SecureCookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
+import javax.inject.Inject
 
 /**
  * 自动登录服务
@@ -23,7 +27,8 @@ import kotlin.coroutines.resume
 class AutoLoginService(
     private val context: Context,
     private val schoolRepository: SchoolRepository,
-    private val secureCookieManager: SecureCookieManager // 用于保存登录后的Cookie
+    private val secureCookieManager: SecureCookieManager,
+    private val loginScriptGenerator: LoginScriptGenerator
 ) {
     
     companion object {
@@ -154,7 +159,7 @@ class AutoLoginService(
                             view?.postDelayed({
                                 if (loginCompleted) return@postDelayed
                                 
-                                val autoLoginScript = generateAutoLoginScript(username, password)
+                                val autoLoginScript = loginScriptGenerator.generateAutoLoginScript(username, password)
                                 view.evaluateJavascript(autoLoginScript) { result ->
                                     Log.d(TAG, "自动登录脚本执行结果: $result")
                                     
@@ -237,24 +242,23 @@ class AutoLoginService(
                     }
                     
                     override fun onReceivedError(
-                        view: WebView?,
-                        errorCode: Int,
-                        description: String?,
-                        failingUrl: String?
+                        view: WebView,
+                        request: WebResourceRequest,
+                        error: WebResourceError
                     ) {
-                        super.onReceivedError(view, errorCode, description, failingUrl)
-                        
-                        if (loginCompleted) return
-                        
-                        Log.e(TAG, "WebView加载错误: $description")
+                        super.onReceivedError(view, request, error)
+                        if (!request.isForMainFrame || loginCompleted) return
+
+                        val description = error.description?.toString().orEmpty()
+                        Log.e(TAG, "WebView??????: $description")
                         loginCompleted = true
-                        
+
                         cleanupWebView()
                         continuation.resume(
                             AutoLoginResult(
                                 success = false,
                                 resultCode = AutoLoginResultCode.NETWORK_ERROR,
-                                message = "网络错误: $description"
+                                message = "??????: $description"
                             )
                         )
                     }
@@ -366,103 +370,6 @@ class AutoLoginService(
         } catch (e: Exception) {
             url
         }
-    }
-    
-    /**
-     * 生成自动登录脚本
-     * 
-     * 基于你提供的HTML结构，自动填充账号密码并登录
-     */
-    private fun generateAutoLoginScript(username: String, password: String): String {
-        // 转义特殊字符（覆盖所有JS危险字符，防止注入）
-        val escapedUsername = escapeForJavaScript(username)
-        val escapedPassword = escapeForJavaScript(password)
-        
-        return """
-            (function() {
-                try {
-                    // 1. 检查是否是登录页面
-                    var form = document.getElementById('fm1');
-                    if (!form) {
-                        console.log('❌ 未找到登录表单');
-                        return JSON.stringify({success: false});
-                    }
-                    
-                    // 2. 检查是否出现验证码
-                    var kaptcha = document.getElementById('kaptcha');
-                    if (kaptcha && kaptcha.style.display !== 'none') {
-                        console.log('⚠️ 检测到验证码');
-                        return JSON.stringify({needsCaptcha: true});
-                    }
-                    
-                    // 3. 填充账号
-                    var userInput = document.getElementById('username');
-                    if (userInput) {
-                        userInput.value = '$escapedUsername';
-                        userInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        userInput.dispatchEvent(new Event('change', { bubbles: true }));
-                        console.log('✅ 账号已填充');
-                    }
-                    
-                    // 4. 填充密码（可见框）
-                    var ppassword = document.getElementById('ppassword');
-                    if (ppassword) {
-                        ppassword.value = '$escapedPassword';
-                        ppassword.dispatchEvent(new Event('input', { bubbles: true }));
-                        ppassword.dispatchEvent(new Event('change', { bubbles: true }));
-                        console.log('✅ 密码框已填充');
-                    }
-                    
-                    // 5. 填充密码（隐藏框）
-                    var password = document.getElementById('password');
-                    if (password) {
-                        password.value = '$escapedPassword';
-                        password.dispatchEvent(new Event('input', { bubbles: true }));
-                        password.dispatchEvent(new Event('change', { bubbles: true }));
-                        console.log('✅ 隐藏密码框已填充');
-                    }
-                    
-                    // 6. 勾选协议（如存在）
-                    var cjgzs = document.getElementById('cjgzsType');
-                    if (cjgzs) {
-                        cjgzs.checked = true;
-                        console.log('✅ 协议已勾选');
-                    }
-                    
-                    // 7. 点击登录按钮（直接点击，由WebViewClient监测页面跳转判断结果）
-                    var loginBtn = document.getElementById('dl');
-                    if (loginBtn) {
-                        console.log('准备点击登录按钮');
-                        loginBtn.click();
-                        console.log('登录按钮已点击，等待页面跳转');
-                        return JSON.stringify({submitted: true});
-                    } else {
-                        console.log('未找到登录按钮');
-                        return JSON.stringify({submitted: false});
-                    }
-                    
-                } catch (e) {
-                    console.error('❌ 自动登录脚本异常:', e);
-                    return JSON.stringify({error: e.message});
-                }
-            })();
-        """.trimIndent()
-    }
-    
-    /**
-     * 将字符串转义为安全的JavaScript单引号字符串内容
-     * 覆盖：反斜杠、单引号、双引号、换行符、回车符、制表符、反引号、美元符号
-     */
-    private fun escapeForJavaScript(input: String): String {
-        return input
-            .replace("\\", "\\\\")     // 反斜杠必须最先转义
-            .replace("'", "\\'")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-            .replace("`", "\\`")       // 反引号（模板字符串）
-            .replace("\$", "\\\$")     // 美元符号（模板字符串）
     }
 }
 

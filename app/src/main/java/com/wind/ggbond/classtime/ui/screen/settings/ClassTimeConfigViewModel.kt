@@ -183,7 +183,7 @@ class ClassTimeConfigViewModel @Inject constructor(
         classTimeRepository.deleteAllByConfig(configName)
         
         // 插入新的默认配置
-        classTimeRepository.insertClassTimes(defaultTimes)
+        classTimeRepository.insertAll(defaultTimes)
         
         // 更新节次数设置
         _morningSections.value = 6  // 上午6节
@@ -391,13 +391,13 @@ class ClassTimeConfigViewModel @Inject constructor(
         
         // 插入新的课程时间
         if (newTimes.isNotEmpty()) {
-            classTimeRepository.insertClassTimes(newTimes)
+            classTimeRepository.insertAll(newTimes)
         }
     }
     
     fun updateClassTime(classTime: ClassTime) {
         viewModelScope.launch {
-            classTimeRepository.updateClassTime(classTime)
+            classTimeRepository.update(classTime)
             // 自动调整后续节次的时间（保持各节次原有时长）
             adjustSubsequentClassTimes(classTime)
         }
@@ -409,7 +409,7 @@ class ClassTimeConfigViewModel @Inject constructor(
      */
     fun updateClassTimeAndApplyUniform(classTime: ClassTime) {
         viewModelScope.launch {
-            classTimeRepository.updateClassTime(classTime)
+            classTimeRepository.update(classTime)
             // 应用统一时长到所有节次
             applyUniformDuration()
         }
@@ -448,7 +448,7 @@ class ClassTimeConfigViewModel @Inject constructor(
                     startTime = newStartTime,
                     endTime = newEndTime
                 )
-                classTimeRepository.updateClassTime(updatedClassTime)
+                classTimeRepository.update(updatedClassTime)
                 previousEndTime = newEndTime
             } else {
                 // 如果不需要改变，后面的也不需要改变了
@@ -486,7 +486,7 @@ class ClassTimeConfigViewModel @Inject constructor(
             }
             
             // 批量更新所有节次
-            updatedTimes.forEach { classTimeRepository.updateClassTime(it) }
+            updatedTimes.forEach { classTimeRepository.update(it) }
         }
     }
     
@@ -514,7 +514,7 @@ class ClassTimeConfigViewModel @Inject constructor(
                 // 晚上
                 ClassTime(sectionNumber = 10, startTime = LocalTime.of(19, 0), endTime = LocalTime.of(19, 40))
             )
-            classTimeRepository.insertClassTimes(defaultTimes)
+            classTimeRepository.insertAll(defaultTimes)
         }
     }
 }

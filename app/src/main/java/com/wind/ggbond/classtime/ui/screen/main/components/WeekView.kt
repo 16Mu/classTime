@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,11 +45,13 @@ import com.wind.ggbond.classtime.ui.theme.secondaryContentColorForBackground
 fun WeekView(
     weekNumber: Int,
     coursesMap: Map<Int, List<Course>>,
-    showWeekend: Boolean = true,  // 新增：是否显示周末
+    showWeekend: Boolean = true,
     onCourseClick: (Course) -> Unit,
-    onCourseLongClick: ((Course) -> Unit)? = null,  // 新增：长按课程卡片回调
+    onCourseLongClick: ((Course) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null
+    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
+    semesterStartDate: java.time.LocalDate? = null,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
     // 根据是否显示周末动态确定天数范围
     val dayCount = if (showWeekend) 7 else 5
@@ -65,20 +69,15 @@ fun WeekView(
             val dayOfWeek = index + 1
             val allCourses = coursesMap[dayOfWeek] ?: emptyList()
             
-            // 优化：使用 remember 缓存过滤结果
-            val coursesForThisWeek = remember(allCourses, weekNumber) {
-                allCourses.filter { course ->
-                    course.weeks.contains(weekNumber)
-                }
-            }
-            
             DaySchedule(
                 weekNumber = weekNumber,
                 dayOfWeek = dayOfWeek,
-                courses = coursesForThisWeek,
+                courses = allCourses,
                 onCourseClick = onCourseClick,
                 onCourseLongClick = onCourseLongClick,
-                getAdjustmentInfo = getAdjustmentInfo
+                getAdjustmentInfo = getAdjustmentInfo,
+                semesterStartDate = semesterStartDate,
+                courseColorMap = courseColorMap
             )
         }
         
@@ -99,7 +98,9 @@ fun DaySchedule(
     courses: List<Course>,
     onCourseClick: (Course) -> Unit,
     onCourseLongClick: ((Course) -> Unit)? = null,
-    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null
+    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
+    semesterStartDate: java.time.LocalDate? = null,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
     Column(
         modifier = Modifier
@@ -186,7 +187,9 @@ fun DaySchedule(
                         course = course,
                         onClick = { onCourseClick(course) },
                         onLongClick = onCourseLongClick?.let { { it(course) } },
-                        adjustmentInfo = adjustmentInfo
+                        adjustmentInfo = adjustmentInfo,
+                        semesterStartDate = semesterStartDate,
+                        courseColorMap = courseColorMap
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -207,27 +210,37 @@ fun CourseCard(
     course: Course,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    adjustmentInfo: com.wind.ggbond.classtime.data.local.entity.CourseAdjustment? = null
+    adjustmentInfo: com.wind.ggbond.classtime.data.local.entity.CourseAdjustment? = null,
+    semesterStartDate: java.time.LocalDate? = null,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
-    // 优化：缓存课程状态判断
-    val courseState = remember(weekNumber, course.dayOfWeek) {
-        val now = java.time.LocalDateTime.now()
-        val currentWeekOfYear = java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()
-        val currentWeek = now.get(currentWeekOfYear)
-        
+    val now = java.time.LocalDateTime.now()
+    val today = java.time.LocalDate.now()
+    
+    val currentWeek = remember(semesterStartDate, today) {
+        if (semesterStartDate != null) {
+            DateUtils.calculateWeekNumber(semesterStartDate, today)
+        } else {
+            val currentWeekOfYear = java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear()
+            now.get(currentWeekOfYear)
+        }
+    }
+    
+    val courseState = remember(weekNumber, currentWeek, course.dayOfWeek) {
         val isPast = weekNumber < currentWeek
         val isOngoing = weekNumber == currentWeek && now.dayOfWeek.value == course.dayOfWeek
-        
         Pair(isPast, isOngoing)
     }
     val (isPast, isOngoing) = courseState
     
     // 优化：缓存颜色解析和计算
-    val baseColor = remember(course.color) {
-        try {
+    val baseColor = remember(course.courseName, courseColorMap) {
+        val dynamicColor = courseColorMap[course.courseName]
+        if (dynamicColor != null) {
+            try { Color(android.graphics.Color.parseColor(dynamicColor)) }
+            catch (e: Exception) { Color(android.graphics.Color.parseColor(course.color)) }
+        } else {
             Color(android.graphics.Color.parseColor(course.color))
-        } catch (e: Exception) {
-            Color.Unspecified
         }
     }.let { if (it == Color.Unspecified) MaterialTheme.colorScheme.primaryContainer else it }
     
@@ -261,6 +274,30 @@ fun CourseCard(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
+            .semantics {
+                contentDescription = buildString {
+                    append(course.courseName)
+                    if (course.teacher.isNotEmpty()) {
+                        append("，${course.teacher}老师")
+                    }
+                    if (course.classroom.isNotEmpty()) {
+                        append("，在${course.classroom}")
+                    }
+                    append("，第${course.startSection}")
+                    if (course.sectionCount > 1) {
+                        append("-${course.startSection + course.sectionCount - 1}")
+                    }
+                    append("节")
+                    if (isOngoing) {
+                        append("，正在上课")
+                    } else if (isPast) {
+                        append("，已结束")
+                    }
+                    if (adjustmentInfo != null) {
+                        append("，已调课")
+                    }
+                }
+            }
             .padding(12.dp)  // 紧凑内边距 10dp
     ) {
         // 「小爱课程表」风格：统一使用黑/白文字 - 与表格模式保持一致
@@ -295,20 +332,15 @@ fun CourseCard(
                         color = titleColor
                     )
                     
-                    // 调课标记
+                    // 调课标记 - 低调小图标
                     if (adjustmentInfo != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f),
-                            shape = RoundedCornerShape(4.dp),
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "⟳",
+                            fontSize = 12.sp,
+                            color = titleColor.copy(alpha = 0.5f),
                             modifier = Modifier.padding(top = 2.dp)
-                        ) {
-                            Text(
-                                text = "🔄",
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
+                        )
                     }
                 }
                 

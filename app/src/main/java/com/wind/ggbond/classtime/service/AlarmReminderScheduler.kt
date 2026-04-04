@@ -8,14 +8,17 @@ import android.os.Build
 import android.util.Log
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
 import com.wind.ggbond.classtime.data.local.entity.Reminder
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.data.repository.ClassTimeRepository
+import com.wind.ggbond.classtime.data.repository.CourseAdjustmentRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ReminderRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.receiver.AlarmReminderReceiver
 import com.wind.ggbond.classtime.util.DateUtils
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -24,18 +27,15 @@ import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * AlarmManager 课程提醒调度器
- * 替代 WorkManager，使用 AlarmManager 实现精确的后台提醒调度
- */
 @Singleton
 class AlarmReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val reminderRepository: ReminderRepository,
     private val scheduleRepository: ScheduleRepository,
     private val classTimeRepository: ClassTimeRepository,
-    private val courseRepository: CourseRepository
-) {
+    private val courseRepository: CourseRepository,
+    private val adjustmentRepository: CourseAdjustmentRepository
+) : IAlarmScheduler {
     
     companion object {
         private const val TAG = "AlarmReminderScheduler"
@@ -44,19 +44,9 @@ class AlarmReminderScheduler @Inject constructor(
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     
     /**
-     * 提醒统计信息
-     */
-    data class ReminderStats(
-        val totalReminders: Int,
-        val activeReminders: Int,
-        val todayReminders: Int,
-        val upcomingReminders: Int
-    )
-    
-    /**
      * 为课程创建提醒
      */
-    suspend fun scheduleCourseReminders(course: Course) {
+    suspend override fun scheduleCourseReminders(course: Course) {
         Log.d(TAG, "scheduleCourseReminders called for: ${course.courseName}, reminderEnabled = ${course.reminderEnabled}")
         
         if (!course.reminderEnabled) {
@@ -98,7 +88,7 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 批量为所有启用提醒的课程创建提醒
      */
-    suspend fun scheduleAllCourseReminders(scheduleId: Long) {
+    suspend override fun scheduleAllCourseReminders(scheduleId: Long) {
         Log.d(TAG, "开始批量创建提醒，课表ID: $scheduleId")
         
         val courses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
@@ -118,21 +108,31 @@ class AlarmReminderScheduler @Inject constructor(
         }
         val classTimes = classTimeRepository.getClassTimesByConfigSync()
         
-        // 先取消所有旧提醒
+        // 先取消所有旧提醒（在重建前完成，确保无重复）
         cancelAllReminders()
         
         var totalScheduled = 0
         var totalFailed = 0
         
-        // 为每门课程创建提醒
+        // 为每门课程创建提醒（带异常保护，防止单门失败导致全部丢失）
         enabledCourses.forEach { course ->
-            course.weeks.forEach { weekNumber ->
-                if (scheduleWeekReminder(course, schedule, weekNumber, classTimes)) {
-                    totalScheduled++
-                } else {
-                    totalFailed++
+            try {
+                course.weeks.forEach { weekNumber ->
+                    if (scheduleWeekReminder(course, schedule, weekNumber, classTimes)) {
+                        totalScheduled++
+                    } else {
+                        totalFailed++
+                    }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "课程 ${course.courseName} 提醒调度异常，跳过", e)
+                totalFailed++
             }
+        }
+        
+        // 如果全部失败，记录严重警告
+        if (totalScheduled == 0 && enabledCourses.isNotEmpty()) {
+            Log.e(TAG, "批量创建提醒全部失败！共 $totalFailed 个失败，请检查系统闹钟权限")
         }
         
         Log.d(TAG, "批量创建完成: 共创建 $totalScheduled 个提醒（失败：$totalFailed）")
@@ -197,7 +197,7 @@ class AlarmReminderScheduler @Inject constructor(
                     workRequestId = "alarm_${course.id}_${weekNumber}" // 改为 alarmRequestId 的标识
                 )
                 
-                reminderRepository.insertReminder(reminder)
+                reminderRepository.insert(reminder)
                 
                 Log.d(TAG, "已创建提醒: ${course.courseName}, 周$weekNumber, ${reminderDateTime}")
                 
@@ -327,13 +327,13 @@ class AlarmReminderScheduler @Inject constructor(
      * 测试用的公开调度方法
      * 用于设置界面的提醒测试功能
      */
-    fun scheduleTestAlarm(
+    override fun scheduleTestAlarm(
         courseId: Long,
         weekNumber: Int,
         triggerTime: Long,
-        isNextCourse: Boolean = false,
-        currentCourseName: String = "",
-        isSameCourseClassroom: Boolean = false
+        isNextCourse: Boolean,
+        currentCourseName: String,
+        isSameCourseClassroom: Boolean
     ): Boolean {
         return scheduleAlarm(
             courseId = courseId,
@@ -348,10 +348,10 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 取消课程的所有提醒
      */
-    suspend fun cancelCourseReminders(courseId: Long) {
+    suspend override fun cancelCourseReminders(courseId: Long) {
         try {
             // 获取该课程的所有提醒记录
-            val reminders = reminderRepository.getAllReminders().filter { it.courseId == courseId }
+            val reminders = reminderRepository.getAll().filter { it.courseId == courseId }
             
             reminders.forEach { reminder ->
                 // 取消 AlarmManager 中的提醒
@@ -400,9 +400,9 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 取消所有提醒
      */
-    suspend fun cancelAllReminders() {
+    suspend override fun cancelAllReminders() {
         try {
-            val allReminders = reminderRepository.getAllReminders()
+            val allReminders = reminderRepository.getAll()
             
             allReminders.forEach { reminder ->
                 // 取消正常提醒
@@ -438,7 +438,7 @@ class AlarmReminderScheduler @Inject constructor(
                 alarmManager.cancel(nextCoursePendingIntent)
             }
             
-            reminderRepository.deleteAllReminders()
+            reminderRepository.deleteAll()
             Log.d(TAG, "已取消所有提醒")
         } catch (e: Exception) {
             Log.e(TAG, "取消所有提醒失败: ${e.message}", e)
@@ -448,7 +448,7 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 批量取消指定课表下所有课程的提醒
      */
-    suspend fun cancelAllCourseReminders(scheduleId: Long) {
+    suspend override fun cancelAllCourseReminders(scheduleId: Long) {
         try {
             val courses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             
@@ -465,7 +465,7 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 重新调度所有提醒（用于开机后恢复）
      */
-    suspend fun rescheduleAllReminders() {
+    suspend override fun rescheduleAllReminders() {
         try {
             Log.d(TAG, "开始重新调度所有提醒...")
             
@@ -488,7 +488,7 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 清理过期的提醒
      */
-    suspend fun cleanExpiredReminders() {
+    suspend override fun cleanExpiredReminders() {
         try {
             val deletedCount = reminderRepository.deleteExpiredReminders()
             Log.d(TAG, "清理了 $deletedCount 个过期提醒")
@@ -500,8 +500,8 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 获取提醒统计信息
      */
-    suspend fun getReminderStats(): ReminderStats {
-        val allReminders = reminderRepository.getAllReminders()
+    suspend override fun getReminderStats(): IAlarmScheduler.ReminderStats {
+        val allReminders = reminderRepository.getAll()
         val now = System.currentTimeMillis()
         val todayStart = LocalDate.now().atStartOfDay()
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -515,7 +515,7 @@ class AlarmReminderScheduler @Inject constructor(
             it.triggerTime > todayEnd && it.triggerTime < todayEnd + 7 * 24 * 60 * 60 * 1000 
         }
         
-        return ReminderStats(
+        return IAlarmScheduler.ReminderStats(
             totalReminders = allReminders.size,
             activeReminders = activeReminders.size,
             todayReminders = todayReminders.size,
@@ -526,18 +526,139 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 更新提醒时间
      */
-    suspend fun updateReminderTime(courseId: Long, newReminderMinutes: Int) {
+    suspend override fun updateReminderTime(courseId: Long, newReminderMinutes: Int) {
         val course = courseRepository.getCourseById(courseId) ?: return
         val updatedCourse = course.copy(reminderMinutes = newReminderMinutes)
         
-        // 重新创建提醒
         scheduleCourseReminders(updatedCourse)
+    }
+    
+    suspend override fun rescheduleRemindersForAdjustment(adjustment: CourseAdjustment) {
+        try {
+            Log.d(TAG, "开始重新调度调课提醒: 课程ID=${adjustment.originalCourseId}, 原${adjustment.originalWeekNumber}周 → 新${adjustment.newWeekNumber}周")
+            
+            val course = courseRepository.getCourseById(adjustment.originalCourseId) ?: run {
+                Log.w(TAG, "未找到课程，无法重新调度提醒")
+                return
+            }
+            
+            if (!course.reminderEnabled) {
+                Log.d(TAG, "课程 ${course.courseName} 未启用提醒，跳过")
+                return
+            }
+            
+            val schedule = scheduleRepository.getCurrentSchedule() ?: return
+            val classTimes = classTimeRepository.getClassTimesByConfigSync()
+            
+            cancelReminderForWeek(course.id, adjustment.originalWeekNumber)
+            
+            val newReminderDateTime = calculateAdjustedReminderTime(
+                course = course,
+                schedule = schedule,
+                adjustment = adjustment,
+                classTimes = classTimes
+            ) ?: run {
+                Log.w(TAG, "无法计算调课后的提醒时间")
+                return
+            }
+            
+            val reminderTimeMillis = newReminderDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            
+            if (reminderTimeMillis < System.currentTimeMillis()) {
+                Log.d(TAG, "调课后的提醒时间已过，不创建提醒")
+                return
+            }
+            
+            val success = scheduleAlarm(
+                courseId = course.id,
+                weekNumber = adjustment.newWeekNumber,
+                triggerTime = reminderTimeMillis,
+                isNextCourse = false
+            )
+            
+            if (success) {
+                val reminder = Reminder(
+                    courseId = course.id,
+                    minutesBefore = course.reminderMinutes,
+                    isEnabled = true,
+                    weekNumber = adjustment.newWeekNumber,
+                    dayOfWeek = adjustment.newDayOfWeek,
+                    triggerTime = reminderTimeMillis,
+                    workRequestId = "alarm_${course.id}_${adjustment.newWeekNumber}"
+                )
+                reminderRepository.insert(reminder)
+                
+                Log.d(TAG, "✅ 调课提醒已更新: ${course.courseName} 第${adjustment.newWeekNumber}周 → ${newReminderDateTime}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "重新调度调课提醒失败: ${e.message}", e)
+        }
+    }
+    
+    private suspend fun cancelReminderForWeek(courseId: Long, weekNumber: Int) {
+        try {
+            val reminders = reminderRepository.getAll().filter {
+                it.courseId == courseId && it.weekNumber == weekNumber
+            }
+            
+            reminders.forEach { reminder ->
+                val intent = Intent(context, AlarmReminderReceiver::class.java).apply {
+                    action = AlarmReminderReceiver.ACTION_COURSE_REMINDER
+                }
+                
+                val requestCode = AlarmReminderReceiver.generateRequestCode(
+                    reminder.courseId, reminder.weekNumber, false
+                )
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context, requestCode, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarmManager.cancel(pendingIntent)
+                
+                val nextCourseRequestCode = AlarmReminderReceiver.generateRequestCode(
+                    reminder.courseId, reminder.weekNumber, true
+                )
+                val nextCoursePendingIntent = PendingIntent.getBroadcast(
+                    context, nextCourseRequestCode, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarmManager.cancel(nextCoursePendingIntent)
+            }
+            
+            reminders.forEach { reminderRepository.delete(it) }
+            Log.d(TAG, "已取消课程$courseId 第${weekNumber}周的旧提醒")
+        } catch (e: Exception) {
+            Log.e(TAG, "取消指定周次提醒失败", e)
+        }
+    }
+    
+    private fun calculateAdjustedReminderTime(
+        course: Course,
+        schedule: Schedule,
+        adjustment: CourseAdjustment,
+        classTimes: List<ClassTime>
+    ): LocalDateTime? {
+        return try {
+            val monday = DateUtils.getMondayOfWeek(schedule.startDate, adjustment.newWeekNumber)
+            val courseDate = monday.plusDays((adjustment.newDayOfWeek - 1).toLong())
+            
+            if (courseDate.isBefore(LocalDate.now())) return null
+            
+            val classTime = classTimes.find { it.sectionNumber == adjustment.newStartSection }
+                ?: return null
+            
+            val courseDateTime = LocalDateTime.of(courseDate, classTime.startTime)
+            courseDateTime.minusMinutes(course.reminderMinutes.toLong())
+        } catch (e: Exception) {
+            Log.e(TAG, "计算调课提醒时间失败", e)
+            null
+        }
     }
     
     /**
      * 启用/禁用课程提醒
      */
-    suspend fun toggleCourseReminder(courseId: Long, enabled: Boolean) {
+    suspend override fun toggleCourseReminder(courseId: Long, enabled: Boolean) {
         val course = courseRepository.getCourseById(courseId) ?: return
         
         if (enabled) {
@@ -547,15 +668,71 @@ class AlarmReminderScheduler @Inject constructor(
         }
     }
     
+    suspend override fun toggleSingleReminder(reminder: Reminder, enabled: Boolean) {
+        if (enabled) {
+            val intent = Intent(context, AlarmReminderReceiver::class.java).apply {
+                action = AlarmReminderReceiver.ACTION_COURSE_REMINDER
+                putExtra(AlarmReminderReceiver.EXTRA_COURSE_ID, reminder.courseId)
+                putExtra(AlarmReminderReceiver.EXTRA_WEEK_NUMBER, reminder.weekNumber)
+                putExtra(AlarmReminderReceiver.EXTRA_IS_NEXT_COURSE, false)
+            }
+            val requestCode = AlarmReminderReceiver.generateRequestCode(
+                reminder.courseId, reminder.weekNumber, false
+            )
+            val pendingIntent = PendingIntent.getBroadcast(
+                context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            val canUseExactAlarm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                alarmManager.canScheduleExactAlarms()
+            } else {
+                true
+            }
+            
+            if (canUseExactAlarm) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP, reminder.triggerTime, pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminder.triggerTime, pendingIntent)
+                }
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP, reminder.triggerTime, pendingIntent
+                    )
+                } else {
+                    alarmManager.set(AlarmManager.RTC_WAKEUP, reminder.triggerTime, pendingIntent)
+                }
+            }
+            Log.d(TAG, "已重新启用单条提醒: courseId=${reminder.courseId}, 周${reminder.weekNumber}")
+        } else {
+            val intent = Intent(context, AlarmReminderReceiver::class.java).apply {
+                action = AlarmReminderReceiver.ACTION_COURSE_REMINDER
+            }
+            val requestCode = AlarmReminderReceiver.generateRequestCode(
+                reminder.courseId, reminder.weekNumber, false
+            )
+            val pendingIntent = PendingIntent.getBroadcast(
+                context, requestCode, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            Log.d(TAG, "已禁用单条提醒: courseId=${reminder.courseId}, 周${reminder.weekNumber}")
+        }
+    }
+    
     /**
      * 获取今天的提醒列表
      */
-    suspend fun getTodayReminders(): List<Reminder> {
+    suspend override fun getTodayReminders(): List<Reminder> {
         val todayStart = LocalDate.now().atStartOfDay()
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val todayEnd = todayStart + 24 * 60 * 60 * 1000
         
-        return reminderRepository.getAllReminders().filter {
+        return reminderRepository.getAll().filter {
             it.triggerTime in todayStart..todayEnd && it.isEnabled
         }
     }
@@ -563,11 +740,11 @@ class AlarmReminderScheduler @Inject constructor(
     /**
      * 获取即将到来的提醒 (未来1小时内)
      */
-    suspend fun getUpcomingReminders(): List<Reminder> {
+    suspend override fun getUpcomingReminders(): List<Reminder> {
         val now = System.currentTimeMillis()
         val oneHourLater = now + 60 * 60 * 1000
         
-        return reminderRepository.getAllReminders().filter {
+        return reminderRepository.getAll().filter {
             it.triggerTime in now..oneHourLater && it.isEnabled
         }
     }
@@ -663,7 +840,7 @@ class AlarmReminderScheduler @Inject constructor(
                     workRequestId = "alarm_next_${currentCourse.id}_${exactNextCourse.id}_${weekNumber}"
                 )
                 
-                reminderRepository.insertReminder(reminder)
+                reminderRepository.insert(reminder)
                 
                 val reminderType = if (isSameCourseAndClassroom) "继续上课" else "换课提醒"
                 Log.d(TAG, "已创建下节课提醒(${reminderType}): ${currentCourse.courseName} → ${exactNextCourse.courseName}, 提醒时间: $reminderTime")

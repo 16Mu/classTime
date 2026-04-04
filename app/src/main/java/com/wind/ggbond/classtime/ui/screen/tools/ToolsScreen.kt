@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.tools
 
 import androidx.compose.foundation.clickable
@@ -5,12 +6,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -23,11 +25,8 @@ import androidx.navigation.NavController
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
 import com.wind.ggbond.classtime.widget.WidgetPinHelper
+import com.wind.ggbond.classtime.widget.WidgetPinHelper.WidgetType
 
-/**
- * 工具页面 - 底部导航Tab2
- * 承载：导入导出、课程管理、自动更新等操作型功能
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolsScreen(
@@ -36,14 +35,10 @@ fun ToolsScreen(
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    
-    // 小组件选择对话框状态
-    var showWidgetDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("工具") }
             )
@@ -53,155 +48,53 @@ fun ToolsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // === 导入导出 ===
-            item {
-                ToolsSectionTitle("导入导出")
-            }
+            item { ToolsSectionTitle("导入导出") }
 
-            // 推荐方式：大CTA卡片
             item {
-                Card(
+                ToolsRecommendCard(
+                    title = "从教务系统导入课表",
+                    subtitle = "支持27+所高校，登录后自动获取",
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         navController.navigate(Screen.SchoolSelection.route)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 左侧图标
-                        Icon(
-                            Icons.AutoMirrored.Filled.Login,
-                            contentDescription = "从教务系统导入",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        // 中间文字
-                        Column(modifier = Modifier.weight(1f)) {
-                            // "推荐"标签
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            ) {
-                                Text(
-                                    "推荐",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                            // 标题
-                            Text(
-                                "从教务系统导入课表",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            // 描述
-                            Text(
-                                "支持27+所高校，登录后自动获取",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                            )
-                        }
-                        // 右侧箭头
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
-                        )
                     }
-                }
+                )
             }
 
-            // 次要方式：两个小卡片并排
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // 手动添加
-                    Card(
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.EditNote,
+                        title = "手动添加",
+                        subtitle = "逐条填写课程",
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             navController.navigate(Screen.BatchCourseCreate.route)
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Icon(
-                                Icons.Default.EditNote,
-                                contentDescription = "手动添加",
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "手动添加",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "逐条填写课程",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                    }
-
-                    // 从文件导入
-                    Card(
+                    )
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.Upload,
+                        title = "从文件导入",
+                        subtitle = "JSON/ICS/CSV",
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             settingsViewModel.showImportDialog()
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Icon(
-                                Icons.Default.Upload,
-                                contentDescription = "从文件导入",
-                                modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "从文件导入",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                "JSON/ICS/CSV",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                    }
+                    )
                 }
             }
 
-            // 导出课表
             item {
-                ToolsRowItem(
-                    icon = Icons.Default.FileDownload,
+                ToolsUnifiedCard(
+                    icon = Icons.Outlined.FileDownload,
                     title = "导出课表",
                     subtitle = "多种格式导出",
                     onClick = {
@@ -211,15 +104,11 @@ fun ToolsScreen(
                 )
             }
 
-            // === 课程管理 ===
-            item {
-                ToolsSectionTitle("课程管理")
-            }
+            item { ToolsSectionTitle("课程管理") }
 
-            // 所有课程
             item {
-                ToolsRowItem(
-                    icon = Icons.Default.List,
+                ToolsUnifiedCard(
+                    icon = Icons.AutoMirrored.Outlined.List,
                     title = "所有课程",
                     subtitle = "查看和编辑课程表中的全部课程",
                     onClick = {
@@ -229,10 +118,9 @@ fun ToolsScreen(
                 )
             }
 
-            // 调课记录
             item {
-                ToolsRowItem(
-                    icon = Icons.Default.SwapHoriz,
+                ToolsUnifiedCard(
+                    icon = Icons.Outlined.SwapHoriz,
                     title = "调课记录",
                     subtitle = "查看和管理临时调课",
                     onClick = {
@@ -242,15 +130,11 @@ fun ToolsScreen(
                 )
             }
 
-            // === 自动更新 ===
-            item {
-                ToolsSectionTitle("自动更新")
-            }
+            item { ToolsSectionTitle("自动更新") }
 
-            // 自动更新设置
             item {
-                ToolsRowItem(
-                    icon = Icons.Default.Autorenew,
+                ToolsUnifiedCard(
+                    icon = Icons.Outlined.Autorenew,
                     title = "自动更新设置",
                     subtitle = "配置自动检查课表变化",
                     onClick = {
@@ -260,44 +144,90 @@ fun ToolsScreen(
                 )
             }
 
-            // 临时隐藏整个桌面小组件分类
-            // === 桌面小组件 ===
-            // item {
-            //     ToolsSectionTitle("桌面小组件")
-            // }
+            item { ToolsSectionTitle("桌面小组件") }
 
-            // // 添加桌面小组件
-            // item {
-            //     ToolsRowItem(
-            //         icon = Icons.Default.Widgets,
-            //         title = "添加桌面小组件",
-            //         subtitle = "快速将小组件添加到桌面",
-            //         onClick = {
-            //             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            //             showWidgetDialog = true
-            //         }
-            //     )
-            // }
-
-            // 底部间距
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.CalendarMonth,
+                        title = "今日课程",
+                        subtitle = "4×2 课程列表",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            WidgetPinHelper.requestPinWidget(context, WidgetType.TODAY_COURSE)
+                        }
+                    )
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.Schedule,
+                        title = "下节课倒计时",
+                        subtitle = "3×2 倒计时",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            WidgetPinHelper.requestPinWidget(context, WidgetType.NEXT_CLASS)
+                        }
+                    )
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.ViewList,
+                        title = "紧凑列表",
+                        subtitle = "省空间样式",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            WidgetPinHelper.requestPinWidget(context, WidgetType.COMPACT_LIST)
+                        }
+                    )
+                    ToolsCompactCard(
+                        icon = Icons.Outlined.DateRange,
+                        title = "周概览",
+                        subtitle = "一周总览",
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            WidgetPinHelper.requestPinWidget(context, WidgetType.WEEK_OVERVIEW)
+                        }
+                    )
+                }
+            }
+
+            item {
+                ToolsUnifiedCard(
+                    icon = Icons.Outlined.Dashboard,
+                    title = "大尺寸课程表",
+                    subtitle = "4×4 大屏展示更多课程细节，支持滚动浏览",
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        WidgetPinHelper.requestPinWidget(context, WidgetType.LARGE_TODAY_COURSE)
+                    }
+                )
+            }
+
+            item {
+                ToolsUnifiedCard(
+                    icon = Icons.Outlined.AutoAwesome,
+                    title = "智能课表",
+                    subtitle = "3×2 智能切换，今日课程结束后自动展示明日课程",
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        WidgetPinHelper.requestPinWidget(context, WidgetType.TOMORROW_COURSE)
+                    }
+                )
             }
         }
     }
 
-    // 小组件选择对话框
-    if (showWidgetDialog) {
-        WidgetSelectionDialog(
-            onDismiss = { showWidgetDialog = false },
-            onSelectWidget = { widgetType ->
-                showWidgetDialog = false
-                WidgetPinHelper.requestPinWidget(context, widgetType)
-            }
-        )
-    }
-
-    // 导出对话框（复用SettingsViewModel的逻辑）
     val showExportDialog by settingsViewModel.showExportDialog.collectAsState()
     if (showExportDialog) {
         com.wind.ggbond.classtime.ui.screen.settings.ExportDialog(
@@ -307,7 +237,6 @@ fun ToolsScreen(
         )
     }
 
-    // 导出结果对话框
     val exportResult by settingsViewModel.exportResult.collectAsState()
     exportResult?.let { result ->
         com.wind.ggbond.classtime.ui.screen.settings.ExportResultDialog(
@@ -319,7 +248,6 @@ fun ToolsScreen(
         )
     }
 
-    // 导入对话框
     val showImportDialog by settingsViewModel.showImportDialog.collectAsState()
     if (showImportDialog) {
         com.wind.ggbond.classtime.ui.screen.settings.ImportDialog(
@@ -329,61 +257,190 @@ fun ToolsScreen(
     }
 }
 
-/**
- * 工具页面分类标题
- */
 @Composable
 private fun ToolsSectionTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(vertical = 8.dp)
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
     )
 }
 
-/**
- * 工具页面行项目（带图标和右箭头）
- */
 @Composable
-private fun ToolsRowItem(
-    icon: ImageVector,
+private fun ToolsRecommendCard(
     title: String,
     subtitle: String,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = Color.Transparent
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 图标容器
             Surface(
-                modifier = Modifier.size(36.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                modifier = Modifier.size(44.dp),
+                shape = RoundedCornerShape(11.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        modifier = Modifier.size(18.dp),
+                        imageVector = Icons.AutoMirrored.Outlined.Login,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-            // 文字
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = "推荐",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+
+            Icon(
+                Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolsCompactCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(9.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolsUnifiedCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    trailingText: String? = null,
+    onTrailingClick: (() -> Unit)? = null,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -391,130 +448,33 @@ private fun ToolsRowItem(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 
-            // 右箭头
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-            )
-        }
-    }
-}
-
-/**
- * 小组件选择对话框
- * 
- * @param onDismiss 关闭对话框回调
- * @param onSelectWidget 选择小组件回调
- */
-@Composable
-private fun WidgetSelectionDialog(
-    onDismiss: () -> Unit,
-    onSelectWidget: (WidgetPinHelper.WidgetType) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "选择小组件",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 遍历所有小组件类型
-                WidgetPinHelper.WidgetType.entries.forEach { widgetType ->
-                    WidgetOptionItem(
-                        widgetType = widgetType,
-                        onClick = { onSelectWidget(widgetType) }
+            if (trailingText != null && onTrailingClick != null) {
+                TextButton(
+                    onClick = onTrailingClick,
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = trailingText,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                     )
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
-}
-
-/**
- * 小组件选项项
- * 
- * @param widgetType 小组件类型
- * @param onClick 点击回调
- */
-@Composable
-private fun WidgetOptionItem(
-    widgetType: WidgetPinHelper.WidgetType,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 小组件图标
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Widgets,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // 小组件信息
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = WidgetPinHelper.getWidgetDisplayName(widgetType),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = WidgetPinHelper.getWidgetDescription(widgetType),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                Icon(
+                    Icons.Outlined.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                 )
             }
-
-            // 添加图标
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "添加",
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }

@@ -20,10 +20,12 @@ import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
 import com.wind.ggbond.classtime.ui.components.checkScheduleState
 import com.wind.ggbond.classtime.util.CourseColorPalette
+import com.wind.ggbond.classtime.util.CourseColorProvider
 import com.wind.ggbond.classtime.util.HtmlScheduleParser
 import com.wind.ggbond.classtime.util.SecureCookieManager
 import com.wind.ggbond.classtime.util.WeekParser
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
+import com.wind.ggbond.classtime.service.contract.IScheduleFetcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,9 +37,6 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject
 
-/**
- * 导入课表 ViewModel
- */
 @HiltViewModel
 class ImportScheduleViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
@@ -45,8 +44,8 @@ class ImportScheduleViewModel @Inject constructor(
     private val schoolRepository: SchoolRepository,
     private val secureCookieManager: SecureCookieManager,
     private val htmlParser: HtmlScheduleParser,
-    private val unifiedScheduleFetchService: com.wind.ggbond.classtime.service.UnifiedScheduleFetchService,
-    private val reminderScheduler: AlarmReminderScheduler,
+    private val unifiedScheduleFetchService: IScheduleFetcher,
+    private val reminderScheduler: IAlarmScheduler,
     private val application: Application
 ) : ViewModel() {
     
@@ -292,7 +291,7 @@ class ImportScheduleViewModel @Inject constructor(
                 // 转换为Course实体并插入
                 // 🎨 智能分配颜色：为不同课程分配不同颜色
                 val courseNames = _parsedCourses.value.map { it.courseName }.distinct()
-                val colorMapping = CourseColorPalette.assignColorsForCourses(courseNames)
+                val colorMapping = CourseColorProvider.assignColorsForCourses(courseNames)
                 
                 val courses = _parsedCourses.value.map { parsed ->
                     val weeks = if (parsed.weeks.isNotEmpty()) {

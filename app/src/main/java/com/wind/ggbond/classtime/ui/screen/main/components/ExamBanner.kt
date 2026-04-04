@@ -10,6 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -120,7 +122,22 @@ private fun ExamBannerContent(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(24.dp),
+            .height(24.dp)
+            .semantics {
+                contentDescription = if (exams.size == 1) {
+                    val exam = exams.first()
+                    buildString {
+                        append("考试提醒：${exam.courseName}${exam.examType}")
+                        exam.dayOfWeek?.let { append("，${DateUtils.getDayOfWeekName(it)}") }
+                        append("，${exam.getTimeDescription()}")
+                        if (exam.location.isNotEmpty()) {
+                            append("，在${exam.location}")
+                        }
+                    }
+                } else {
+                    "考试提醒：共${exams.size}场考试"
+                }
+            },
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
         shape = RoundedCornerShape(4.dp)
     ) {
@@ -156,18 +173,19 @@ private fun ExamBannerContent(
                 }
             }
 
-            // 右侧关闭按钮
+            // 右侧关闭按钮（增大触摸区域至 48dp，满足 WCAG 最小触摸目标要求）
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .size(20.dp)
-                    .padding(0.dp)
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .size(36.dp)
+                    .padding(8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "关闭",
-                    modifier = Modifier.size(12.dp),
+                    modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }

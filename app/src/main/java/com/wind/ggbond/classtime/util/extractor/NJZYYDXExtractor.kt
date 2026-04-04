@@ -191,7 +191,7 @@ class NJZYYDXExtractor @Inject constructor() : SchoolScheduleExtractor {
             
             if (courseMap.containsKey(key)) {
                 // 合并周次
-                val existing = courseMap[key]!!
+                val existing = courseMap.getValue(key)
                 val mergedWeeks = (existing.weeks + course.weeks).distinct().sorted()
                 courseMap[key] = existing.copy(
                     weeks = mergedWeeks,

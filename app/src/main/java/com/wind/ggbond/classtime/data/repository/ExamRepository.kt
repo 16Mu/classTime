@@ -3,69 +3,55 @@ package com.wind.ggbond.classtime.data.repository
 import com.wind.ggbond.classtime.data.local.dao.ExamDao
 import com.wind.ggbond.classtime.data.local.entity.Exam
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * 考试仓库
- */
 @Singleton
 class ExamRepository @Inject constructor(
-    private val examDao: ExamDao
-) {
-    
-    /**
-     * 获取所有考试
-     */
-    fun getAllExams(): Flow<List<Exam>> {
-        return examDao.getAllExams()
+    examDao: ExamDao
+) : BaseRepository<Exam, ExamDao>(examDao) {
+
+    override suspend fun getAll(): List<Exam> {
+        return dao.getAllExams().first()
     }
-    
-    /**
-     * 根据ID获取考试
-     */
-    suspend fun getExamById(examId: Long): Exam? {
-        return examDao.getExamById(examId)
+
+    override fun getAllFlow(): Flow<List<Exam>> = dao.getAllExams()
+
+    override suspend fun getById(id: Long): Exam? = dao.getExamById(id)
+
+    override fun getByIdFlow(id: Long): Flow<Exam?> = dao.getExamByIdFlow(id)
+
+    override suspend fun insert(entity: Exam): Long =
+        dao.insertExam(entity.copy(updatedAt = System.currentTimeMillis()))
+
+    override suspend fun insertAll(entities: List<Exam>): List<Long> {
+        val currentTime = System.currentTimeMillis()
+        return dao.insertExams(entities.map { it.copy(updatedAt = currentTime) })
     }
-    
-    /**
-     * 根据ID获取考试（Flow）
-     */
-    fun getExamByIdFlow(examId: Long): Flow<Exam?> {
-        return examDao.getExamByIdFlow(examId)
-    }
-    
-    /**
-     * 获取指定课程的所有考试
-     */
-    fun getExamsByCourse(courseId: Long): Flow<List<Exam>> {
-        return examDao.getExamsByCourse(courseId)
-    }
-    
-    /**
-     * 获取指定周次范围的考试（用于顶部横幅）
-     */
-    suspend fun getExamsByWeekRange(startWeek: Int, endWeek: Int): List<Exam> {
-        return examDao.getExamsByWeekRange(startWeek, endWeek)
-    }
-    
-    /**
-     * 获取指定周次范围的考试（Flow版本）
-     */
-    fun getExamsByWeekRangeFlow(startWeek: Int, endWeek: Int): Flow<List<Exam>> {
-        return examDao.getExamsByWeekRangeFlow(startWeek, endWeek)
-    }
-    
-    /**
-     * 获取指定周次且有具体节次的考试（用于课表显示）
-     */
-    suspend fun getExamsWithSectionByWeek(weekNumber: Int): List<Exam> {
-        return examDao.getExamsWithSectionByWeek(weekNumber)
-    }
-    
-    /**
-     * 检查指定时间段是否有考试冲突
-     */
+
+    override suspend fun update(entity: Exam) =
+        dao.updateExam(entity.copy(updatedAt = System.currentTimeMillis()))
+
+    override suspend fun delete(entity: Exam) = dao.deleteExam(entity)
+
+    override suspend fun deleteById(id: Long) = dao.deleteExamById(id)
+
+    override suspend fun deleteAll() = dao.deleteAllExams()
+
+    suspend fun deleteExamsByCourse(courseId: Long) = dao.deleteExamsByCourse(courseId)
+
+    fun getExamsByCourse(courseId: Long): Flow<List<Exam>> = dao.getExamsByCourse(courseId)
+
+    suspend fun getExamsByWeekRange(startWeek: Int, endWeek: Int): List<Exam> =
+        dao.getExamsByWeekRange(startWeek, endWeek)
+
+    fun getExamsByWeekRangeFlow(startWeek: Int, endWeek: Int): Flow<List<Exam>> =
+        dao.getExamsByWeekRangeFlow(startWeek, endWeek)
+
+    suspend fun getExamsWithSectionByWeek(weekNumber: Int): List<Exam> =
+        dao.getExamsWithSectionByWeek(weekNumber)
+
     suspend fun checkExamConflict(
         weekNumber: Int,
         dayOfWeek: Int,
@@ -73,82 +59,12 @@ class ExamRepository @Inject constructor(
         sectionCount: Int,
         excludeExamId: Long? = null
     ): List<Exam> {
-        val conflicts = examDao.getExamsInTimeRange(
-            weekNumber,
-            dayOfWeek,
-            startSection,
-            startSection + sectionCount
+        val conflicts = dao.getExamsInTimeRange(
+            weekNumber, dayOfWeek, startSection, startSection + sectionCount
         )
-        
-        return if (excludeExamId != null) {
-            conflicts.filter { it.id != excludeExamId }
-        } else {
-            conflicts
-        }
+        return if (excludeExamId != null) conflicts.filter { it.id != excludeExamId } else conflicts
     }
-    
-    /**
-     * 获取即将到来的考试
-     */
-    suspend fun getUpcomingExams(fromWeek: Int, limit: Int = 10): List<Exam> {
-        return examDao.getUpcomingExams(fromWeek, limit)
-    }
-    
-    /**
-     * 插入考试
-     */
-    suspend fun insertExam(exam: Exam): Long {
-        return examDao.insertExam(exam.copy(
-            updatedAt = System.currentTimeMillis()
-        ))
-    }
-    
-    /**
-     * 插入多个考试
-     */
-    suspend fun insertExams(exams: List<Exam>): List<Long> {
-        val currentTime = System.currentTimeMillis()
-        val updatedExams = exams.map { it.copy(updatedAt = currentTime) }
-        return examDao.insertExams(updatedExams)
-    }
-    
-    /**
-     * 更新考试
-     */
-    suspend fun updateExam(exam: Exam) {
-        examDao.updateExam(exam.copy(
-            updatedAt = System.currentTimeMillis()
-        ))
-    }
-    
-    /**
-     * 删除考试
-     */
-    suspend fun deleteExam(exam: Exam) {
-        examDao.deleteExam(exam)
-    }
-    
-    /**
-     * 根据ID删除考试
-     */
-    suspend fun deleteExamById(examId: Long) {
-        examDao.deleteExamById(examId)
-    }
-    
-    /**
-     * 删除指定课程的所有考试
-     */
-    suspend fun deleteExamsByCourse(courseId: Long) {
-        examDao.deleteExamsByCourse(courseId)
-    }
-    
-    /**
-     * 删除所有考试
-     */
-    suspend fun deleteAllExams() {
-        examDao.deleteAllExams()
-    }
+
+    suspend fun getUpcomingExams(fromWeek: Int, limit: Int = 10): List<Exam> =
+        dao.getUpcomingExams(fromWeek, limit)
 }
-
-
-

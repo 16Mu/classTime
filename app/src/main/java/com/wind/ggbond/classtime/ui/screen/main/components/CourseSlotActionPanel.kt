@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.data.local.entity.Course
 
@@ -167,14 +169,16 @@ private fun ActionMenuItem(
 
     Column(
         modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clickable(onClick = onClick)
+            .semantics { contentDescription = label }
             .padding(horizontal = itemHorizontalPadding, vertical = itemVerticalPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = label,
+            contentDescription = null,
             modifier = Modifier.size(iconSize),
             tint = iconColor
         )
@@ -192,7 +196,7 @@ private fun ActionMenuItem(
  */
 @Composable
 private fun ActionMenuDivider() {
-    Divider(
+    HorizontalDivider(
         modifier = Modifier
             .width(1.dp)
             .height(32.dp),

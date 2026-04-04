@@ -433,7 +433,9 @@ class UniversalSmartExtractor @Inject constructor() : SchoolScheduleExtractor {
                                 break;
                             }
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.warn('访问iframe失败(可能跨域):', e.message);
+                    }
                 }
                 
                 if (!kbtableHtml) {
@@ -626,17 +628,19 @@ class UniversalSmartExtractor @Inject constructor() : SchoolScheduleExtractor {
                                             weeks: parseWeeks(lines.length > 1 ? lines[1] : '')
                                         });
                                     }
-                                } catch (e) {}
+                                } catch (e) {
+                                    console.warn('解析青果kbcontent失败:', e.message);
+                                }
                             });
                         });
                     });
                 }
-                
+
                 return courses;
             })()
         """.trimIndent()
     }
-    
+
     /**
      * 生成联亦科技系统提取逻辑
      */
@@ -680,7 +684,9 @@ class UniversalSmartExtractor @Inject constructor() : SchoolScheduleExtractor {
                                                 weeks: parseWeeks(lines.length > 3 ? lines[3] : '')
                                             });
                                         }
-                                    } catch (e) {}
+                                    } catch (e) {
+                                        console.warn('解析联亦课程文本失败:', e.message);
+                                    }
                                 }
                             });
                         });

@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.*
@@ -23,20 +24,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.wind.ggbond.classtime.service.ExportService
+import com.wind.ggbond.classtime.service.contract.IDataExporter
 
-/**
- * 导出对话框组件
- * 采用Card+Dialog风格，与应用整体设计保持一致
- */
 @Composable
 fun ExportDialog(
     onDismiss: () -> Unit,
-    onExport: (ExportService.ExportFormat) -> Unit,
-    onShare: (ExportService.ExportFormat) -> Unit
+    onExport: (IDataExporter.ExportFormat) -> Unit,
+    onShare: (IDataExporter.ExportFormat) -> Unit
 ) {
-    // 当前选中的导出格式
-    var selectedFormat by remember { mutableStateOf(ExportService.ExportFormat.ICS) }
+    var selectedFormat by remember { mutableStateOf(IDataExporter.ExportFormat.ICS) }
     // 触觉反馈
     val haptic = LocalHapticFeedback.current
     
@@ -185,7 +181,7 @@ fun ExportDialog(
  */
 @Composable
 private fun ExportFormatOption(
-    format: ExportService.ExportFormat,
+    format: IDataExporter.ExportFormat,
     icon: ImageVector,
     title: String,
     description: String,
@@ -308,43 +304,40 @@ private fun ExportFormatOption(
  * 导出选项数据类
  */
 private data class ExportOption(
-    val format: ExportService.ExportFormat,
+    val format: IDataExporter.ExportFormat,
     val icon: ImageVector,
     val title: String,
     val description: String
 )
 
-/**
- * 获取所有导出选项
- */
 private fun getExportOptions(): List<ExportOption> {
     return listOf(
         ExportOption(
-            format = ExportService.ExportFormat.ICS,
+            format = IDataExporter.ExportFormat.ICS,
             icon = Icons.Default.CalendarMonth,
             title = "ICS 日历格式",
             description = "可导入到系统日历、Outlook、Google日历等"
         ),
         ExportOption(
-            format = ExportService.ExportFormat.JSON,
+            format = IDataExporter.ExportFormat.JSON,
             icon = Icons.Default.Code,
             title = "JSON 格式",
             description = "结构化数据，适合备份和程序处理"
         ),
         ExportOption(
-            format = ExportService.ExportFormat.CSV,
+            format = IDataExporter.ExportFormat.CSV,
             icon = Icons.Default.TableChart,
             title = "CSV 表格",
             description = "可在Excel、WPS等表格软件中打开"
         ),
         ExportOption(
-            format = ExportService.ExportFormat.TXT,
+            format = IDataExporter.ExportFormat.TXT,
             icon = Icons.Default.Description,
             title = "纯文本",
             description = "简单易读，适合打印和查看"
         ),
         ExportOption(
-            format = ExportService.ExportFormat.HTML,
+            format = IDataExporter.ExportFormat.HTML,
             icon = Icons.Default.Language,
             title = "HTML 网页",
             description = "美观的网页格式，可在浏览器中查看"
@@ -352,13 +345,9 @@ private fun getExportOptions(): List<ExportOption> {
     )
 }
 
-/**
- * 导出结果对话框
- * 采用Card+Dialog风格，简洁的结果展示
- */
 @Composable
 fun ExportResultDialog(
-    result: ExportService.ExportResult,
+    result: IDataExporter.ExportResult,
     onDismiss: () -> Unit,
     onShare: (() -> Unit)? = null,
     onOpen: (() -> Unit)? = null
@@ -525,7 +514,7 @@ fun ExportResultDialog(
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.OpenInNew,
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )

@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.welcome
 
 import android.Manifest
@@ -12,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -263,7 +265,7 @@ fun PermissionGuideScreen(
                             Text("开始使用")
                             Spacer(Modifier.width(4.dp))
                             Icon(
-                                Icons.Default.ArrowForward,
+                                Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )

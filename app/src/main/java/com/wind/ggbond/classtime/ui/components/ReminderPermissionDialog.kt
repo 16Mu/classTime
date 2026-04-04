@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.components
 
 import androidx.compose.runtime.*

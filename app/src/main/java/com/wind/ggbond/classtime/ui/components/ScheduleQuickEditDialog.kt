@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.components
 
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.data.local.entity.Schedule
+import com.wind.ggbond.classtime.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -47,19 +49,22 @@ fun ScheduleQuickEditDialog(
         initialSelectedDateMillis = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
     )
     
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.Edit,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text("编辑课表")
+            }
         },
-        title = { 
-            Text("编辑课表") 
-        },
-        text = {
+        content = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -80,7 +85,7 @@ fun ScheduleQuickEditDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                         singleLine = true
                     )
@@ -113,10 +118,8 @@ fun ScheduleQuickEditDialog(
                     onValueChange = { },
                     label = { Text("第一天上课日期") },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showDatePicker = true },
+                        .fillMaxWidth(),
                     readOnly = true,
-                    enabled = false,
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledTextColor = MaterialTheme.colorScheme.onSurface,
                         disabledBorderColor = MaterialTheme.colorScheme.outline,
@@ -145,7 +148,7 @@ fun ScheduleQuickEditDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
@@ -194,25 +197,29 @@ fun ScheduleQuickEditDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onConfirm(scheduleName, startDate, totalWeeks)
-                },
-                enabled = scheduleName.isNotBlank()
+        actions = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("保存")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onDismiss()
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDismiss()
+                    }
+                ) {
+                    Text("取消")
                 }
-            ) {
-                Text("取消")
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onConfirm(scheduleName, startDate, totalWeeks)
+                    },
+                    enabled = scheduleName.isNotBlank()
+                ) {
+                    Text("保存")
+                }
             }
         }
     )
@@ -245,3 +252,4 @@ fun ScheduleQuickEditDialog(
         }
     }
 }
+

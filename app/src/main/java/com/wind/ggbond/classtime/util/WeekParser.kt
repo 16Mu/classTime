@@ -76,7 +76,7 @@ object WeekParser {
                             }
                         }
                     } catch (e: NumberFormatException) {
-                        // 忽略无效的数字
+                        android.util.Log.w("WeekParser", "周次范围解析失败: $numberPart", e)
                     }
                 }
             } else {
@@ -85,7 +85,7 @@ object WeekParser {
                     val week = numberPart.toInt()
                     result.add(week)
                 } catch (e: NumberFormatException) {
-                    // 忽略无效的数字
+                    android.util.Log.w("WeekParser", "周次数字解析失败: $numberPart", e)
                 }
             }
         }
@@ -141,6 +141,50 @@ object WeekParser {
         }
         
         return parts.joinToString(",") + suffix
+    }
+
+    fun formatWeeksForDisplay(weeks: List<Int>): String {
+        if (weeks.isEmpty()) return ""
+        val sorted = weeks.sorted()
+        if (sorted.size == 1) return "${sorted[0]}"
+
+        val segments = mutableListOf<String>()
+        var i = 0
+        while (i < sorted.size) {
+            val start = sorted[i]
+
+            var endStep1 = start
+            var k = i + 1
+            while (k < sorted.size && sorted[k] == endStep1 + 1) {
+                endStep1 = sorted[k]
+                k++
+            }
+
+            if (k > i + 1) {
+                segments.add("$start-$endStep1")
+                i = k
+                continue
+            }
+
+            val isOdd = start % 2 == 1
+            var endStep2 = start
+            k = i + 1
+            while (k < sorted.size && sorted[k] == endStep2 + 2 && sorted[k] % 2 == start % 2) {
+                endStep2 = sorted[k]
+                k++
+            }
+
+            if (k > i + 1) {
+                val suffix = if (isOdd) "(单周)" else "(双周)"
+                segments.add("$start-$endStep2$suffix")
+                i = k
+                continue
+            }
+
+            segments.add("$start")
+            i++
+        }
+        return segments.joinToString(",")
     }
 }
 

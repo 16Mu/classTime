@@ -1,3 +1,7 @@
+// [Monet] 已排查：该文件使用 courseColor (String?) 直接解析颜色用于调课记录卡片图标容器显示。
+// 说明：此为"读取已有课程颜色并渲染"场景，courseColor 来自 Course 实体的 color 字段（数据库存储的十六进制颜色值），
+// 属于课程颜色的消费端，非生成端。如需支持 Monet 动态配色，可考虑在 AdjustmentListItem 组件中
+// 接收动态颜色参数，或使用 CourseColorProvider.getColorForCourse() 根据课程名重新获取。
 package com.wind.ggbond.classtime.ui.screen.adjustment
 
 import androidx.compose.animation.AnimatedVisibility
@@ -14,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -157,7 +162,7 @@ fun AdjustmentManagementScreen(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Default.Undo,
+                            Icons.AutoMirrored.Filled.Undo,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.error
@@ -369,7 +374,7 @@ private fun AdjustmentListItem(
                             verticalAlignment = Alignment.Top
                         ) {
                             Icon(
-                                Icons.Default.Notes,
+                                Icons.AutoMirrored.Filled.Notes,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -397,7 +402,7 @@ private fun AdjustmentListItem(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             ),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                            border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                                 brush = androidx.compose.ui.graphics.SolidColor(
                                     MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
                                 )
@@ -405,7 +410,7 @@ private fun AdjustmentListItem(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Icon(
-                                Icons.Default.Undo,
+                                Icons.AutoMirrored.Filled.Undo,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )

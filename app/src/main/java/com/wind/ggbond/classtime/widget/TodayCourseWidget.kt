@@ -30,6 +30,9 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.wind.ggbond.classtime.MainActivity
+import com.wind.ggbond.classtime.widget.data.WidgetDisplayData
+import com.wind.ggbond.classtime.widget.data.WidgetCourseItem
+import com.wind.ggbond.classtime.widget.WidgetDataProvider
 
 /**
  * 今日课程桌面小组件

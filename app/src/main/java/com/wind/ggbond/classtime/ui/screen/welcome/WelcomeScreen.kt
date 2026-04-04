@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.welcome
 
 import android.app.Activity
@@ -9,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -306,7 +308,7 @@ private fun FullDisclaimerStep(
     val scrollState = rememberScrollState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
     var readingTimeElapsed by remember { mutableStateOf(false) }
-    var countdownSeconds by remember { mutableIntStateOf(10) }
+    var countdownSeconds by remember { mutableIntStateOf(5) }
     
     // 检测是否滚动到底部
     LaunchedEffect(scrollState.value, scrollState.maxValue) {
@@ -672,7 +674,7 @@ private fun StepNavigationButtons(
                 Text(if (currentStep == 0) "继续" else "下一步")
                 Spacer(modifier = Modifier.width(4.dp))
                 Icon(
-                    imageVector = Icons.Default.ArrowForward,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )

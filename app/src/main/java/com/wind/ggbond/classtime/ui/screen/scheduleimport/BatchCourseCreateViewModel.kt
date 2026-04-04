@@ -465,6 +465,15 @@ class BatchCourseCreateViewModel @Inject constructor(
             if (it.id == courseId) it.copy(note = note) else it
         }
     }
+    
+    /**
+     * 更新整个课程项（用于快捷编辑）
+     */
+    fun updateCourseItem(updatedCourse: BatchCourseItem) {
+        _courseItems.value = _courseItems.value.map {
+            if (it.id == updatedCourse.id) updatedCourse else it
+        }
+    }
 
     // ===================== 时间段操作 =====================
 

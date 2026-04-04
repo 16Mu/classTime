@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.reminder
 
 import androidx.compose.animation.AnimatedVisibility
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -620,7 +622,7 @@ private fun ReminderTestDialog(
                     onClick = { onTestNextClassReminder(); onDismiss() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.NextPlan, null, Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.NextPlan, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("下节课提醒测试")
                 }

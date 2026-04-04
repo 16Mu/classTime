@@ -85,5 +85,6 @@ sealed class Screen(val route: String) {
     object PermissionTutorial : Screen("permission_tutorial/{permissionType}") {
         fun createRoute(permissionType: String) = "permission_tutorial/$permissionType"
     }
+    object BackgroundSettings : Screen("background_settings")
 }
 

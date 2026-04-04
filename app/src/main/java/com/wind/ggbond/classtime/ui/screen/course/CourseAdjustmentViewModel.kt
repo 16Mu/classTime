@@ -6,18 +6,17 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
 import com.wind.ggbond.classtime.data.repository.CourseAdjustmentRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * 临时调课ViewModel
- */
 @HiltViewModel
 class CourseAdjustmentViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
-    private val adjustmentRepository: CourseAdjustmentRepository
+    private val adjustmentRepository: CourseAdjustmentRepository,
+    private val reminderScheduler: IAlarmScheduler
 ) : ViewModel() {
     
     // 当前课程
@@ -242,6 +241,9 @@ class CourseAdjustmentViewModel @Inject constructor(
                 android.util.Log.d("CourseAdjustmentVM", "✓ 原时间: 第${_originalWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}节")
                 android.util.Log.d("CourseAdjustmentVM", "✓ 新时间: 第${_newWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(_newDayOfWeek.value)} 第${_newStartSection.value}节")
                 android.util.Log.d("CourseAdjustmentVM", "====================================")
+                
+                val savedAdjustment = adjustment.copy(id = savedId)
+                reminderScheduler.rescheduleRemindersForAdjustment(savedAdjustment)
                 
                 _saveState.value = SaveState.Success("临时调课设置成功")
             } catch (e: Exception) {

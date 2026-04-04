@@ -60,6 +60,9 @@ class FloatingUpdateActivity : ComponentActivity() {
     lateinit var secureCookieManager: SecureCookieManager
     
     @Inject
+    lateinit var loginScriptGenerator: com.wind.ggbond.classtime.service.helper.LoginScriptGenerator
+    
+    @Inject
     lateinit var extractorFactory: com.wind.ggbond.classtime.util.extractor.SchoolExtractorFactory
     
     @Inject
@@ -349,14 +352,16 @@ fun DebugWebViewDialog(
                             }
                             
                             override fun onReceivedError(
-                                view: WebView?,
-                                errorCode: Int,
-                                description: String?,
-                                failingUrl: String?
+                                view: WebView,
+                                request: android.webkit.WebResourceRequest,
+                                error: android.webkit.WebResourceError
                             ) {
-                                super.onReceivedError(view, errorCode, description, failingUrl)
-                                Log.e("DebugWebView", "❌ 加载错误: $description")
-                                statusText = "❌ 加载错误: $description"
+                                super.onReceivedError(view, request, error)
+                                if (!request.isForMainFrame) return
+
+                                val description = error.description?.toString().orEmpty()
+                                Log.e("DebugWebView", "????????: $description")
+                                statusText = "????????: $description"
                             }
                         }
                     }
@@ -537,10 +542,12 @@ private suspend fun performAutoLogin(
         }
         
         // 获取SecureCookieManager用于登录后保存Cookie
-        val secureCookieManager = (context as? FloatingUpdateActivity)?.secureCookieManager
+        val activity = context as? FloatingUpdateActivity
+        val secureCookieManager = activity?.secureCookieManager
+        val loginScriptGenerator = activity?.loginScriptGenerator
         
-        if (secureCookieManager == null) {
-            Log.w("AutoLogin", "无法获取 SecureCookieManager")
+        if (secureCookieManager == null || loginScriptGenerator == null) {
+            Log.w("AutoLogin", "无法获取 SecureCookieManager 或 LoginScriptGenerator")
             return AutoLoginResult(
                 success = false,
                 resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
@@ -551,7 +558,8 @@ private suspend fun performAutoLogin(
         val autoLoginService = com.wind.ggbond.classtime.service.AutoLoginService(
             context,
             schoolRepository,
-            secureCookieManager
+            secureCookieManager,
+            loginScriptGenerator
         )
         
         val result = autoLoginService.performAutoLogin(schoolId, username, password)

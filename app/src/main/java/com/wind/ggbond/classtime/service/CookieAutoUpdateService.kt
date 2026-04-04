@@ -8,6 +8,7 @@ import com.wind.ggbond.classtime.data.model.SchoolConfig
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.AutoUpdateLogRepository
 import com.wind.ggbond.classtime.util.SecureCookieManager
+import com.wind.ggbond.classtime.service.contract.IScheduleFetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,32 +16,10 @@ import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * 🍪 Cookie自动更新服务
- * 
- * 功能：使用保存的Cookie自动更新课表
- * 
- * 工作流程：
- * 0. 用户首次手动登录 → 保存Cookie
- * 1. 用户进入软件
- * 2. 判断是否触发更新(用户设置的每X天后更新)
- * 3. 自动更新触发
- * 4. 后台创建隐藏WebView
- * 5. 加载登录页面 (loginUrl)
- * 6. 服务器验证Cookie ✅
- * 7. 自动跳转到课表页面 ✅
- * 8. 等待页面加载完成
- * 9. 使用CQEPCExtractor提取课表 ✅
- * 10. 更新数据库
- * 11. 清理WebView，完成 ✅
- * 
- * @author AI Assistant
- * @since 2025-11-04
- */
 @Singleton
 class CookieAutoUpdateService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val unifiedScheduleFetchService: UnifiedScheduleFetchService,
+    private val unifiedScheduleFetchService: IScheduleFetcher,
     private val courseRepository: CourseRepository,
     private val autoUpdateLogRepository: AutoUpdateLogRepository,
     private val secureCookieManager: SecureCookieManager,
@@ -371,7 +350,7 @@ class CookieAutoUpdateService @Inject constructor(
                 val result = performAutoUpdate(schoolConfig, currentSchedule.id)
                 
                 if (result.isSuccess) {
-                    val updateResult = result.getOrNull()!!
+                    val updateResult = result.getOrNull() ?: return@withContext Pair(false, "更新结果为空")
                     Pair(true, updateResult.message)
                 } else {
                     val error = result.exceptionOrNull()

@@ -118,7 +118,7 @@ class CCSFDXExtractor @Inject constructor() : SchoolScheduleExtractor {
                 val con = parts[1]
                 
                 if (morear.containsKey(id)) {
-                    morear[id]!!.add(con)
+                    morear.getValue(id).add(con)
                 } else {
                     morear[id] = mutableListOf(con)
                 }
@@ -297,7 +297,7 @@ class CCSFDXExtractor @Inject constructor() : SchoolScheduleExtractor {
             val key = "${course.courseName}|${course.teacher}|${course.classroom}|${course.dayOfWeek}|${course.startSection}"
             
             if (courseMap.containsKey(key)) {
-                val existing = courseMap[key]!!
+                val existing = courseMap.getValue(key)
                 val mergedWeeks = (existing.weeks + course.weeks).distinct().sorted()
                 courseMap[key] = existing.copy(
                     weeks = mergedWeeks,

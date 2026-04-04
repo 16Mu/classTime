@@ -127,10 +127,17 @@ fun BatchCourseCreateScreen(
                     "成功创建 ${state.courseCount} 门课程（${state.recordCount} 条记录）",
                     duration = SnackbarDuration.Short
                 )
-                kotlinx.coroutines.delay(500)
-                navController.navigate(Screen.Main.createRoute(refresh = true)) {
-                    popUpTo(BottomNavItem.Schedule.route) { inclusive = false }
+                kotlinx.coroutines.delay(800)
+                // 直接导航到课表标签页，不使用 Screen.Main.createRoute
+                navController.navigate(BottomNavItem.Schedule.route) {
+                    // 清空到根路由
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = false
+                    }
+                    // 避免重复导航
                     launchSingleTop = true
+                    // 恢复状态
+                    restoreState = true
                 }
             }
             is BatchSaveState.Error -> {
@@ -569,6 +576,33 @@ private fun DetailedConfigPhase(
 
     val currentCourse = courseItems[currentIndex]
     val haptic = LocalHapticFeedback.current
+    
+    // 步骤验证逻辑
+    val step1Valid = currentCourse.timeSlots.isNotEmpty() &&
+        currentCourse.timeSlots.all { slot ->
+            slot.dayOfWeek in 1..7 &&
+            slot.startSection >= 1 &&
+            slot.sectionCount >= 1
+        }
+    
+    val step2Valid = currentCourse.timeSlots.all { slot ->
+        slot.customWeeks.isNotEmpty()
+    }
+    
+    val step3Valid = true // 提醒设置无必填项
+    
+    val canProceed = when (currentStep) {
+        1 -> step1Valid
+        2 -> step2Valid
+        3 -> step3Valid
+        else -> false
+    }
+    
+    val validationMessage = when (currentStep) {
+        1 -> if (!step1Valid) "请完善时间段配置" else null
+        2 -> if (!step2Valid) "请为所有时间段选择周次" else null
+        else -> null
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         CourseProgressIndicator(
@@ -678,6 +712,7 @@ private fun DetailedConfigPhase(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onStepChange(currentStep + 1)
                         },
+                        enabled = canProceed,
                         modifier = Modifier.weight(2f),
                         contentPadding = PaddingValues(vertical = 8.dp),
                         shape = RoundedCornerShape(12.dp),
@@ -727,6 +762,17 @@ private fun DetailedConfigPhase(
                         Spacer(Modifier.width(6.dp))
                         Text("进入颜色选择", style = MaterialTheme.typography.labelMedium)
                     }
+                }
+                
+                // 显示验证错误提示
+                if (!canProceed && validationMessage != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = validationMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -879,33 +925,61 @@ private fun ColorSelectionPhase(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                Card(shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+            // 一键分配按钮（单独占据一行，跨两列）
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(2) }) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "一键自动分配颜色",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            FilledTonalButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    viewModel.autoAssignAllColors()
-                                },
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
+                            Text(
+                                text = "为所有课程智能分配不同颜色",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        
+                        var isAssigning by remember { mutableStateOf(false) }
+                        
+                        FilledTonalButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isAssigning = true
+                                viewModel.autoAssignAllColors()
+                                // 延迟重置状态，确保UI更新
+                                kotlinx.coroutines.GlobalScope.launch {
+                                    kotlinx.coroutines.delay(500)
+                                    isAssigning = false
+                                }
+                            },
+                            enabled = !isAssigning,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            if (isAssigning) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            } else {
                                 Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("智能分配", style = MaterialTheme.typography.labelSmall)
                             }
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (isAssigning) "分配中..." else "智能分配",
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                 }
@@ -1110,6 +1184,8 @@ private fun TimeScheduleStep(course: BatchCourseItem, courseId: Long, viewModel:
                         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) { Text(text = "点击上方按钮添加时间段", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } else {
                         course.timeSlots.forEachIndexed { index, slot ->
+                            // 反转索引，使最新的时间段显示在最上面
+                            val displayIndex = course.timeSlots.size - index
                             val isExpanded = slot.id in expandedSlotIds.value
                             key(slot.id) {
                                 AnimatedContent(
@@ -1126,8 +1202,8 @@ private fun TimeScheduleStep(course: BatchCourseItem, courseId: Long, viewModel:
                                     },
                                     modifier = Modifier.animateItem()
                                 ) { expanded ->
-                                    if (expanded) TimeSlotEditRowExpanded(slotIndex = index + 1, slot = slot, canDelete = course.timeSlots.size > 1, onDelete = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); viewModel.removeTimeSlot(courseId, slot.id) }, onUpdate = { day, start, end, room -> viewModel.updateSlotDayOfWeek(courseId, slot.id, day); viewModel.updateSlotStartSection(courseId, slot.id, start); viewModel.updateSlotEndSection(courseId, slot.id, end); if (room.isNotBlank()) viewModel.updateSlotClassroom(courseId, slot.id, room) }, defaultClassroom = course.defaultClassroom)
-                                    else TimeSlotDisplayCard(index = index + 1, slot = slot, defaultClassroom = course.defaultClassroom, onClick = { expandedSlotIds.value = setOf(slot.id) })
+                                    if (expanded) TimeSlotEditRowExpanded(slotIndex = displayIndex, slot = slot, canDelete = course.timeSlots.size > 1, onDelete = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); viewModel.removeTimeSlot(courseId, slot.id) }, onUpdate = { day, start, end, room -> viewModel.updateSlotDayOfWeek(courseId, slot.id, day); viewModel.updateSlotStartSection(courseId, slot.id, start); viewModel.updateSlotEndSection(courseId, slot.id, end); if (room.isNotBlank()) viewModel.updateSlotClassroom(courseId, slot.id, room) }, defaultClassroom = course.defaultClassroom)
+                                    else TimeSlotDisplayCard(index = displayIndex, slot = slot, defaultClassroom = course.defaultClassroom, onClick = { expandedSlotIds.value = setOf(slot.id) })
                                 }
                             }
                             if (index < course.timeSlots.size - 1) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
@@ -1256,17 +1332,21 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
 
                         val options = listOf(
                             5 to "5分钟",
+                            10 to "10分钟",
                             15 to "15分钟",
                             30 to "30分钟",
                             60 to "1小时"
                         )
+                        var showCustomInput by remember { mutableStateOf(false) }
+                        var customMinutes by remember { mutableStateOf("") }
+                        
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             options.forEach { (minutes, label) ->
-                                val isSelected = reminderMinutes == minutes
+                                val isSelected = reminderMinutes == minutes && !showCustomInput
                                 Surface(
                                     shape = RoundedCornerShape(20.dp),
                                     color = if (isSelected) MaterialTheme.colorScheme.primary
@@ -1275,6 +1355,7 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         reminderMinutes = minutes
                                         viewModel.updateReminderMinutes(course.id, minutes)
+                                        showCustomInput = false
                                     }
                                 ) {
                                     Text(
@@ -1286,6 +1367,63 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                                     )
                                 }
                             }
+                            
+                            // 自定义选项
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (showCustomInput) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    showCustomInput = true
+                                    customMinutes = if (reminderMinutes !in options.map { it.first }) {
+                                        reminderMinutes.toString()
+                                    } else {
+                                        ""
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = "自定义",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (showCustomInput) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (showCustomInput) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                        
+                        // 自定义输入框
+                        if (showCustomInput) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = customMinutes,
+                                onValueChange = { newValue ->
+                                    customMinutes = newValue
+                                    newValue.toIntOrNull()?.let { minutes ->
+                                        if (minutes in 1..120) {
+                                            reminderMinutes = minutes
+                                            viewModel.updateReminderMinutes(course.id, minutes)
+                                        }
+                                    }
+                                },
+                                label = { Text("自定义分钟数") },
+                                placeholder = { Text("输入1-120之间的数字") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                isError = customMinutes.toIntOrNull()?.let { it !in 1..120 } ?: (customMinutes.isNotBlank()),
+                                supportingText = {
+                                    if (customMinutes.isNotBlank()) {
+                                        val value = customMinutes.toIntOrNull()
+                                        if (value == null) {
+                                            Text("请输入有效数字", color = MaterialTheme.colorScheme.error)
+                                        } else if (value !in 1..120) {
+                                            Text("范围应为1-120分钟", color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                }
+                            )
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
@@ -1308,9 +1446,9 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) {
-                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Notifications, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
                                     }
-                                    Text(text = "上课提醒", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                    Text(text = "课程提醒", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                 }
 
                                 Text(text = course.courseName.ifBlank { "未命名课程" }, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
@@ -1432,9 +1570,11 @@ private fun PreviewPhase(
     courseItems: List<BatchCourseItem>,
     onEdit: (Int) -> Unit,
     onSaveAll: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: BatchCourseCreateViewModel
 ) {
     val haptic = LocalHapticFeedback.current
+    var editingCourse by remember { mutableStateOf<BatchCourseItem?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Surface(
@@ -1486,6 +1626,10 @@ private fun PreviewPhase(
                     courseItem = course,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        editingCourse = course
+                    },
+                    onDetailedEdit = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onEdit(index)
                     }
                 )
@@ -1528,10 +1672,27 @@ private fun PreviewPhase(
             }
         }
     }
+    
+    // 快捷编辑对话框
+    editingCourse?.let { course ->
+        QuickEditDialog(
+            courseItem = course,
+            onDismiss = { editingCourse = null },
+            onConfirm = { updatedCourse ->
+                viewModel.updateCourseItem(updatedCourse)
+                editingCourse = null
+            }
+        )
+    }
 }
 
 @Composable
-private fun PreviewCard(index: Int, courseItem: BatchCourseItem, onClick: () -> Unit) {
+private fun PreviewCard(
+    index: Int,
+    courseItem: BatchCourseItem,
+    onClick: () -> Unit,
+    onDetailedEdit: () -> Unit
+) {
     val defaultColor = MaterialTheme.colorScheme.primary
 
     val courseColor = remember(courseItem.color) {
@@ -1542,7 +1703,7 @@ private fun PreviewCard(index: Int, courseItem: BatchCourseItem, onClick: () -> 
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -1570,7 +1731,7 @@ private fun PreviewCard(index: Int, courseItem: BatchCourseItem, onClick: () -> 
                         )
                     }
                 }
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f).clickable { onClick() }) {
                     Text(
                         text = courseItem.courseName.ifBlank { "未命名课程" },
                         style = MaterialTheme.typography.titleSmall,
@@ -1588,12 +1749,24 @@ private fun PreviewCard(index: Int, courseItem: BatchCourseItem, onClick: () -> 
                         )
                     }
                 }
-                Icon(
-                    Icons.Default.Edit,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(20.dp)
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Edit,
+                            "快捷编辑",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(onClick = onDetailedEdit, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Settings,
+                            "详细配置",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             if (courseItem.timeSlots.isNotEmpty()) {

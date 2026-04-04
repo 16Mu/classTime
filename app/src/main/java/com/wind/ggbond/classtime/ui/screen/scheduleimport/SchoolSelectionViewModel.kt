@@ -12,10 +12,13 @@ import com.wind.ggbond.classtime.data.local.entity.SchoolEntity
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.text.Collator
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -31,7 +34,7 @@ data class SchoolGroup(
 /**
  * 学校选择 ViewModel
  */
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SchoolSelectionViewModel @Inject constructor(
     private val schoolRepository: SchoolRepository,
@@ -89,7 +92,7 @@ class SchoolSelectionViewModel @Inject constructor(
                 ) { provinceSchoolsArray ->
                     val groups = provinceSchoolsArray
                         .map { (province, schools) -> SchoolGroup(province, schools) }
-                        .sortedBy { it.province }
+                        .sortedWith(compareBy(Collator.getInstance(Locale.CHINESE)) { it.province })
                     android.util.Log.d("SchoolSelectionViewModel", "schoolGroups 更新，分组数量：${groups.size}")
                     groups
                 }
@@ -227,4 +230,3 @@ class SchoolSelectionViewModel @Inject constructor(
         }
     }
 }
-

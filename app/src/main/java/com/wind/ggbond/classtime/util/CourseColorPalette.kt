@@ -98,7 +98,7 @@ object CourseColorPalette {
         uniqueCourseNames.forEach { courseName ->
             // 如果已经分配过颜色，使用缓存的颜色
             val color = if (courseColorMap.containsKey(courseName)) {
-                courseColorMap[courseName]!!
+                courseColorMap.getValue(courseName)
             } else {
                 // 否则分配新颜色
                 getColorForCourse(courseName, usedColors)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,6 +40,7 @@ import com.wind.ggbond.classtime.util.WeekParser
 import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.topGradientOverlayAlpha
 import com.wind.ggbond.classtime.BuildConfig
+import com.wind.ggbond.classtime.util.CourseColorProvider
 
 /**
  * 课程详情页面
@@ -61,6 +63,18 @@ fun CourseDetailScreen(
     val currentSchedule by viewModel.currentSchedule.collectAsState()
     val currentWeekNumber by viewModel.currentWeekNumber.collectAsState()
     val context = LocalContext.current
+    
+    var dynamicCourseColor by remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(course) {
+        course?.let { c ->
+            if (c.color.isEmpty()) {
+                dynamicCourseColor = CourseColorProvider.getColorForCourse(c.courseName)
+            } else {
+                dynamicCourseColor = c.color
+            }
+        }
+    }
     
     // 临时调课 ViewModel
     val adjustmentViewModel: CourseAdjustmentViewModel = hiltViewModel()
@@ -181,13 +195,17 @@ fun CourseDetailScreen(
                     ),
                     colors = CardDefaults.cardColors(
                         containerColor = try {
-                            Color(android.graphics.Color.parseColor(c.color))
+                            val colorStr = dynamicCourseColor ?: c.color
+                            Color(android.graphics.Color.parseColor(colorStr))
                         } catch (e: Exception) {
                             MaterialTheme.colorScheme.primaryContainer
                         }
                     )
                 ) {
-                    val bg = try { Color(android.graphics.Color.parseColor(c.color)) } catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
+                    val bg = try { 
+                        val colorStr = dynamicCourseColor ?: c.color
+                        Color(android.graphics.Color.parseColor(colorStr)) 
+                    } catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
                     val contentColor = contentColorForBackground(bg)
                     val overlayAlpha = topGradientOverlayAlpha(bg)
                     Box(
@@ -531,11 +549,14 @@ fun CourseDetailScreen(
                 else -> {}
             }
         }
-        
-        com.wind.ggbond.classtime.ui.screen.course.components.CourseAdjustmentDialog(
-            course = course!!,
-            currentWeekNumber = adjustmentViewModel.originalWeekNumber.collectAsState().value,
-            totalWeeks = currentSchedule!!.totalWeeks,
+
+        val currentCourse = course
+        val currentSch = currentSchedule
+        if (currentCourse != null && currentSch != null) {
+            com.wind.ggbond.classtime.ui.screen.course.components.CourseAdjustmentDialog(
+                course = currentCourse,
+                currentWeekNumber = adjustmentViewModel.originalWeekNumber.collectAsState().value,
+                totalWeeks = currentSch.totalWeeks,
             newWeekNumber = adjustmentViewModel.newWeekNumber.collectAsState().value,
             newDayOfWeek = adjustmentViewModel.newDayOfWeek.collectAsState().value,
             newStartSection = adjustmentViewModel.newStartSection.collectAsState().value,
@@ -553,15 +574,18 @@ fun CourseDetailScreen(
             onReasonChange = { adjustmentViewModel.setReason(it) },
             onConfirm = { adjustmentViewModel.saveAdjustment() },
             onDismiss = { viewModel.hideAdjustmentDialog() }
-        )
+            )
+        }
     }
-    
+
     // 添加考试对话框
-    if (showAddExamDialog && course != null && currentSchedule != null) {
+    val courseVal = course
+    val scheduleVal = currentSchedule
+    if (showAddExamDialog && courseVal != null && scheduleVal != null) {
         com.wind.ggbond.classtime.ui.screen.course.components.AddExamDialog(
-            course = course!!,
+            course = courseVal,
             currentWeek = currentWeekNumber,
-            totalWeeks = currentSchedule!!.totalWeeks,
+            totalWeeks = scheduleVal.totalWeeks,
             onDismiss = { viewModel.hideAddExamDialog() },
             onConfirm = { exam ->
                 viewModel.saveExam(exam)
@@ -743,7 +767,7 @@ fun ExamInfoItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Assignment,
+                        Icons.AutoMirrored.Filled.Assignment,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(18.dp)

@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.wind.ggbond.classtime.data.model.ParsedCourse
@@ -13,6 +15,7 @@ import com.wind.ggbond.classtime.data.model.SchoolConfig
 import com.wind.ggbond.classtime.util.HtmlScheduleParser
 import com.wind.ggbond.classtime.util.MutableContextWrapper
 import com.wind.ggbond.classtime.util.SecureCookieManager
+import com.wind.ggbond.classtime.service.contract.IScheduleFetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,24 +24,13 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/**
- * 🎯 统一的课表获取服务 - 基于Cookie
- * 
- * 核心设计思路：
- * 1. 使用保存的Cookie获取课表
- * 2. Cookie失效时提示用户重新登录
- * 3. 手动导入和自动更新使用相同的底层实现
- * 
- * @author AI Assistant
- * @since 2025-11-04
- */
 @Singleton
 class UnifiedScheduleFetchService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val htmlParser: HtmlScheduleParser,
     private val secureCookieManager: SecureCookieManager,
     private val extractorFactory: com.wind.ggbond.classtime.util.extractor.SchoolExtractorFactory
-) {
+) : IScheduleFetcher {
     companion object {
         private const val TAG = "UnifiedScheduleFetch"
         private const val TIMEOUT_MS = 30000L // 30秒超时
@@ -56,9 +48,9 @@ class UnifiedScheduleFetchService @Inject constructor(
      * @param showWebView 是否显示WebView（手动导入时为true，自动更新时为false）
      * @return 课程列表和Cookie
      */
-    suspend fun fetchSchedule(
+    suspend override fun fetchSchedule(
         schoolConfig: SchoolConfig,
-        showWebView: Boolean = false
+        showWebView: Boolean
     ): Result<Pair<List<ParsedCourse>, String>> {
         
         val domain = extractDomain(schoolConfig.loginUrl)
@@ -227,16 +219,18 @@ class UnifiedScheduleFetchService @Inject constructor(
                         }
                         
                         override fun onReceivedError(
-                            view: WebView?,
-                            errorCode: Int,
-                            description: String?,
-                            failingUrl: String?
+                            view: WebView,
+                            request: WebResourceRequest,
+                            error: WebResourceError
                         ) {
-                            super.onReceivedError(view, errorCode, description, failingUrl)
-                            Log.e(TAG, "❌ 页面加载错误: $description")
+                            super.onReceivedError(view, request, error)
+                            if (!request.isForMainFrame || hasResumed.get()) return
+
+                            val description = error.description?.toString().orEmpty()
+                            Log.e(TAG, "WebView??????: $description")
                             safeResume {
                                 continuation.resumeWithException(
-                                    Exception("页面加载失败: $description")
+                                    Exception("??????: $description")
                                 )
                             }
                         }

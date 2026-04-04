@@ -1,3 +1,7 @@
+// [Monet] 已排查：该文件使用 course?.color 直接解析颜色用于提醒卡片左侧指示条显示。
+// 说明：此为"读取已有课程颜色并渲染"场景，course.color 来自数据库存储的十六进制颜色值，
+// 属于课程颜色的消费端，非生成端。如需支持 Monet 动态配色，可考虑在数据层将 color 字段
+// 替换为动态生成的颜色值，或在 Composable 中使用 CourseColorProvider.getColorForCourse() 重新获取。
 package com.wind.ggbond.classtime.ui.screen.reminder
 
 import androidx.compose.animation.animateColorAsState
@@ -8,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,8 +43,11 @@ fun ReminderManagementScreen(
     onNavigateBack: () -> Unit,
     viewModel: ReminderManagementViewModel = hiltViewModel()
 ) {
+    val haptic = LocalHapticFeedback.current
+    
     // 收集ViewModel状态
     val reminders by viewModel.reminders.collectAsState()
+    val groupedReminders by viewModel.groupedReminders.collectAsState()
     val courseMap by viewModel.courseMap.collectAsState()
     val stats by viewModel.stats.collectAsState()
     val filterType by viewModel.filterType.collectAsState()
@@ -52,8 +62,11 @@ fun ReminderManagementScreen(
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("提醒管理") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, "返回")
+                    IconButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onNavigateBack()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
                     }
                 },
                 actions = {
@@ -84,12 +97,12 @@ fun ReminderManagementScreen(
                 onFilterSelected = { viewModel.setFilter(it) }
             )
             
-            // 提醒列表（按日期分组）
+            // 提醒列表（按日期分组）- 使用ViewModel预计算的分组数据
             if (reminders.isEmpty()) {
                 EmptyReminderView(filterType = filterType)
             } else {
                 ReminderGroupedList(
-                    reminders = reminders,
+                    groupedReminders = groupedReminders.dateGroups,
                     courseMap = courseMap,
                     onDelete = { viewModel.showDeleteDialog(it) },
                     onToggle = { viewModel.toggleReminder(it) }
@@ -277,29 +290,21 @@ private fun ReminderFilterBar(
 }
 
 /**
- * 按日期分组的提醒列表
+ * 按日期分组的提醒列表 - 接收ViewModel预计算的分组数据，避免重复计算
  */
 @Composable
 private fun ReminderGroupedList(
-    reminders: List<Reminder>,
+    groupedReminders: Map<java.time.LocalDate, List<Reminder>>,
     courseMap: Map<Long, Course>,
     onDelete: (Reminder) -> Unit,
     onToggle: (Reminder) -> Unit
 ) {
-    // 按触发日期分组
-    val grouped = reminders.groupBy { reminder ->
-        LocalDateTime.ofInstant(
-            Instant.ofEpochMilli(reminder.triggerTime),
-            ZoneId.systemDefault()
-        ).toLocalDate()
-    }.toSortedMap()
-    
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        grouped.forEach { (date, dateReminders) ->
+        groupedReminders.forEach { (date, dateReminders) ->
             // 日期分组头
             item(key = "header_$date") {
                 DateGroupHeader(date = date)
@@ -371,18 +376,25 @@ private fun ReminderCompactCard(
     onDelete: () -> Unit,
     onToggle: () -> Unit
 ) {
-    // 提取触发时间
-    val triggerTime = LocalDateTime.ofInstant(
-        Instant.ofEpochMilli(reminder.triggerTime),
-        ZoneId.systemDefault()
-    )
+    // 提取触发时间 - 使用remember缓存时间转换，避免每次重组重新计算
+    val triggerTime by remember(reminder.triggerTime) {
+        derivedStateOf {
+            LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(reminder.triggerTime),
+                ZoneId.systemDefault()
+            )
+        }
+    }
     // 判断过期状态
     val isExpired = reminder.triggerTime < System.currentTimeMillis()
-    // 解析课程颜色
-    val courseColor = try {
-        Color(android.graphics.Color.parseColor(course?.color ?: "#D4A574"))
-    } catch (_: Exception) {
-        MaterialTheme.colorScheme.primary
+    // 解析课程颜色 - 使用remember缓存颜色解析
+    val defaultColor = MaterialTheme.colorScheme.primary
+    val courseColor = remember(course?.color) {
+        try {
+            Color(android.graphics.Color.parseColor(course?.color ?: "#D4A574"))
+        } catch (_: Exception) {
+            defaultColor
+        }
     }
     // 根据状态计算整体透明度
     val contentAlpha = if (isExpired) 0.5f else if (!reminder.isEnabled) 0.65f else 1f
@@ -503,8 +515,8 @@ private fun ReminderCompactCard(
                     
                     // 第二行：教室 + 教师（如果有）
                     val detailParts = mutableListOf<String>()
-                    if (!course?.classroom.isNullOrBlank()) detailParts.add(course!!.classroom)
-                    if (!course?.teacher.isNullOrBlank()) detailParts.add(course!!.teacher)
+                    course?.classroom?.takeIf { it.isNotBlank() }?.let { detailParts.add(it) }
+                    course?.teacher?.takeIf { it.isNotBlank() }?.let { detailParts.add(it) }
                     if (detailParts.isNotEmpty()) {
                         Text(
                             text = detailParts.joinToString(" · "),

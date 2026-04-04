@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.data.local.entity.Schedule
+import com.wind.ggbond.classtime.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -57,19 +58,22 @@ fun ScheduleExpiredDialog(
     // 日期格式化
     val dateFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日")
     
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.Warning,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error
-            )
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text("课表已过期")
+            }
         },
-        title = { 
-            Text("课表已过期") 
-        },
-        text = {
+        content = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -96,24 +100,28 @@ fun ScheduleExpiredDialog(
                 )
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onCreateNew()
-                }
+        actions = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("创建新课表")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onContinue()
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onContinue()
+                    }
+                ) {
+                    Text("继续使用")
                 }
-            ) {
-                Text("继续使用")
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCreateNew()
+                    }
+                ) {
+                    Text("创建新课表")
+                }
             }
         }
     )
@@ -178,19 +186,22 @@ fun CreateScheduleDialog(
         initialSelectedDateMillis = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
     )
     
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                Icons.Default.CalendarMonth,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                Icon(
+                    Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text("创建课表")
+            }
         },
-        title = { 
-            Text("创建课表") 
-        },
-        text = {
+        content = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -218,7 +229,7 @@ fun CreateScheduleDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                         singleLine = true
                     )
@@ -282,7 +293,7 @@ fun CreateScheduleDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                     ExposedDropdownMenu(
@@ -330,25 +341,29 @@ fun CreateScheduleDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onConfirm(scheduleName, startDate, totalWeeks)
-                },
-                enabled = scheduleName.isNotBlank()
+        actions = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("创建")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onDismiss()
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDismiss()
+                    }
+                ) {
+                    Text("取消")
                 }
-            ) {
-                Text("取消")
+                Spacer(modifier = Modifier.width(Spacing.sm))
+                TextButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onConfirm(scheduleName, startDate, totalWeeks)
+                    },
+                    enabled = scheduleName.isNotBlank()
+                ) {
+                    Text("创建")
+                }
             }
         }
     )

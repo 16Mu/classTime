@@ -2,7 +2,6 @@ package com.wind.ggbond.classtime.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -46,7 +45,7 @@ class SecureCredentialsManager(
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.e(TAG, "加密存储初始化失败，凭据功能不可用", e)
+            AppLogger.e(TAG, "加密存储初始化失败，凭据功能不可用", e)
             null  // 不回退到明文存储，标记为不可用
         }
     }
@@ -60,7 +59,7 @@ class SecureCredentialsManager(
      */
     fun saveCredentials(schoolId: String, username: String, password: String) {
         val prefs = encryptedPrefs ?: run {
-            Log.e(TAG, "加密存储不可用，无法保存凭据")
+            AppLogger.e(TAG, "加密存储不可用，无法保存凭据")
             return
         }
         try {
@@ -68,9 +67,11 @@ class SecureCredentialsManager(
                 .putString(KEY_PREFIX_USERNAME + schoolId, username)
                 .putString(KEY_PREFIX_PASSWORD + schoolId, password)
                 .apply()
-            Log.d(TAG, "凭据已保存: schoolId=$schoolId")
+            AppLogger.sensitive(TAG, "Username", username)
+            AppLogger.sensitive(TAG, "Password", password)
+            AppLogger.d(TAG, "凭据已保存: schoolId=$schoolId")
         } catch (e: Exception) {
-            Log.e(TAG, "保存凭据失败: schoolId=$schoolId", e)
+            AppLogger.e(TAG, "保存凭据失败: schoolId=$schoolId", e)
         }
     }
     
@@ -92,7 +93,7 @@ class SecureCredentialsManager(
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "读取凭据失败: schoolId=$schoolId", e)
+            AppLogger.e(TAG, "读取凭据失败: schoolId=$schoolId", e)
             null
         }
     }
@@ -109,9 +110,9 @@ class SecureCredentialsManager(
                 .remove(KEY_PREFIX_USERNAME + schoolId)
                 .remove(KEY_PREFIX_PASSWORD + schoolId)
                 .apply()
-            Log.d(TAG, "凭据已删除: schoolId=$schoolId")
+            AppLogger.d(TAG, "凭据已删除: schoolId=$schoolId")
         } catch (e: Exception) {
-            Log.e(TAG, "删除凭据失败: schoolId=$schoolId", e)
+            AppLogger.e(TAG, "删除凭据失败: schoolId=$schoolId", e)
         }
     }
     
@@ -122,9 +123,9 @@ class SecureCredentialsManager(
         val prefs = encryptedPrefs ?: return
         try {
             prefs.edit().clear().apply()
-            Log.d(TAG, "所有凭据已清除")
+            AppLogger.d(TAG, "所有凭据已清除")
         } catch (e: Exception) {
-            Log.e(TAG, "清除所有凭据失败", e)
+            AppLogger.e(TAG, "清除所有凭据失败", e)
         }
     }
     
@@ -141,7 +142,7 @@ class SecureCredentialsManager(
             val password = prefs.getString(KEY_PREFIX_PASSWORD + schoolId, null)
             username != null && password != null
         } catch (e: Exception) {
-            Log.e(TAG, "检查凭据失败: schoolId=$schoolId", e)
+            AppLogger.e(TAG, "检查凭据失败: schoolId=$schoolId", e)
             false
         }
     }
@@ -157,7 +158,7 @@ class SecureCredentialsManager(
         return try {
             prefs.getString(KEY_PREFIX_USERNAME + schoolId, null)
         } catch (e: Exception) {
-            Log.e(TAG, "读取用户名失败: schoolId=$schoolId", e)
+            AppLogger.e(TAG, "读取用户名失败: schoolId=$schoolId", e)
             null
         }
     }

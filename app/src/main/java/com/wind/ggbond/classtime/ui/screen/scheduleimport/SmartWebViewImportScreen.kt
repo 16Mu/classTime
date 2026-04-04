@@ -471,11 +471,6 @@ fun SmartWebViewImportScreen(
                             // ✅ 安全配置
                             allowFileAccess = false
                             allowContentAccess = false
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
-                                allowFileAccessFromFileURLs = false
-                                allowUniversalAccessFromFileURLs = false
-                            }
-                            
                             // ✅ 混合内容模式 - 允许HTTP和HTTPS混合使用
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
@@ -527,48 +522,52 @@ fun SmartWebViewImportScreen(
                                 }
                                 
                                 override fun onReceivedError(
-                                    view: WebView?,
-                                    errorCode: Int,
-                                    description: String?,
-                                    failingUrl: String?
-                                ) {
-                                    super.onReceivedError(view, errorCode, description, failingUrl)
-                                    isLoading = false
-                                    
-                                    android.util.Log.e("SmartWebView", "页面加载失败: $description (错误码: $errorCode, URL: $failingUrl)")
-                                    
-                                    // 检查是否是HTTP/2协议错误
-                                    if (description?.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true) == true ||
-                                        description?.contains("ERR_SPDY_PROTOCOL_ERROR", ignoreCase = true) == true) {
-                                        // HTTP/2错误：尝试回退到HTTP
-                                        if (failingUrl?.startsWith("https://") == true) {
-                                            val httpUrl = failingUrl.replace("https://", "http://")
-                                            android.util.Log.d("SmartWebView", "检测到HTTP/2错误，回退到HTTP: $httpUrl")
-                                            Toast.makeText(
-                                                context,
-                                                "检测到协议错误，正在尝试其他方式加载...",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                            view?.loadUrl(httpUrl)
-                                            return
-                                        }
-                                    }
-                                    
-                                    // 尝试将HTTP自动转换为HTTPS重试
-                                    if (failingUrl?.startsWith("http://") == true && 
-                                        description?.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true) != true) {
-                                        val httpsUrl = failingUrl.replace("http://", "https://")
-                                        android.util.Log.d("SmartWebView", "HTTP加载失败，尝试HTTPS: $httpsUrl")
-                                        view?.loadUrl(httpsUrl)
-                                    } else {
-                                        // 最终失败，显示错误信息
+                                view: WebView,
+                                request: android.webkit.WebResourceRequest,
+                                error: android.webkit.WebResourceError
+                            ) {
+                                super.onReceivedError(view, request, error)
+                                if (!request.isForMainFrame) return
+                                isLoading = false
+
+                                val description = error.description?.toString().orEmpty()
+                                val failingUrl = request.url?.toString()
+                                val errorCode = error.errorCode
+
+                                android.util.Log.e("SmartWebView", "?????????: $description (????? $errorCode, URL: $failingUrl)")
+
+                                // ????????HTTP/2??????
+                                if (description.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true) ||
+                                    description.contains("ERR_SPDY_PROTOCOL_ERROR", ignoreCase = true)) {
+                                    // HTTP/2?????????????TTP
+                                    if (failingUrl?.startsWith("https://") == true) {
+                                        val httpUrl = failingUrl.replace("https://", "http://")
+                                        android.util.Log.d("SmartWebView", "?????HTTP/2??????????TTP: $httpUrl")
                                         Toast.makeText(
                                             context,
-                                            "页面加载失败: $description\n请检查网络或联系管理员",
-                                            Toast.LENGTH_LONG
+                                            "????????????????????????????..",
+                                            Toast.LENGTH_SHORT
                                         ).show()
+                                        view.loadUrl(httpUrl)
+                                        return
                                     }
                                 }
+
+                                // ?????TTP????????TTPS???
+                                if (failingUrl?.startsWith("http://") == true &&
+                                    !description.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true)) {
+                                    val httpsUrl = failingUrl.replace("http://", "https://")
+                                    android.util.Log.d("SmartWebView", "HTTP???????????TTPS: $httpsUrl")
+                                    view.loadUrl(httpsUrl)
+                                } else {
+                                    // ?????????????????
+                                    Toast.makeText(
+                                        context,
+                                        "?????????: $description\n?????????????????",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
                                 
                                 override fun onReceivedHttpError(
                                     view: WebView?,
@@ -946,7 +945,7 @@ fun ScheduleSetupDialogInWebView(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
                             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                         )
                         ExposedDropdownMenu(

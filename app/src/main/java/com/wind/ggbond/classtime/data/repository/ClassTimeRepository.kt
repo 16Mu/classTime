@@ -4,83 +4,79 @@ import com.wind.ggbond.classtime.data.local.dao.ClassTimeDao
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * 上下课时间配置数据仓库
- */
 @Singleton
 class ClassTimeRepository @Inject constructor(
-    private val classTimeDao: ClassTimeDao,
+    classTimeDao: ClassTimeDao,
     private val scheduleRepository: ScheduleRepository
-) {
-    
-    fun getClassTimesByConfig(configName: String = "default"): Flow<List<ClassTime>> {
-        return classTimeDao.getClassTimesByConfig(configName)
+) : BaseRepository<ClassTime, ClassTimeDao>(classTimeDao) {
+
+    override suspend fun getAll(): List<ClassTime> =
+        dao.getClassTimesByConfigSync()
+
+    override fun getAllFlow(): Flow<List<ClassTime>> = dao.getClassTimesByConfig()
+
+    override suspend fun getById(id: Long): ClassTime? =
+        dao.getClassTimesByConfigSync().find { it.id == id }
+
+    override fun getByIdFlow(id: Long): Flow<ClassTime?> =
+        kotlinx.coroutines.flow.flow { emit(getById(id)) }
+
+    override suspend fun insert(entity: ClassTime): Long = dao.insertClassTime(entity)
+
+    override suspend fun insertAll(entities: List<ClassTime>): List<Long> =
+        entities.map { dao.insertClassTime(it) }
+
+    override suspend fun update(entity: ClassTime) = dao.updateClassTime(entity)
+
+    override suspend fun delete(entity: ClassTime) = dao.deleteClassTime(entity)
+
+    override suspend fun deleteById(id: Long) {
+        getById(id)?.let { delete(it) }
     }
-    
-    suspend fun getClassTimesByConfigSync(configName: String = "default"): List<ClassTime> {
-        return classTimeDao.getClassTimesByConfigSync(configName)
-    }
-    
-    suspend fun getClassTime(configName: String = "default", sectionNumber: Int): ClassTime? {
-        return classTimeDao.getClassTime(configName, sectionNumber)
-    }
-    
-    /**
-     * 根据课表ID获取对应的时间配置
-     */
+
+    override suspend fun deleteAll() = dao.deleteAllByConfig()
+
+    fun getClassTimesByConfig(configName: String = "default"): Flow<List<ClassTime>> =
+        dao.getClassTimesByConfig(configName)
+
+    suspend fun getClassTimesByConfigSync(configName: String = "default"): List<ClassTime> =
+        dao.getClassTimesByConfigSync(configName)
+
+    suspend fun getClassTime(configName: String = "default", sectionNumber: Int): ClassTime? =
+        dao.getClassTime(configName, sectionNumber)
+
     suspend fun getClassTimesBySchedule(scheduleId: Long): List<ClassTime> {
         val schedule = scheduleRepository.getScheduleById(scheduleId)
         val configName = schedule?.classTimeConfigName ?: "default"
-        return classTimeDao.getClassTimesByConfigSync(configName)
+        return dao.getClassTimesByConfigSync(configName)
     }
-    
-    /**
-     * 根据课表ID获取对应的时间配置（Flow版本）
-     */
-    fun getClassTimesByScheduleFlow(scheduleId: Long): Flow<List<ClassTime>> {
-        // 由于需要先获取课表信息，这里使用一个简化的实现
-        // 实际使用中，可以在ViewModel中处理这个逻辑
-        return classTimeDao.getClassTimesByConfig("default")
+
+    fun getClassTimesByScheduleFlow(scheduleId: Long): Flow<List<ClassTime>> = kotlinx.coroutines.flow.flow {
+        val schedule = scheduleRepository.getScheduleById(scheduleId)
+        emitAll(dao.getClassTimesByConfig(schedule?.classTimeConfigName ?: "default"))
     }
-    
-    /**
-     * 为课表设置时间配置
-     */
+
     suspend fun setClassTimeConfigForSchedule(scheduleId: Long, configName: String) {
         val schedule = scheduleRepository.getScheduleById(scheduleId)
         if (schedule != null) {
-            val updatedSchedule = schedule.copy(
-                classTimeConfigName = configName,
-                updatedAt = System.currentTimeMillis()
+            scheduleRepository.updateSchedule(
+                schedule.copy(
+                    classTimeConfigName = configName,
+                    updatedAt = System.currentTimeMillis()
+                )
             )
-            scheduleRepository.updateSchedule(updatedSchedule)
         }
     }
-    
-    suspend fun insertClassTime(classTime: ClassTime): Long {
-        return classTimeDao.insertClassTime(classTime)
-    }
-    
-    suspend fun insertClassTimes(classTimes: List<ClassTime>) {
-        classTimeDao.insertClassTimes(classTimes)
-    }
-    
-    suspend fun updateClassTime(classTime: ClassTime) {
-        classTimeDao.updateClassTime(classTime)
-    }
-    
-    suspend fun deleteClassTime(classTime: ClassTime) {
-        classTimeDao.deleteClassTime(classTime)
-    }
-    
-    suspend fun deleteAllByConfig(configName: String = "default") {
-        classTimeDao.deleteAllByConfig(configName)
+
+    suspend fun deleteAllByConfig(configName: String = "default") =
+        dao.deleteAllByConfig(configName)
+
+    private inline fun <T> runBlockingOrNull(block: () -> T): T? {
+        return try { block() } catch (_: Exception) { null }
     }
 }
-
-
-

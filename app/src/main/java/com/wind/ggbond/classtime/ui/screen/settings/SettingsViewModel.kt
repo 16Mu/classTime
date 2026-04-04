@@ -21,15 +21,14 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.wind.ggbond.classtime.R
-import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.ExportService
+import com.wind.ggbond.classtime.data.repository.SettingsRepository
+import com.wind.ggbond.classtime.service.contract.IDataExporter
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.service.KeepAliveService
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
 import com.wind.ggbond.classtime.util.BackgroundPermissionHelper
 import com.wind.ggbond.classtime.util.ReminderDiagnostic
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,37 +36,31 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.MonetColorPalette
+import com.wind.ggbond.classtime.util.CourseColorPalette
+import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import javax.inject.Inject
 
-/**
- * 设置页面 ViewModel
- */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
-    private val exportService: ExportService,
+    private val settingsRepository: SettingsRepository,
+    private val exportService: IDataExporter,
     private val importService: com.wind.ggbond.classtime.service.ImportService,
-    private val reminderScheduler: AlarmReminderScheduler
+    private val reminderScheduler: IAlarmScheduler,
+    private val backgroundThemeManager: BackgroundThemeManager
 ) : ViewModel() {
-    
-    // 使用统一的 DataStore 管理器
-    private val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
-    
+
     companion object {
-        private val REMINDER_ENABLED_KEY = DataStoreManager.SettingsKeys.REMINDER_ENABLED_KEY
-        private val DEFAULT_REMINDER_MINUTES_KEY = DataStoreManager.SettingsKeys.DEFAULT_REMINDER_MINUTES_KEY
-        private val COMPACT_MODE_ENABLED_KEY = DataStoreManager.SettingsKeys.COMPACT_MODE_ENABLED_KEY
-        private val DISCLAIMER_ACCEPTED_KEY = DataStoreManager.SettingsKeys.DISCLAIMER_ACCEPTED_KEY
-        private val ONBOARDING_COMPLETED_KEY = DataStoreManager.SettingsKeys.ONBOARDING_COMPLETED_KEY
-        val HEADS_UP_NOTIFICATION_ENABLED_KEY = DataStoreManager.SettingsKeys.HEADS_UP_NOTIFICATION_ENABLED_KEY
-        private val SHOW_WEEKEND_KEY = DataStoreManager.SettingsKeys.SHOW_WEEKEND_KEY
-        private val BOTTOM_BAR_BLUR_ENABLED_KEY = DataStoreManager.SettingsKeys.BOTTOM_BAR_BLUR_ENABLED_KEY
+        private const val TAG = "SettingsVM"
     }
     
     private val _reminderEnabled = MutableStateFlow(false)  // 默认关闭，让用户主动开启
@@ -91,6 +84,13 @@ class SettingsViewModel @Inject constructor(
     private val _bottomBarBlurEnabled = MutableStateFlow(true)  // 默认开启底部栏高斯模糊
     val bottomBarBlurEnabled: StateFlow<Boolean> = _bottomBarBlurEnabled.asStateFlow()
     
+    // ==================== 莫奈课程取色 ====================
+    private val _monetEnabled = MutableStateFlow(false)
+    val monetEnabled: StateFlow<Boolean> = _monetEnabled.asStateFlow()
+    
+    private val _courseColorSaturation = MutableStateFlow(1)  // 0=柔和, 1=标准, 2=鲜艳
+    val courseColorSaturation: StateFlow<Int> = _courseColorSaturation.asStateFlow()
+    
     // ✅ 后台运行状态
     private val _backgroundStatus = MutableStateFlow(BackgroundPermissionHelper.checkBackgroundStatus(context))
     val backgroundStatus: StateFlow<BackgroundPermissionHelper.BackgroundStatus> = _backgroundStatus.asStateFlow()
@@ -111,8 +111,8 @@ class SettingsViewModel @Inject constructor(
     private val _showExportDialog = MutableStateFlow(false)
     val showExportDialog: StateFlow<Boolean> = _showExportDialog.asStateFlow()
     
-    private val _exportResult = MutableStateFlow<ExportService.ExportResult?>(null)
-    val exportResult: StateFlow<ExportService.ExportResult?> = _exportResult.asStateFlow()
+    private val _exportResult = MutableStateFlow<IDataExporter.ExportResult?>(null)
+    val exportResult: StateFlow<IDataExporter.ExportResult?> = _exportResult.asStateFlow()
     
     // 通知权限提示对话框
     private val _showNotificationPermissionDialog = MutableStateFlow(false)
@@ -131,35 +131,85 @@ class SettingsViewModel @Inject constructor(
     // 提醒测试对话框状态
     private val _showReminderTestDialog = MutableStateFlow(false)
     val showReminderTestDialog: StateFlow<Boolean> = _showReminderTestDialog.asStateFlow()
+
+    // 莫奈课程取色相关状态
+    val monetCourseColorsEnabled: StateFlow<Boolean> = settingsRepository
+        .observeMonetCourseColorsEnabled()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
+    val monetColorPreview: StateFlow<List<String>> = combine(
+        monetCourseColorsEnabled,
+        courseColorSaturation,
+        backgroundThemeManager.observeCourseColors(
+            when (courseColorSaturation.value) {
+                0 -> MonetColorPalette.SaturationLevel.SOFT
+                2 -> MonetColorPalette.SaturationLevel.VIBRANT
+                else -> MonetColorPalette.SaturationLevel.STANDARD
+            }
+        )
+    ) { enabled, saturation, _ ->
+        if (enabled) {
+            // 使用动态生成的颜色
+            val seedColor = backgroundThemeManager.getCurrentSeedColor()
+            val level = when (saturation) {
+                0 -> MonetColorPalette.SaturationLevel.SOFT
+                2 -> MonetColorPalette.SaturationLevel.VIBRANT
+                else -> MonetColorPalette.SaturationLevel.STANDARD
+            }
+            MonetColorPalette.generatePalette(seedColor, level, isDarkMode = false)
+        } else {
+            // 返回固定调色板的颜色用于对比预览
+            CourseColorPalette.getAllColors()
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = CourseColorPalette.getAllColors()
+    )
     
     init {
         loadSettings()
         // 持续观察 DataStore，确保不同页面的 ViewModel 实例都能实时收到更新
         viewModelScope.launch {
-            settingsDataStore.data
-                .map { it[COMPACT_MODE_ENABLED_KEY] ?: false }
+            settingsRepository.observeCompactModeEnabled()
                 .distinctUntilChanged()
                 .collect { value ->
                     _compactModeEnabled.value = value
                 }
         }
         viewModelScope.launch {
-            settingsDataStore.data
-                .map { it[SHOW_WEEKEND_KEY] ?: true }
+            settingsRepository.observeShowWeekendEnabled()
                 .distinctUntilChanged()
                 .collect { value ->
                     _showWeekendEnabled.value = value
                 }
         }
+        viewModelScope.launch {
+            settingsRepository.observeMonetCourseColorsEnabled()
+                .distinctUntilChanged()
+                .collect { value ->
+                    _monetEnabled.value = value
+                }
+        }
+        viewModelScope.launch {
+            settingsRepository.observeCourseColorSaturation()
+                .distinctUntilChanged()
+                .collect { value ->
+                    _courseColorSaturation.value = value
+                }
+        }
     }
-    
+
     private fun loadSettings() {
         viewModelScope.launch {
-            val preferences = settingsDataStore.data.first()
-            _reminderEnabled.value = preferences[REMINDER_ENABLED_KEY] ?: false  // 首次使用默认关闭
-            _defaultReminderMinutes.value = preferences[DEFAULT_REMINDER_MINUTES_KEY] ?: 10
-            _compactModeEnabled.value = preferences[COMPACT_MODE_ENABLED_KEY] ?: false
-            val headsUpEnabled = preferences[HEADS_UP_NOTIFICATION_ENABLED_KEY] ?: true  // 默认开启
+            _reminderEnabled.value = settingsRepository.isReminderEnabled()
+            _defaultReminderMinutes.value = settingsRepository.getDefaultReminderMinutes()
+            _compactModeEnabled.value = settingsRepository.isCompactModeEnabled()
+            val headsUpEnabled = settingsRepository.isHeadsUpNotificationEnabled()
             _headsUpNotificationEnabled.value = headsUpEnabled
             // 同步到 SharedPreferences（供 Worker 读取）
             context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
@@ -167,10 +217,13 @@ class SettingsViewModel @Inject constructor(
                 .putBoolean("heads_up_notification_enabled", headsUpEnabled)
                 .apply()
             // 加载完成后设置实际值，而不是默认 false
-            _disclaimerAccepted.value = preferences[DISCLAIMER_ACCEPTED_KEY] ?: false
-            _onboardingCompleted.value = preferences[ONBOARDING_COMPLETED_KEY] ?: false
-            _showWeekendEnabled.value = preferences[SHOW_WEEKEND_KEY] ?: true  // 默认显示周末
-            _bottomBarBlurEnabled.value = preferences[BOTTOM_BAR_BLUR_ENABLED_KEY] ?: true  // 默认开启高斯模糊
+            _disclaimerAccepted.value = settingsRepository.isDisclaimerAccepted()
+            _onboardingCompleted.value = settingsRepository.isOnboardingCompleted()
+            _showWeekendEnabled.value = settingsRepository.isShowWeekendEnabled()
+            _bottomBarBlurEnabled.value = settingsRepository.isBottomBarBlurEnabled()
+            // 莫奈课程取色
+            _monetEnabled.value = settingsRepository.isMonetCourseColorsEnabled()
+            _courseColorSaturation.value = settingsRepository.getCourseColorSaturation()
         }
     }
     
@@ -210,31 +263,29 @@ class SettingsViewModel @Inject constructor(
     
     private suspend fun applyReminderEnabledChange(enabled: Boolean) {
         // 1. 更新全局设置
-        settingsDataStore.edit { preferences ->
-            preferences[REMINDER_ENABLED_KEY] = enabled
-        }
+        settingsRepository.setReminderEnabled(enabled)
         _reminderEnabled.value = enabled
-        
+
         // 2. 获取当前课表
         val schedule = scheduleRepository.getCurrentSchedule()
-        
+
         if (enabled) {
             // 开启提醒：同时开启所有课程的提醒并创建通知
             try {
                 schedule?.let {
                     // 获取默认提醒时间
-                    val defaultMinutes = settingsDataStore.data.first()[DEFAULT_REMINDER_MINUTES_KEY] ?: 10
-                    
+                    val defaultMinutes = settingsRepository.getDefaultReminderMinutes()
+
                     // 批量开启所有课程的提醒
                     val updatedCount = courseRepository.enableAllCoursesReminder(it.id, defaultMinutes)
-                    
+
                     android.util.Log.d("SettingsViewModel", "✅ 已开启 $updatedCount 门课程的提醒")
-                    
+
                     // 批量创建提醒任务
                     reminderScheduler.scheduleAllCourseReminders(it.id)
-                    
+
                     android.util.Log.d("SettingsViewModel", "✅ 已创建所有课程的通知任务")
-                    
+
                     android.widget.Toast.makeText(
                         context,
                         "已为 $updatedCount 门课程开启提醒",
@@ -255,14 +306,14 @@ class SettingsViewModel @Inject constructor(
                 schedule?.let {
                     // 批量关闭所有课程的提醒
                     val updatedCount = courseRepository.disableAllCoursesReminder(it.id)
-                    
+
                     android.util.Log.d("SettingsViewModel", "✅ 已关闭 $updatedCount 门课程的提醒")
-                    
+
                     // 取消所有提醒任务
                     reminderScheduler.cancelAllCourseReminders(it.id)
-                    
+
                     android.util.Log.d("SettingsViewModel", "✅ 已取消所有课程的通知任务")
-                    
+
                     android.widget.Toast.makeText(
                         context,
                         "已关闭所有课程提醒",
@@ -279,22 +330,18 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun updateDefaultReminderMinutes(minutes: Int) {
         viewModelScope.launch {
-            settingsDataStore.edit { preferences ->
-                preferences[DEFAULT_REMINDER_MINUTES_KEY] = minutes
-            }
+            settingsRepository.setDefaultReminderMinutes(minutes)
             _defaultReminderMinutes.value = minutes
         }
     }
-    
+
     fun updateHeadsUpNotificationEnabled(enabled: Boolean) {
         viewModelScope.launch {
             // 同时保存到 DataStore 和 SharedPreferences（兼容 Worker 读取）
-            settingsDataStore.edit { preferences ->
-                preferences[HEADS_UP_NOTIFICATION_ENABLED_KEY] = enabled
-            }
+            settingsRepository.setHeadsUpNotificationEnabled(enabled)
             // 保存到 SharedPreferences 供 Worker 读取
             context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
                 .edit()
@@ -303,12 +350,12 @@ class SettingsViewModel @Inject constructor(
             _headsUpNotificationEnabled.value = enabled
         }
     }
-    
+
     /**
      * 读取弹窗通知设置（用于 Worker 中读取）
      */
     suspend fun isHeadsUpNotificationEnabled(): Boolean {
-        return settingsDataStore.data.first()[HEADS_UP_NOTIFICATION_ENABLED_KEY] ?: true
+        return settingsRepository.isHeadsUpNotificationEnabled()
     }
     
     /**
@@ -328,7 +375,7 @@ class SettingsViewModel @Inject constructor(
     /**
      * 导出课程表（指定格式）
      */
-    fun exportSchedule(format: ExportService.ExportFormat) {
+    fun exportSchedule(format: IDataExporter.ExportFormat) {
         viewModelScope.launch {
             val schedule = scheduleRepository.getCurrentSchedule()
             schedule?.let {
@@ -355,7 +402,7 @@ class SettingsViewModel @Inject constructor(
     /**
      * 分享导出的文件
      */
-    fun shareExportedFile(format: ExportService.ExportFormat) {
+    fun shareExportedFile(format: IDataExporter.ExportFormat) {
         viewModelScope.launch {
             val schedule = scheduleRepository.getCurrentSchedule()
             schedule?.let {
@@ -447,13 +494,13 @@ class SettingsViewModel @Inject constructor(
     /**
      * 获取MIME类型
      */
-    private fun getMimeType(format: ExportService.ExportFormat): String {
+    private fun getMimeType(format: IDataExporter.ExportFormat): String {
         return when (format) {
-            ExportService.ExportFormat.JSON -> "application/json"
-            ExportService.ExportFormat.ICS -> "text/calendar"
-            ExportService.ExportFormat.CSV -> "text/csv"
-            ExportService.ExportFormat.TXT -> "text/plain"
-            ExportService.ExportFormat.HTML -> "text/html"
+            IDataExporter.ExportFormat.JSON -> "application/json"
+            IDataExporter.ExportFormat.ICS -> "text/calendar"
+            IDataExporter.ExportFormat.CSV -> "text/csv"
+            IDataExporter.ExportFormat.TXT -> "text/plain"
+            IDataExporter.ExportFormat.HTML -> "text/html"
         }
     }
     
@@ -477,34 +524,48 @@ class SettingsViewModel @Inject constructor(
     fun updateCompactModeEnabled(enabled: Boolean) {
         viewModelScope.launch {
             android.util.Log.d("SettingsViewModel", "updateCompactModeEnabled called with: $enabled")
-            settingsDataStore.edit { preferences ->
-                preferences[COMPACT_MODE_ENABLED_KEY] = enabled
-            }
+            settingsRepository.setCompactModeEnabled(enabled)
             _compactModeEnabled.value = enabled
             android.util.Log.d("SettingsViewModel", "紧凑模式已更新为: ${_compactModeEnabled.value}")
         }
     }
-    
+
     fun updateShowWeekendEnabled(enabled: Boolean) {
         viewModelScope.launch {
             android.util.Log.d("SettingsViewModel", "updateShowWeekendEnabled called with: $enabled")
-            settingsDataStore.edit { preferences ->
-                preferences[SHOW_WEEKEND_KEY] = enabled
-            }
+            settingsRepository.setShowWeekendEnabled(enabled)
             _showWeekendEnabled.value = enabled
             android.util.Log.d("SettingsViewModel", "显示周末已更新为: ${_showWeekendEnabled.value}")
         }
     }
-    
+
     /**
      * 更新底部导航栏高斯模糊开关
      */
     fun updateBottomBarBlurEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.edit { preferences ->
-                preferences[BOTTOM_BAR_BLUR_ENABLED_KEY] = enabled
-            }
+            settingsRepository.setBottomBarBlurEnabled(enabled)
             _bottomBarBlurEnabled.value = enabled
+        }
+    }
+    
+    /**
+     * 更新莫奈课程取色开关
+     */
+    fun updateMonetEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setMonetCourseColorsEnabled(enabled)
+            _monetEnabled.value = enabled
+        }
+    }
+    
+    /**
+     * 更新课程颜色饱和度等级 (0=柔和, 1=标准, 2=鲜艳)
+     */
+    fun updateCourseColorSaturation(saturation: Int) {
+        viewModelScope.launch {
+            settingsRepository.setCourseColorSaturation(saturation)
+            _courseColorSaturation.value = saturation
         }
     }
     
@@ -986,21 +1047,17 @@ class SettingsViewModel @Inject constructor(
 
     fun acceptDisclaimer() {
         viewModelScope.launch {
-            settingsDataStore.edit { preferences ->
-                preferences[DISCLAIMER_ACCEPTED_KEY] = true
-            }
+            settingsRepository.setDisclaimerAccepted(true)
             _disclaimerAccepted.value = true
         }
     }
-    
+
     /**
      * 标记功能引导已完成
      */
     fun markOnboardingCompleted() {
         viewModelScope.launch {
-            settingsDataStore.edit { preferences ->
-                preferences[ONBOARDING_COMPLETED_KEY] = true
-            }
+            settingsRepository.setOnboardingCompleted(true)
             _onboardingCompleted.value = true
         }
     }
@@ -1068,7 +1125,9 @@ class SettingsViewModel @Inject constructor(
                     courseId = testCourse.id,
                     weekNumber = 1,
                     triggerTime = triggerTime,
-                    isNextCourse = false
+                    isNextCourse = false,
+                    currentCourseName = testCourse.courseName,
+                    isSameCourseClassroom = false
                 )
                 
                 if (success) {
@@ -1157,7 +1216,9 @@ class SettingsViewModel @Inject constructor(
                     courseId = testCourse.id,
                     weekNumber = 1,
                     triggerTime = triggerTime,
-                    isNextCourse = false
+                    isNextCourse = false,
+                    currentCourseName = testCourse.courseName,
+                    isSameCourseClassroom = false
                 )
                 
                 if (success) {
@@ -1221,12 +1282,12 @@ class SettingsViewModel @Inject constructor(
                 val results = ReminderDiagnostic.runDiagnostic(context)
                 val summary = ReminderDiagnostic.getDiagnosticSummary(results)
                 val hasCriticalIssues = ReminderDiagnostic.hasCriticalIssues(results)
-                
+
                 // 构建详细报告
                 val report = StringBuilder()
                 report.appendLine("🔍 $summary")
                 report.appendLine()
-                
+
                 results.forEach { result ->
                     val statusIcon = if (result.status) "✅" else "❌"
                     report.appendLine("$statusIcon ${result.item}")
@@ -1236,25 +1297,45 @@ class SettingsViewModel @Inject constructor(
                     }
                     report.appendLine()
                 }
-                
+
                 if (hasCriticalIssues) {
                     report.appendLine("⚠️ 发现严重问题，可能影响提醒功能")
                 } else {
                     report.appendLine("✅ 未发现严重问题")
                 }
-                
+
                 // 显示诊断报告
                 Toast.makeText(context, summary, Toast.LENGTH_SHORT).show()
-                
+
                 // 可以考虑将报告保存到剪贴板或显示在对话框中
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText("提醒诊断报告", report.toString())
                 clipboard.setPrimaryClip(clip)
                 Toast.makeText(context, "详细报告已复制到剪贴板", Toast.LENGTH_LONG).show()
-                
+
             } catch (e: Exception) {
                 Toast.makeText(context, "诊断失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    /**
+     * 设置莫奈课程取色开关状态
+     */
+    fun setMonetCourseColorsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setMonetCourseColorsEnabled(enabled)
+        }
+    }
+
+    /**
+     * 设置课程颜色饱和度等级
+     * @param saturation 0=柔和, 1=标准, 2=鲜艳
+     */
+    fun setCourseColorSaturation(saturation: Int) {
+        viewModelScope.launch {
+            val clampedSaturation = saturation.coerceIn(0, 2)
+            settingsRepository.setCourseColorSaturation(clampedSaturation)
         }
     }
 }

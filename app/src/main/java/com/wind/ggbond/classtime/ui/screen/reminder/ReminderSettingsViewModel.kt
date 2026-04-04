@@ -9,7 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.PermissionGuideManager
 import com.wind.ggbond.classtime.util.ReminderDiagnostic
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -73,7 +73,7 @@ class ReminderSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
-    private val reminderScheduler: AlarmReminderScheduler
+    private val reminderScheduler: IAlarmScheduler
 ) : ViewModel() {
 
     // DataStore 实例
@@ -386,7 +386,9 @@ class ReminderSettingsViewModel @Inject constructor(
                     courseId = testCourse.id,
                     weekNumber = 1,
                     triggerTime = triggerTime,
-                    isNextCourse = false
+                    isNextCourse = false,
+                    currentCourseName = testCourse.courseName,
+                    isSameCourseClassroom = false
                 )
                 if (success) {
                     android.widget.Toast.makeText(context, "立即提醒测试成功，5秒后收到通知", android.widget.Toast.LENGTH_SHORT).show()
@@ -459,7 +461,9 @@ class ReminderSettingsViewModel @Inject constructor(
                     courseId = testCourse.id,
                     weekNumber = 1,
                     triggerTime = triggerTime,
-                    isNextCourse = false
+                    isNextCourse = false,
+                    currentCourseName = testCourse.courseName,
+                    isSameCourseClassroom = false
                 )
                 if (success) {
                     android.widget.Toast.makeText(context, "上课提醒测试成功，5秒后收到通知", android.widget.Toast.LENGTH_SHORT).show()

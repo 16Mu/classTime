@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.welcome
 
 import androidx.compose.animation.*
@@ -9,6 +10,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -73,10 +75,6 @@ fun FeatureIntroductionScreen(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-                
-                TextButton(onClick = onSkip) {
-                    Text("跳过")
-                }
             }
             
             // 功能介绍页面内容
@@ -172,7 +170,15 @@ fun FeatureIntroductionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // 上一步按钮
+                    // 跳过按钮（移至底部，方便单手操作）
+                    TextButton(
+                        onClick = onSkip,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Text("跳过")
+                    }
+                    
+                    // 上一步按钮（非首页显示）
                     if (pagerState.currentPage > 0) {
                         OutlinedButton(
                             onClick = {
@@ -183,7 +189,7 @@ fun FeatureIntroductionScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                Icons.Default.ArrowBack,
+                                Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -210,7 +216,7 @@ fun FeatureIntroductionScreen(
                         Text(if (isLastPage) "开始使用" else "下一步")
                         Spacer(Modifier.width(4.dp))
                         Icon(
-                            if (isLastPage) Icons.Default.Check else Icons.Default.ArrowForward,
+                            if (isLastPage) Icons.Default.Check else Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )

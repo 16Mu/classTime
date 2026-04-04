@@ -25,6 +25,9 @@ interface ReminderDao {
     
     @Query("SELECT * FROM reminders WHERE id = :reminderId")
     suspend fun getReminderById(reminderId: Long): Reminder?
+
+    @Query("SELECT * FROM reminders WHERE id = :reminderId")
+    fun getReminderByIdFlow(reminderId: Long): Flow<Reminder?>
     
     @Query("SELECT * FROM reminders WHERE triggerTime BETWEEN :startTime AND :endTime AND isEnabled = 1 ORDER BY triggerTime")
     suspend fun getRemindersInTimeRange(startTime: Long, endTime: Long): List<Reminder>
@@ -59,6 +62,5 @@ interface ReminderDao {
     @Query("SELECT COUNT(*) FROM reminders WHERE triggerTime BETWEEN :startTime AND :endTime AND isEnabled = 1")
     suspend fun getReminderCountInRange(startTime: Long, endTime: Long): Int
 }
-
 
 

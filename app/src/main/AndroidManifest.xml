@@ -29,6 +29,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     
+    <!-- 桌面小组件绑定权限 (Android 12+ 必须，否则 requestPinAppWidget 无效) -->
+    <uses-permission android:name="android.permission.REQUEST_BIND_WIDGETS" />
+    
     <!-- 文件访问权限 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -187,6 +190,51 @@
             android:enabled="true"
             android:exported="false"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- 紧凑列表桌面小组件 -->
+        <receiver
+            android:name=".widget.CompactListViewWidgetReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/compact_list_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.wind.ggbond.classtime.ACTION_REFRESH_COMPACT_LIST_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/compact_list_widget_info" />
+        </receiver>
+
+        <!-- 周概览桌面小组件 -->
+        <receiver
+            android:name=".widget.WeekOverviewWidgetReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/week_overview_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.wind.ggbond.classtime.ACTION_REFRESH_WEEK_OVERVIEW_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/week_overview_widget_info" />
+        </receiver>
+
+        <!-- 智能课表(今日/明日切换)桌面小组件 -->
+        <receiver
+            android:name=".widget.TomorrowCourseWidgetReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/tomorrow_course_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.wind.ggbond.classtime.ACTION_REFRESH_TOMORROW_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tomorrow_course_widget_info" />
+        </receiver>
 
         <!-- 小组件固定回调接收器 -->
         <receiver

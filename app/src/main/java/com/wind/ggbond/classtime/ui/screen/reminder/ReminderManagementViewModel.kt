@@ -6,15 +6,24 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Reminder
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ReminderRepository
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 import javax.inject.Inject
+
+/**
+ * 按日期分组的提醒数据
+ */
+data class GroupedReminders(
+    val dateGroups: Map<java.time.LocalDate, List<Reminder>>
+)
 
 /**
  * 筛选标签类型
@@ -33,7 +42,7 @@ enum class ReminderFilterType {
 class ReminderManagementViewModel @Inject constructor(
     private val reminderRepository: ReminderRepository,
     private val courseRepository: CourseRepository,
-    private val reminderScheduler: AlarmReminderScheduler
+    private val reminderScheduler: IAlarmScheduler
 ) : ViewModel() {
     
     // 全部提醒（未筛选）
@@ -66,6 +75,10 @@ class ReminderManagementViewModel @Inject constructor(
     // 当前选中的提醒
     private val _selectedReminder = MutableStateFlow<Reminder?>(null)
     val selectedReminder: StateFlow<Reminder?> = _selectedReminder.asStateFlow()
+
+    // 按日期分组的提醒数据（预计算，避免Composable内重复分组）
+    private val _groupedReminders = MutableStateFlow(GroupedReminders(emptyMap()))
+    val groupedReminders: StateFlow<GroupedReminders> = _groupedReminders.asStateFlow()
     
     init {
         loadReminders()
@@ -77,7 +90,7 @@ class ReminderManagementViewModel @Inject constructor(
      */
     private fun loadReminders() {
         viewModelScope.launch {
-            reminderRepository.getAllRemindersFlow().collect { reminders ->
+            reminderRepository.getAllFlow().collect { reminders ->
                 _allReminders.value = reminders.sortedBy { it.triggerTime }
                 // 加载关联的课程信息
                 loadCourseInfo(reminders)
@@ -136,8 +149,8 @@ class ReminderManagementViewModel @Inject constructor(
         val weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY).atStartOfDay()
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val weekEnd = weekStart + 7 * 24 * 60 * 60 * 1000
-        
-        _reminders.value = when (_filterType.value) {
+
+        val filtered = when (_filterType.value) {
             ReminderFilterType.ALL -> _allReminders.value
             ReminderFilterType.TODAY -> _allReminders.value.filter {
                 it.triggerTime in todayStart until todayEnd
@@ -149,6 +162,16 @@ class ReminderManagementViewModel @Inject constructor(
                 it.triggerTime < now
             }
         }
+        _reminders.value = filtered
+
+        // 预计算按日期分组的结果，避免Composable内重复计算
+        val grouped = filtered.groupBy { reminder ->
+            LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(reminder.triggerTime),
+                ZoneId.systemDefault()
+            ).toLocalDate()
+        }.toSortedMap()
+        _groupedReminders.value = GroupedReminders(grouped)
     }
     
     /**
@@ -197,7 +220,7 @@ class ReminderManagementViewModel @Inject constructor(
      */
     fun deleteReminder(reminder: Reminder) {
         viewModelScope.launch {
-            reminderRepository.deleteReminder(reminder)
+            reminderRepository.delete(reminder)
             loadStats()
         }
     }
@@ -208,15 +231,11 @@ class ReminderManagementViewModel @Inject constructor(
     fun toggleReminder(reminder: Reminder) {
         viewModelScope.launch {
             val updatedReminder = reminder.copy(isEnabled = !reminder.isEnabled)
-            reminderRepository.updateReminder(updatedReminder)
+            reminderRepository.update(updatedReminder)
             
-            // 如果启用，重新调度；如果禁用，取消调度
-            if (updatedReminder.isEnabled) {
-                reminderScheduler.toggleCourseReminder(reminder.courseId, true)
-            } else {
-                reminderScheduler.toggleCourseReminder(reminder.courseId, false)
-            }
+            reminderScheduler.toggleSingleReminder(updatedReminder, updatedReminder.isEnabled)
             
+            loadReminders()
             loadStats()
         }
     }

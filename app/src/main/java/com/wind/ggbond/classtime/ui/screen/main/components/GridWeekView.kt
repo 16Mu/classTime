@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.window.Popup
+import com.wind.ggbond.classtime.ui.components.glassModifier
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -81,21 +84,23 @@ fun GridWeekView(
     coursesMap: Map<Int, List<Course>>,
     classTimes: List<com.wind.ggbond.classtime.data.local.entity.ClassTime>,
     compactModeEnabled: Boolean = false,
-    showWeekend: Boolean = true,  // 新增：是否显示周末
+    showWeekend: Boolean = true,
     onCourseClick: (Course) -> Unit,
-    onCourseLongClick: ((Course) -> Unit)? = null,  // 新增：长按课程卡片回调（不关心坐标，内部处理）
+    onCourseLongClick: ((Course) -> Unit)? = null,
     onEmptyCellClick: ((dayOfWeek: Int, section: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    semesterStartDate: java.time.LocalDate? = null,  // 新增：学期开始日期，用于计算每周日期
-    exams: List<com.wind.ggbond.classtime.data.local.entity.Exam> = emptyList(),  // 新增：考试列表
-    onExamClick: (com.wind.ggbond.classtime.data.local.entity.Exam) -> Unit = {},  // 新增：考试点击回调
+    semesterStartDate: java.time.LocalDate? = null,
+    exams: List<com.wind.ggbond.classtime.data.local.entity.Exam> = emptyList(),
+    onExamClick: (com.wind.ggbond.classtime.data.local.entity.Exam) -> Unit = {},
     onSlotActionAdd: ((dayOfWeek: Int, section: Int, weekNumber: Int) -> Unit)? = null,
     onSlotActionAdjust: ((Course) -> Unit)? = null,
     onSlotActionDelete: ((Course, Int) -> Unit)? = null,
     onSlotActionCopy: ((Course, Int) -> Unit)? = null,
     onSlotActionPaste: ((Int, Int) -> Unit)? = null,
     hasClipboard: Boolean = false,
-    currentWeekNumber: Int = weekNumber  // 系统实际当前周次，用于区分空状态文案
+    currentWeekNumber: Int = weekNumber,
+    getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
     // ✅ 生产环境移除调试日志
     
@@ -261,8 +266,13 @@ fun GridWeekView(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)  // 增加高度以容纳两行
-                .background(MaterialTheme.colorScheme.surface)
+                .height(48.dp)
+                .glassModifier(
+                    alpha = 0.78f,
+                    tintColor = MaterialTheme.colorScheme.surface,
+                    borderWidth = 0.dp,
+                    borderColor = Color.Transparent
+                )
         ) {
             val dayCount = dayRange.count()
             // 星期区域总宽度（扣除左侧 40dp 的节次标题列）
@@ -594,24 +604,31 @@ fun GridWeekView(
                                         val baseHeight = rowHeights.getOrNull(currentSection - 1) ?: fullHeightPerSection
                                         // 根据起始节次计算错峰索引：越往后的节次，动画开始越晚
                                         val staggerIndex = (courseAtSection.startSection - 1).coerceAtLeast(0)
-                                        CourseCardCell(
-                                            weekNumber = weekNumber,
-                                            course = courseAtSection,
-                                            classTimes = classTimes,
-                                            compactModeEnabled = compactModeEnabled,
-                                            showWeekend = showWeekend,
-                                            onCourseClick = onCourseClick,
-                                            onCourseLongClick = { course, positionY, positionX ->  // ✅ 接收课程卡片顶部 Y 和中心 X
-                                                onCourseLongClick?.invoke(course)
-                                                // 长按时显示操作面板，记录槽位坐标
-                                                selectedSlotForAction = Triple(dayOfWeek, courseAtSection.startSection, listOf(course))
-                                                slotPositionY = positionY
-                                                slotPositionX = positionX
-                                            },
-                                            modifier = Modifier.height(baseHeight * courseAtSection.sectionCount.toFloat()),
-                                            staggerIndex = staggerIndex,
-                                            semesterStartDate = semesterStartDate  // ✅ 传递学期开始日期
-                                        )
+                                    val adjustmentInfoForCourse = getAdjustmentInfo?.invoke(
+                                        courseAtSection.id,
+                                        weekNumber,
+                                        dayOfWeek,
+                                        courseAtSection.startSection
+                                    )
+                                    CourseCardCell(
+                                        weekNumber = weekNumber,
+                                        course = courseAtSection,
+                                        classTimes = classTimes,
+                                        compactModeEnabled = compactModeEnabled,
+                                        showWeekend = showWeekend,
+                                        onCourseClick = onCourseClick,
+                                        onCourseLongClick = { course, positionY, positionX ->  // ✅ 接收课程卡片顶部 Y 和中心 X
+                                            onCourseLongClick?.invoke(course)
+                                            selectedSlotForAction = Triple(dayOfWeek, courseAtSection.startSection, listOf(course))
+                                            slotPositionY = positionY
+                                            slotPositionX = positionX
+                                        },
+                                        modifier = Modifier.height(baseHeight * courseAtSection.sectionCount.toFloat()),
+                                        staggerIndex = staggerIndex,
+                                        semesterStartDate = semesterStartDate,
+                                        adjustmentInfo = adjustmentInfoForCourse,
+                                        courseColorMap = courseColorMap
+                                    )
                                         currentSection += courseAtSection.sectionCount
                                     } else {
                                         val baseHeight = rowHeights.getOrNull(currentSection - 1) ?: fullHeightPerSection
@@ -690,8 +707,9 @@ fun GridWeekView(
     }
 
     // ✅ 操作面板显示 - 使用 Popup 在当前课程/空白格子正上方显示
-    if (selectedSlotForAction != null) {
-        val (dayOfWeek, section, courses) = selectedSlotForAction!!
+    val selectedSlot = selectedSlotForAction
+    if (selectedSlot != null) {
+        val (dayOfWeek, section, courses) = selectedSlot
         val density = LocalDensity.current
 
         // ✅ 使用记录的课程卡片顶部 Y 和面板高度来精确定位
@@ -1489,14 +1507,16 @@ fun CourseCardCell(
     compactModeEnabled: Boolean = false,
     showWeekend: Boolean = true,
     onCourseClick: (Course) -> Unit,
-    onCourseLongClick: ((Course, Float, Float) -> Unit)? = null,  // ✅ 传递课程卡片顶部 Y 和中心 X
+    onCourseLongClick: ((Course, Float, Float) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    staggerIndex: Int = 0,  // 用于错峰动画的索引
-    semesterStartDate: java.time.LocalDate? = null  // ✅ 添加学期开始日期参数
+    staggerIndex: Int = 0,
+    semesterStartDate: java.time.LocalDate? = null,
+    adjustmentInfo: com.wind.ggbond.classtime.data.local.entity.CourseAdjustment? = null,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
     // ✅ 优化：使用remember缓存课程是否应该显示
-    val shouldShowThisWeek = remember(course.id, weekNumber) {
-        course.weeks.contains(weekNumber)
+    val shouldShowThisWeek = remember(course.id, weekNumber, adjustmentInfo) {
+        adjustmentInfo != null || course.weeks.contains(weekNumber)
     }
     
     // ✅ 优化：使用remember缓存课程时间查找
@@ -1509,9 +1529,14 @@ fun CourseCardCell(
         classTimes.find { it.sectionNumber == courseEndSection }?.endTime
     }
     
-    // ✅ 优化：使用remember缓存状态计算
-    val now = java.time.LocalDateTime.now()
-    val today = java.time.LocalDate.now()
+    // ✅ 优化：使用remember缓存时间对象，避免每帧重复获取系统时间
+    // 课程卡片数量多时（一屏可能有20-40个），减少重复的 LocalDateTime.now() 调用
+    val now by remember {
+        derivedStateOf { java.time.LocalDateTime.now() }
+    }
+    val today by remember {
+        derivedStateOf { java.time.LocalDate.now() }
+    }
     
     // 使用学期开始日期计算当前周次，确保与课程表周数一致
     val currentWeek = remember(semesterStartDate, today) {
@@ -1536,11 +1561,13 @@ fun CourseCardCell(
     }
     
     // ✅ 优化：使用remember缓存颜色计算
-    val baseColor = remember(course.color) {
-        try {
-        Color(android.graphics.Color.parseColor(course.color))
-    } catch (e: Exception) {
-            Color(0xFF42A5F5)  // 默认蓝色
+    val baseColor = remember(course.courseName, courseColorMap) {
+        val dynamicColor = courseColorMap[course.courseName]
+        if (dynamicColor != null) {
+            try { Color(android.graphics.Color.parseColor(dynamicColor)) }
+            catch (e: Exception) { Color(android.graphics.Color.parseColor(course.color)) }
+        } else {
+            Color(android.graphics.Color.parseColor(course.color))
         }
     }
     
@@ -1627,19 +1654,60 @@ fun CourseCardCell(
                 } },
                 onClickLabel = "查看详情"
             )
-            .padding(horizontal = 4.dp, vertical = 4.dp),  // 紧凑内边距
+            .semantics {
+                contentDescription = buildString {
+                    append(course.courseName)
+                    if (course.teacher.isNotEmpty()) {
+                        append("，${course.teacher}老师")
+                    }
+                    if (course.classroom.isNotEmpty()) {
+                        append("，在${course.classroom}")
+                    }
+                    append("，第${course.startSection}")
+                    if (course.sectionCount > 1) {
+                        append("-${course.startSection + course.sectionCount - 1}")
+                    }
+                    append("节")
+                    if (isOngoing) {
+                        append("，正在上课")
+                    } else if (isPast) {
+                        append("，已结束")
+                    }
+                    if (!shouldShowThisWeek) {
+                        append("，本周不上课")
+                    }
+                    if (adjustmentInfo != null) {
+                        append("，已调课")
+                    }
+                }
+            }
+            .padding(horizontal = 3.dp, vertical = 2.dp),  // 更紧凑的内边距
         contentAlignment = Alignment.TopStart  // 左上对齐
     ) {
-            // 状态指示器：仅显示"正在上课"
-            if (isOngoing) {
-                // 正在上课：右上角绿色指示器
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF10B981))  // 翡翠绿
-                )
+            // 状态指示器区域
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 2.dp, top = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                // 调课标记 - 低调小图标
+                if (adjustmentInfo != null) {
+                    Text(
+                        text = "⟳",
+                        fontSize = 10.sp,
+                        color = textColor.copy(alpha = 0.4f)
+                    )
+                }
+                // 正在上课：绿色指示器
+                if (isOngoing) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981))
+                    )
+                }
             }
             // 本周不上课：不显示指示器，仅通过极低透明度表现
             
@@ -1657,8 +1725,8 @@ fun CourseCardCell(
                 // 课程名称字体配置 - 增大基础字体
                 // 紧凑模式下字体放大，隐藏周末时格子更宽，字体可以更大
                 val targetFontScale = when {
-                    compactModeEnabled && !showWeekend -> 1.4f  // 隐藏周末：放大40%
-                    compactModeEnabled -> 1.2f  // 显示周末：放大20%
+                    compactModeEnabled && !showWeekend -> 1.2f  // 隐藏周末：放大20%（降低以显示更多内容）
+                    compactModeEnabled -> 1.1f  // 显示周末：放大10%
                     else -> 1.0f  // 普通模式
                 }
 
@@ -1674,12 +1742,12 @@ fun CourseCardCell(
                     label = "course_font_scale"
                 )
                 val (nameFontSize, nameLineHeight, maxNameLines) = when {
-                    course.sectionCount >= 8 -> Triple((18 * fontScale).sp, (20 * fontScale).sp, Int.MAX_VALUE)
-                    course.sectionCount >= 6 -> Triple((16 * fontScale).sp, (18 * fontScale).sp, 10)
-                    course.sectionCount >= 4 -> Triple((15 * fontScale).sp, (17 * fontScale).sp, 6)
-                    course.sectionCount >= 3 -> Triple((14 * fontScale).sp, (16 * fontScale).sp, 4)
-                    course.sectionCount >= 2 -> Triple((13 * fontScale).sp, (15 * fontScale).sp, 3)
-                    else -> Triple((12 * fontScale).sp, (14 * fontScale).sp, 2)
+                    course.sectionCount >= 8 -> Triple((15 * fontScale).sp, (17 * fontScale).sp, Int.MAX_VALUE)
+                    course.sectionCount >= 6 -> Triple((14 * fontScale).sp, (16 * fontScale).sp, 10)
+                    course.sectionCount >= 4 -> Triple((13 * fontScale).sp, (15 * fontScale).sp, 6)
+                    course.sectionCount >= 3 -> Triple((12 * fontScale).sp, (14 * fontScale).sp, 5)
+                    course.sectionCount >= 2 -> Triple((11 * fontScale).sp, (13 * fontScale).sp, 4)
+                    else -> Triple((11 * fontScale).sp, (13 * fontScale).sp, 3)
                 }
                 
                 if (useProportionalLayout) {
@@ -1820,16 +1888,16 @@ fun CourseCardCell(
                         overflow = TextOverflow.Ellipsis,
                         fontSize = nameFontSize,
                         lineHeight = nameLineHeight,
-                        letterSpacing = 0.sp
+                        letterSpacing = (-0.5).sp
                     )
                     
                     // 2. 教室和教师信息 - 次要信息
                     if (course.classroom.isNotEmpty() || course.teacher.isNotEmpty()) {
                         val (detailFontSize, detailMaxLines) = when {
-                            course.sectionCount >= 6 -> (11 * fontScale).sp to 3
-                            course.sectionCount >= 4 -> (10 * fontScale).sp to 2
+                            course.sectionCount >= 6 -> (10 * fontScale).sp to 3
+                            course.sectionCount >= 4 -> (9 * fontScale).sp to 2
                             course.sectionCount >= 2 -> (9 * fontScale).sp to 2
-                            else -> (9 * fontScale).sp to 1
+                            else -> (8 * fontScale).sp to 2
                         }
                         
                         // 教室
@@ -1973,7 +2041,11 @@ fun EmptyCell(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)  // 长按震动反馈
                         it(dayOfWeek, section, cellPositionY, cellCenterX)
                     } }
-                ),
+                )
+                .semantics {
+                    contentDescription = "${DateUtils.getDayOfWeekName(dayOfWeek)}，第${section}节，空闲" +
+                            if (isToday) "，今天" else ""
+                },
             contentAlignment = Alignment.Center
         ) {
             // ✅ 简化：移除选中状态，紧凑模式下不显示装饰图案

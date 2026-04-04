@@ -79,6 +79,32 @@ object DataStoreManager {
         // 最近使用的学校（JSON格式：["schoolId1", "schoolId2", ...]，最多保存5个）
         val RECENT_SCHOOLS_KEY = stringPreferencesKey("recent_schools")
         
+        // ==================== 背景主题相关配置 ====================
+        // 背景方案列表（JSON格式）
+        val BACKGROUNDS_JSON_KEY = stringPreferencesKey("backgrounds_json")
+        // 当前激活的背景索引
+        val ACTIVE_BACKGROUND_INDEX_KEY = intPreferencesKey("active_background_index")
+        // 种子颜色（用于动态主题）
+        val SEED_COLOR_KEY = intPreferencesKey("seed_color")
+        // 是否使用动态主题
+        val USE_DYNAMIC_THEME_KEY = booleanPreferencesKey("use_dynamic_theme")
+        // 背景模糊半径
+        val BLUR_RADIUS_KEY = intPreferencesKey("blur_radius")
+        // 背景暗化程度
+        val DIM_AMOUNT_KEY = intPreferencesKey("dim_amount")
+        // 背景类型
+        val BACKGROUND_TYPE_KEY = stringPreferencesKey("background_type")
+        // 自定义背景 URI
+        val CUSTOM_BACKGROUND_URI_KEY = stringPreferencesKey("custom_background_uri")
+        // 最后更新检查时间
+        val LAST_UPDATE_CHECK_TIME_KEY = longPreferencesKey("last_update_check_time")
+
+        // ==================== 莫奈课程颜色相关配置 ====================
+        /** 是否启用莫奈课程颜色（默认关闭） */
+        val MONET_COURSE_COLORS_ENABLED_KEY = booleanPreferencesKey("monet_course_colors_enabled")
+        /** 课程颜色饱和度等级 (0=柔和, 1=标准, 2=鲜艳) */
+        val COURSE_COLOR_SATURATION_KEY = intPreferencesKey("course_color_saturation")
+
         // 默认值
         const val DEFAULT_AUTO_UPDATE_ENABLED = true  // 默认开启自动更新
         const val DEFAULT_INTERVAL_UPDATE_ENABLED = true  // 默认开启间隔更新
@@ -88,6 +114,17 @@ object DataStoreManager {
         const val MAX_RECENT_SCHOOLS = 5  // 最多保存5个最近使用的学校
         const val DEFAULT_BOTTOM_BAR_BLUR_ENABLED = true  // 默认开启底部栏高斯模糊
         const val UPDATE_DEDUP_INTERVAL_MS = 5 * 60 * 1000  // 防重复间隔：5分钟
+        
+        // 背景主题默认值
+        const val DEFAULT_ACTIVE_BACKGROUND_INDEX = 0  // 默认激活第一个背景
+        const val MAX_BACKGROUNDS_COUNT = 10  // 最多支持10套背景方案
+        const val DEFAULT_BLUR_RADIUS = 0  // 默认模糊半径
+        const val DEFAULT_DIM_AMOUNT = 40  // 默认暗化程度
+        const val DEFAULT_BACKGROUND_TYPE = "image"  // 默认背景类型
+
+        // 莫尼课程颜色默认值
+        const val DEFAULT_MONET_COURSE_COLORS_ENABLED = false  // 默认关闭
+        const val DEFAULT_COURSE_COLOR_SATURATION = 1  // 默认标准模式
     }
 }
 

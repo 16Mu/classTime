@@ -4,6 +4,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import com.wind.ggbond.classtime.service.contract.IWidgetRefresher
 import androidx.glance.appwidget.updateAll
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -16,18 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.TimeUnit
 
-/**
- * Widget 刷新工具
- * 
- * 在以下场景调用以通知 Widget 更新数据：
- * - 课程增删改
- * - 调课操作
- * - 课表导入
- * - 学期切换
- * - 自动更新完成
- * - 周期性倒计时刷新（WorkManager 驱动）
- */
-object WidgetRefreshHelper {
+object WidgetRefreshHelper : IWidgetRefresher {
 
     private const val TAG = "WidgetRefreshHelper"
 
@@ -43,7 +33,7 @@ object WidgetRefreshHelper {
      * 
      * @param context 应用上下文
      */
-    fun refreshAllWidgets(context: Context) {
+    override fun refreshAllWidgets(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // 刷新今日课程 Widget (Glance)
@@ -65,21 +55,21 @@ object WidgetRefreshHelper {
      * @param context 应用上下文
      * @return 是否有至少一个 Widget 在桌面上
      */
-    fun hasActiveWidgets(context: Context): Boolean {
+    override fun hasActiveWidgets(context: Context): Boolean {
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        // 检查今日课程 Widget (Glance)
         val todayCourseIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, TodayCourseWidgetReceiver::class.java)
         )
-        // 检查下节课倒计时 Widget (Glance)
         val nextClassIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, NextClassWidgetReceiver::class.java)
         )
-        // 检查 4x4 大尺寸小组件 (RemoteViews)
         val largeWidgetIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, LargeTodayCourseWidgetProvider::class.java)
         )
-        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty() || largeWidgetIds.isNotEmpty()
+        val tomorrowCourseIds = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, TomorrowCourseWidgetReceiver::class.java)
+        )
+        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty() || largeWidgetIds.isNotEmpty() || tomorrowCourseIds.isNotEmpty()
     }
 
     /**
@@ -91,7 +81,7 @@ object WidgetRefreshHelper {
      * 
      * @param context 应用上下文
      */
-    fun startPeriodicRefresh(context: Context) {
+    override fun startPeriodicRefresh(context: Context) {
         if (!hasActiveWidgets(context)) {
             Log.d(TAG, "无活跃 Widget，跳过周期刷新任务启动")
             return
@@ -117,7 +107,7 @@ object WidgetRefreshHelper {
      * 
      * @param context 应用上下文
      */
-    fun stopPeriodicRefresh(context: Context) {
+    override fun stopPeriodicRefresh(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_REFRESH_WORK_NAME)
         Log.d(TAG, "周期刷新任务已停止")
     }

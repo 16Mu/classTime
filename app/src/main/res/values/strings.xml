@@ -60,4 +60,32 @@
     <!-- 桌面小组件 - 4x4大尺寸今日课程 -->
     <string name="large_widget_name">今日课程(大)</string>
     <string name="large_widget_description">4x4大尺寸小组件，展示更多今日课程</string>
+    
+    <!-- 桌面小组件 - 紧凑列表 -->
+    <string name="compact_list_widget_name">紧凑列表</string>
+    <string name="compact_list_widget_description">紧凑列表样式的小组件，显示今日课程</string>
+    
+    <!-- 桌面小组件 - 周概览 -->
+    <string name="week_overview_widget_name">周概览</string>
+    <string name="week_overview_widget_description">周概览样式的小组件，显示本周课程</string>
+
+    <!-- 桌面小组件 - 智能课表(今日/明日切换) -->
+    <string name="tomorrow_course_widget_name">智能课表</string>
+    <string name="tomorrow_course_widget_description">3x2智能切换，今日课程结束后自动展示明日课程</string>
+    
+    <!-- 无障碍描述字符串 -->
+    <string name="desc_info">信息</string>
+    <string name="desc_check">勾选</string>
+    <string name="desc_warning">警告</string>
+    <string name="desc_permission_icon">权限图标</string>
+    <string name="desc_photo_library">相册</string>
+    <string name="desc_video_library">视频库</string>
+    <string name="desc_gif">GIF动图</string>
+    <string name="desc_video_file">视频文件</string>
+    <string name="desc_wallpaper">壁纸</string>
+    <string name="desc_blur_on">模糊效果</string>
+    <string name="desc_expand">展开</string>
+    <string name="desc_edit">编辑</string>
+    <string name="desc_delete_outline">删除</string>
+    <string name="MAX_BACKGROUNDS_COUNT">最多支持10套背景方案</string>
 </resources>

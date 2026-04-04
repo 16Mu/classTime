@@ -139,7 +139,7 @@ class KeepAliveService : Service() {
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("课程表正在运行")
-            .setContentText("保持应用在后台运行，确保提醒正常")
+            .setContentText("请勿划掉此通知，否则可能导致课程提醒收不到或延迟")
             .setSmallIcon(R.drawable.ic_notification)  // 使用通知图标
             .setContentIntent(pendingIntent)
             .setOngoing(true)  // 设置为持续通知，用户无法滑动删除

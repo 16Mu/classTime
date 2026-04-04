@@ -107,7 +107,7 @@ class InitializationRepository @Inject constructor(
             currentStart = endTime.plusMinutes(breakDuration)
         }
 
-        classTimeRepository.insertClassTimes(defaultTimes)
+        classTimeRepository.insertAll(defaultTimes)
     }
 }
 

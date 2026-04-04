@@ -66,14 +66,22 @@ fun WebViewLoginScreen(
         return
     }
     
-    val schoolUrl = school!!.loginUrl
+    val schoolEntity = school
+    if (schoolEntity == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("加载中...")
+        }
+        return
+    }
+    
+    val schoolUrl = schoolEntity.loginUrl
     
     Scaffold(
         topBar = {
             TopAppBar(
                 // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
                 windowInsets = WindowInsets(0, 0, 0, 0),
-                title = { Text(school!!.name) },
+                title = { Text(schoolEntity.name) },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
@@ -112,11 +120,6 @@ fun WebViewLoginScreen(
                             // ✅ 安全配置 - 防止文件访问和XSS攻击
                             allowFileAccess = false
                             allowContentAccess = false
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
-                                allowFileAccessFromFileURLs = false
-                                allowUniversalAccessFromFileURLs = false
-                            }
-                            
                             // ✅ 混合内容模式 - 允许HTTP资源（教务系统需要）
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
                                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW

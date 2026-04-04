@@ -21,7 +21,7 @@ import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.service.BackgroundWebViewFetchService
 import com.wind.ggbond.classtime.service.ScheduleFetchService
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.SecureCookieManager
 import com.wind.ggbond.classtime.util.WeekParser
 import dagger.assisted.Assisted
@@ -31,22 +31,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlin.coroutines.coroutineContext
 
-/**
- * 课表自动更新 Worker
- * 
- * 功能：
- * 1. 定时从教务系统抓取最新课表
- * 2. 对比本地课表，智能更新变化的课程
- * 3. 发送更新通知
- * 
- * 改进：
- * - 添加取消检查，避免浪费资源
- * - 优化错误处理和重试逻辑
- * - 添加性能监控
- */
 @HiltWorker
 class ScheduleAutoUpdateWorker @AssistedInject constructor(
     @Assisted context: Context,
@@ -57,7 +44,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
     private val scheduleRepository: ScheduleRepository,
     private val schoolRepository: SchoolRepository,
     private val courseAdjustmentRepository: CourseAdjustmentRepository,
-    private val reminderScheduler: AlarmReminderScheduler,
+    private val reminderScheduler: IAlarmScheduler,
     private val secureCookieManager: SecureCookieManager,
     private val courseDatabase: com.wind.ggbond.classtime.data.local.database.CourseDatabase
 ) : CoroutineWorker(context, workerParams) {
@@ -81,7 +68,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
         
         try {
             // ✅ 检查是否被取消
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
             // 1. 获取当前课表
             val currentSchedule = scheduleRepository.getCurrentSchedule()
@@ -97,7 +84,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                 return@withContext Result.success()
             }
             
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
             val school = schoolRepository.getSchoolById(schoolId)
             if (school == null) {
@@ -197,9 +184,9 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             
             Log.d(TAG, "✅ 成功抓取 ${fetchedCourses.count()} 门课程")
             
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
             // 6. 获取本地课表
             val localCourses = courseRepository.getAllCoursesBySchedule(currentSchedule.id)
@@ -207,7 +194,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             
             Log.d(TAG, "本地课程: ${localCourses.count()}, 远程课程: ${fetchedCourses.count()}")
             
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
             // 7. 对比并更新课程
             val updateResult = updateCourses(
@@ -216,7 +203,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                 scheduleId = currentSchedule.id
             )
             
-            if (!coroutineContext.isActive) return@withContext Result.success()
+            if (!currentCoroutineContext().isActive) return@withContext Result.success()
             
             // 8. 发送更新通知
             if (updateResult.hasChanges) {
@@ -299,7 +286,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
         
         // 处理远程课程
         for (remoteCourse in remoteCourses) {
-            if (!coroutineContext.isActive) break
+            if (!currentCoroutineContext().isActive) break
             
             val key = "${remoteCourse.courseName}_${remoteCourse.teacher}"
             val localCourse = localCourseMap[key]
@@ -385,7 +372,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             }
         }
         
-        if (!coroutineContext.isActive) {
+        if (!currentCoroutineContext().isActive) {
             return UpdateResult(0, 0, 0, 0, emptyList())
         }
         
@@ -400,7 +387,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
         try {
             courseDatabase.withTransaction {
                 // 检查是否被取消
-                if (!coroutineContext.isActive) {
+                if (!currentCoroutineContext().isActive) {
                     throw CancellationException("任务被取消")
                 }
                 
@@ -410,7 +397,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                     coursesToAdd.forEach { courseRepository.insertCourse(it) }
                 }
                 
-                if (!coroutineContext.isActive) {
+                if (!currentCoroutineContext().isActive) {
                     throw CancellationException("任务被取消")
                 }
                 
@@ -420,7 +407,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                     coursesToUpdate.forEach { courseRepository.updateCourse(it) }
                 }
                 
-                if (!coroutineContext.isActive) {
+                if (!currentCoroutineContext().isActive) {
                     throw CancellationException("任务被取消")
                 }
                 
@@ -430,7 +417,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                     adjustmentsToAdd.forEach { courseAdjustmentRepository.saveAdjustment(it) }
                 }
                 
-                if (!coroutineContext.isActive) {
+                if (!currentCoroutineContext().isActive) {
                     throw CancellationException("任务被取消")
                 }
                 
@@ -569,7 +556,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle("时课 $title")
                 .setContentText(content)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(if (result != null) buildDetailedContent(content, result!!) else content))
+                .setStyle(NotificationCompat.BigTextStyle().bigText(result?.let { buildDetailedContent(content, it) } ?: content))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)  // 统一使用高优先级
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)

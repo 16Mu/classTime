@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,12 +19,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.border
+import com.wind.ggbond.classtime.ui.theme.Spacing
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -38,6 +43,7 @@ import com.wind.ggbond.classtime.util.WeekParser
 /**
  * 课程详情底部弹出卡片
  * 参考主流APP设计，从底部滑出占据屏幕2/3高度
+ * 支持莫奈动态取色：通过 dynamicColor 参数传入 MonetColorPalette 动态颜色
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +54,8 @@ fun CourseDetailBottomSheet(
     onRequestAdjustment: ((Long) -> Unit)? = null,  // 请求调课（传courseId，Dialog在上层弹出）
     onRequestAddExam: ((Long) -> Unit)? = null,      // 请求添加考试（传courseId，Dialog在上层弹出）
     startInEditMode: Boolean = false,                // 是否直接进入编辑模式
-    viewModel: CourseDetailViewModel = hiltViewModel()
+    viewModel: CourseDetailViewModel = hiltViewModel(),
+    dynamicColor: String? = null                     // 莫奈动态取色支持，为null时使用课程原始颜色
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
@@ -124,20 +131,19 @@ fun CourseDetailBottomSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
-            // 自定义拖动手柄，更加美观
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Spacing.md))
                 Surface(
                     modifier = Modifier
                         .width(40.dp)
-                        .height(4.dp),
+                        .height(Spacing.xs),
                     shape = RoundedCornerShape(2.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 ) {}
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Spacing.sm))
             }
         }
     ) {
@@ -156,6 +162,7 @@ fun CourseDetailBottomSheet(
                 CourseHeaderCard(
                     course = c,
                     isEditMode = isEditMode,
+                    dynamicColor = dynamicColor,  // 传递莫奈动态颜色
                     onEdit = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         // 切换到编辑模式而不是跳转页面
@@ -228,16 +235,16 @@ fun CourseDetailBottomSheet(
                     }
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                
+                Spacer(modifier = Modifier.height(Spacing.lg))
+
                 // 可滚动的内容区域
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(scrollState)
-                        .padding(horizontal = 24.dp)
+                        .padding(horizontal = Spacing.xl)
                         .padding(bottom = 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                 ) {
                     // 基本信息 - 支持编辑模式切换
                     AnimatedContent(
@@ -548,6 +555,7 @@ fun CourseDetailBottomSheet(
 
 /**
  * 课程头部卡片 - 支持编辑/查看模式切换
+ * 支持莫奈动态取色：通过 dynamicColor 参数传入外部动态颜色
  */
 @Composable
 private fun CourseHeaderCard(
@@ -556,8 +564,12 @@ private fun CourseHeaderCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSave: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    dynamicColor: String? = null  // 莫奈动态取色支持，为null时使用course.color
 ) {
+    // 优先使用动态颜色，否则回退到课程原始颜色
+    val displayColor = dynamicColor ?: course.color
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -569,14 +581,14 @@ private fun CourseHeaderCard(
         ),
         colors = CardDefaults.cardColors(
             containerColor = try {
-                Color(android.graphics.Color.parseColor(course.color))
+                Color(android.graphics.Color.parseColor(displayColor))
             } catch (e: Exception) {
                 MaterialTheme.colorScheme.primaryContainer
             }
         )
     ) {
         val bg = try {
-            Color(android.graphics.Color.parseColor(course.color))
+            Color(android.graphics.Color.parseColor(displayColor))
         } catch (e: Exception) {
             MaterialTheme.colorScheme.primaryContainer
         }
@@ -600,15 +612,15 @@ private fun CourseHeaderCard(
                 targetState = isEditMode,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(12.dp),
+                    .padding(Spacing.md),
                 label = "header_buttons_animation"
             ) { editMode ->
                 if (editMode) {
                     // 编辑模式 - 显示保存和取消按钮
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         FilledIconButton(
                             onClick = onCancel,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).size(40.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = contentColor.copy(alpha = 0.2f),
                                 contentColor = contentColor
@@ -622,7 +634,7 @@ private fun CourseHeaderCard(
                         }
                         FilledIconButton(
                             onClick = onSave,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).size(40.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = contentColor.copy(alpha = 0.3f),
                                 contentColor = contentColor
@@ -637,10 +649,10 @@ private fun CourseHeaderCard(
                     }
                 } else {
                     // 查看模式 - 显示编辑和删除按钮
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         FilledIconButton(
                             onClick = onEdit,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).size(40.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = contentColor.copy(alpha = 0.2f),
                                 contentColor = contentColor
@@ -654,7 +666,7 @@ private fun CourseHeaderCard(
                         }
                         FilledIconButton(
                             onClick = onDelete,
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).size(40.dp),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = contentColor.copy(alpha = 0.2f),
                                 contentColor = contentColor
@@ -674,7 +686,7 @@ private fun CourseHeaderCard(
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = Spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // 图标
@@ -695,7 +707,7 @@ private fun CourseHeaderCard(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Spacing.md))
                 
                 Text(
                     text = course.courseName,
@@ -727,11 +739,11 @@ private fun EditableTimeSection(
     
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
@@ -749,14 +761,14 @@ private fun EditableTimeSection(
         
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Spacing.lg),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
             )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 // 星期选择
                 var expandedDay by remember { mutableStateOf(false) }
@@ -779,8 +791,8 @@ private fun EditableTimeSection(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDay) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
-                        shape = RoundedCornerShape(12.dp),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        shape = RoundedCornerShape(Spacing.md),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.secondary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -808,7 +820,7 @@ private fun EditableTimeSection(
                 var sectionCountText by remember(sectionCount) { mutableStateOf(sectionCount.toString()) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     // 开始节次
                     OutlinedTextField(
@@ -863,7 +875,7 @@ private fun EditableTimeSection(
                 
                 // 周次选择
                 HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = Spacing.xs),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                 )
                 
@@ -872,13 +884,13 @@ private fun EditableTimeSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showWeekPicker = true }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = Spacing.sm),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
                         Icon(
                             Icons.Default.DateRange,
@@ -894,7 +906,7 @@ private fun EditableTimeSection(
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(
                             text = if (weeks.isEmpty()) "未设置" else WeekParser.formatWeekList(weeks),
@@ -949,11 +961,11 @@ private fun EditableInfoSection(
     
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
@@ -971,14 +983,14 @@ private fun EditableInfoSection(
         
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(Spacing.lg),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
             )
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 // 课程名称输入框
                 OutlinedTextField(
@@ -996,7 +1008,7 @@ private fun EditableInfoSection(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 1,
                     maxLines = 2,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(Spacing.md),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -1006,7 +1018,7 @@ private fun EditableInfoSection(
                 // 教师和教室并排
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     // 教师输入框
                     OutlinedTextField(
@@ -1023,7 +1035,7 @@ private fun EditableInfoSection(
                         },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(Spacing.md),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
@@ -1626,7 +1638,10 @@ private fun EditableReminderSection(
                     )
                     Switch(
                         checked = reminderEnabled,
-                        onCheckedChange = onReminderEnabledChange
+                        onCheckedChange = onReminderEnabledChange,
+                        modifier = Modifier.semantics {
+                            stateDescription = if (reminderEnabled) "已开启" else "已关闭"
+                        }
                     )
                 }
                 
@@ -1729,7 +1744,7 @@ private fun ReadOnlyNoteSection(note: String) {
     // 无内容时不显示
     if (note.isEmpty()) return
     
-    InfoSection(title = "备注", icon = Icons.Default.Notes) {
+    InfoSection(title = "备注", icon = Icons.AutoMirrored.Filled.Notes) {
         Text(
             text = note,
             style = MaterialTheme.typography.bodyMedium,

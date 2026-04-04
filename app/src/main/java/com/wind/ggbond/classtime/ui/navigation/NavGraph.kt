@@ -294,6 +294,11 @@ fun NavGraph(
                 permissionTypeName = permissionType
             )
         }
+        
+        // 背景与主题设置
+        composable(Screen.BackgroundSettings.route) {
+            com.wind.ggbond.classtime.ui.screen.settings.BackgroundSettingsScreen(navController)
+        }
     }
 }
 

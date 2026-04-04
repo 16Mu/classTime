@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.profile
 
 import androidx.compose.foundation.clickable
@@ -24,6 +25,11 @@ import androidx.navigation.NavController
 import com.wind.ggbond.classtime.R
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
+import com.wind.ggbond.classtime.ui.viewmodel.UpdateViewModel
+import com.wind.ggbond.classtime.ui.components.UpdateDialog
+import com.wind.ggbond.classtime.ui.components.UpdateCheckLoadingDialog
+import android.content.Intent
+import android.net.Uri
 
 /**
  * 我的页面 - 底部导航Tab3
@@ -33,13 +39,17 @@ import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
+    mainViewModel: com.wind.ggbond.classtime.ui.viewmodel.MainViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
-    // 收集各项设置状态
     val compactModeEnabled by settingsViewModel.compactModeEnabled.collectAsState()
     val showWeekendEnabled by settingsViewModel.showWeekendEnabled.collectAsState()
+    val bottomBarBlurEnabled by settingsViewModel.bottomBarBlurEnabled.collectAsState()
     val reminderEnabled by settingsViewModel.reminderEnabled.collectAsState()
     val defaultReminderMinutes by settingsViewModel.defaultReminderMinutes.collectAsState()
+    val updateState by updateViewModel.updateState.collectAsState()
+    val currentVersion by updateViewModel.currentVersion.collectAsState()
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
 
@@ -137,6 +147,33 @@ fun ProfileScreen(
                 )
             }
 
+            // 底部栏模糊
+            item {
+                ProfileSwitchItem(
+                    icon = Icons.Default.BlurOn,
+                    title = "底部栏半透明",
+                    subtitle = if (bottomBarBlurEnabled) "已开启，使用半透明背景" else "已关闭，使用不透明背景",
+                    checked = bottomBarBlurEnabled,
+                    onCheckedChange = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        settingsViewModel.updateBottomBarBlurEnabled(it)
+                    }
+                )
+            }
+
+            // 背景与主题
+            item {
+                ProfileNavigateItem(
+                    icon = Icons.Default.Wallpaper,
+                    title = "背景与主题",
+                    subtitle = "自定义背景图片、视频和动态配色",
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        navController.navigate(Screen.BackgroundSettings.route)
+                    }
+                )
+            }
+
             // 课程配色
             item {
                 ProfileNavigateItem(
@@ -186,7 +223,10 @@ fun ProfileScreen(
                     icon = Icons.Default.Info,
                     title = "应用版本",
                     subtitle = "v${com.wind.ggbond.classtime.BuildConfig.VERSION_NAME}",
-                    onClick = {}
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        updateViewModel.checkUpdate(force = true)
+                    }
                 )
             }
 
@@ -314,6 +354,41 @@ fun ProfileScreen(
             }
         )
     }
+
+    when (val state = updateState) {
+        is UpdateViewModel.UpdateState.Checking -> {
+            UpdateCheckLoadingDialog("正在检查更新...")
+        }
+        is UpdateViewModel.UpdateState.UpdateAvailable -> {
+            UpdateDialog(
+                versionInfo = state.versionInfo,
+                currentVersion = currentVersion,
+                onDismiss = { updateViewModel.dismissUpdate() },
+                onDownload = { url ->
+                    updateViewModel.dismissUpdate()
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProfileScreen", "打开下载链接失败", e)
+                    }
+                }
+            )
+        }
+        is UpdateViewModel.UpdateState.Error -> {
+            AlertDialog(
+                onDismissRequest = { updateViewModel.resetState() },
+                title = { Text("检查失败") },
+                text = { Text(state.message) },
+                confirmButton = {
+                    TextButton(onClick = { updateViewModel.resetState() }) {
+                        Text("确定")
+                    }
+                }
+            )
+        }
+        else -> {}
+    }
 }
 
 // ==================== 组件 ====================
@@ -392,10 +467,10 @@ private fun ProfileNavigateItem(
             }
 
             Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                Icons.Default.KeyboardArrowRight,
+                contentDescription = "更多",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
             )
         }
     }
@@ -517,10 +592,10 @@ private fun ProfileDangerItem(
             }
 
             Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                Icons.Default.KeyboardArrowRight,
+                contentDescription = "更多",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
             )
         }
     }

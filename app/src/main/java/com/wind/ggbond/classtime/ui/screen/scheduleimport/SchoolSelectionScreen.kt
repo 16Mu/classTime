@@ -409,58 +409,49 @@ fun ProvinceIndexBar(
     provinces: List<String>,
     onProvinceClick: (String) -> Unit
 ) {
-    // 当前选中的索引字母
-    var selectedLetter by remember { mutableStateOf<String?>(null) }
-    // 获取震动反馈
+    var selectedProvince by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
-    
+
     Box(
         modifier = Modifier
             .fillMaxHeight()
-            .padding(end = 4.dp),  // 更靠右，减小右侧边距
-        contentAlignment = Alignment.CenterEnd  // 对齐到右侧
+            .padding(end = 4.dp),
+        contentAlignment = Alignment.CenterEnd
     ) {
-        // 索引字母列表（带圆角半透明背景，像微信）
         Column(
             modifier = Modifier
-                .fillMaxHeight(0.7f)  // 占屏幕高度的70%
-                .width(20.dp)
+                .fillMaxHeight(0.85f)
+                .width(28.dp)
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),  // 半透明背景
-                    shape = RoundedCornerShape(10.dp)  // 圆角
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(14.dp)
                 )
-                .padding(vertical = 4.dp)  // 内边距
+                .padding(vertical = 4.dp, horizontal = 2.dp)
                 .pointerInput(provinces) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            // 计算触摸位置对应的字母
                             val index = (offset.y / (size.height / provinces.size)).toInt()
                                 .coerceIn(0, provinces.size - 1)
                             val province = provinces[index]
-                            selectedLetter = province.take(1)
+                            selectedProvince = province
                             onProvinceClick(province)
-                            // 触发震动反馈
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
                         onDrag = { change, _ ->
                             change.consume()
-                            // 计算当前拖动位置对应的字母
                             val index = (change.position.y / (size.height / provinces.size)).toInt()
                                 .coerceIn(0, provinces.size - 1)
                             val province = provinces[index]
-                            val letter = province.take(1)
-                            if (selectedLetter != letter) {
-                                selectedLetter = letter
+                            if (selectedProvince != province) {
+                                selectedProvince = province
                                 onProvinceClick(province)
-                                // 切换字母时触发震动
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             }
                         },
                         onDragEnd = {
-                            // 延迟清除选中状态
                             kotlinx.coroutines.GlobalScope.launch {
                                 kotlinx.coroutines.delay(200)
-                                selectedLetter = null
+                                selectedProvince = null
                             }
                         }
                     )
@@ -469,36 +460,35 @@ fun ProvinceIndexBar(
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
             provinces.forEach { province ->
-                val letter = province.take(1)
-                val isSelected = selectedLetter == letter
-                
+                val isSelected = selectedProvince == province
+
                 Text(
-                    text = letter,
+                    text = province,
                     modifier = Modifier
-                        .size(16.dp)
-                        .clickable { 
-                            selectedLetter = letter
+                        .width(24.dp)
+                        .clickable {
+                            selectedProvince = province
                             onProvinceClick(province)
-                            // 点击时触发震动
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         },
-                    fontSize = 10.sp,
-                    color = if (isSelected) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
+                    fontSize = 9.sp,
+                    color = if (isSelected)
+                        MaterialTheme.colorScheme.primary
+                    else
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    textAlign = TextAlign.Center
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
-        
-        // 放大提示框（滑动时显示）
-        if (selectedLetter != null) {
+
+        if (selectedProvince != null) {
             Box(
                 modifier = Modifier
-                    .offset(x = (-60).dp)
+                    .offset(x = (-70).dp)
                     .size(50.dp)
                     .background(
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -512,10 +502,11 @@ fun ProvinceIndexBar(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = selectedLetter!!,
-                    fontSize = 24.sp,
+                    text = selectedProvince!!,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1
                 )
             }
         }

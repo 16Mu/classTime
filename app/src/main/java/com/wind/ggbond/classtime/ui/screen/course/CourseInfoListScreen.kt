@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,7 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.ui.theme.CourseColors
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.course.CourseInfoListViewModel
+import com.wind.ggbond.classtime.util.CourseColorProvider
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedback
@@ -64,6 +66,16 @@ fun CourseInfoListScreen(
     
     val haptic = LocalHapticFeedback.current
     val listState = rememberLazyListState()
+    
+    // 动态课程颜色Map（莫奈颜色支持）
+    var courseColorMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    
+    LaunchedEffect(aggregatedCourses) {
+        if (aggregatedCourses.isNotEmpty()) {
+            val courseNames = aggregatedCourses.map { it.courseName }
+            courseColorMap = CourseColorProvider.assignColorsForCourses(courseNames)
+        }
+    }
     
     // BottomSheet 课程详情/编辑状态
     var selectedCourseId by remember { mutableStateOf<Long?>(null) }
@@ -263,7 +275,6 @@ fun CourseInfoListScreen(
                         aggregatedCourse = aggregatedCourse,
                         onClick = { 
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            // 点击打开 BottomSheet 查看/编辑课程详情
                             val firstSlotId = aggregatedCourse.timeSlots.firstOrNull()?.id
                             if (firstSlotId != null) {
                                 selectedCourseId = firstSlotId
@@ -276,13 +287,13 @@ fun CourseInfoListScreen(
                         haptic = haptic,
                         onTimeSlotClick = { courseId -> selectedCourseId = courseId },
                         onAddTimeSlot = {
-                            // 跳转到课程编辑页面，预填充课程名称以添加新时间段
                             navController.navigate(
                                 Screen.CourseEdit.createRoute(
                                     courseName = aggregatedCourse.courseName
                                 )
                             )
-                        }
+                        },
+                        courseColorMap = courseColorMap
                     )
                 }
             }
@@ -319,7 +330,7 @@ private fun CourseTableInfoCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
@@ -366,7 +377,7 @@ private fun CourseTableInfoCard(
                 ) {
                     // 课表名称
                     InfoChip(
-                        icon = Icons.Default.Label,
+                        icon = Icons.AutoMirrored.Filled.Label,
                         label = "名称",
                         value = it.name,
                         modifier = Modifier.weight(1f)
@@ -420,7 +431,8 @@ private fun AggregatedCourseCard(
     onToggleExpanded: () -> Unit,
     haptic: HapticFeedback,
     onTimeSlotClick: (Long) -> Unit,
-    onAddTimeSlot: () -> Unit
+    onAddTimeSlot: () -> Unit,
+    courseColorMap: Map<String, String> = emptyMap()
 ) {
     // 星期名称映射
     val dayNames = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
@@ -448,11 +460,22 @@ private fun AggregatedCourseCard(
         label = "arrowRotation"
     )
     
-    // 获取课程颜色
-    val courseColor = try {
-        Color(android.graphics.Color.parseColor(aggregatedCourse.color))
-    } catch (_: Exception) {
-        CourseColors[kotlin.math.abs(aggregatedCourse.courseName.hashCode()) % CourseColors.size]
+    // 获取课程颜色 - 优先从外部传入的动态颜色Map中查找，回退到本地解析
+    val courseColor = remember(aggregatedCourse.courseName, aggregatedCourse.color, courseColorMap) {
+        val dynamicColor = courseColorMap[aggregatedCourse.courseName]
+        if (dynamicColor != null) {
+            try {
+                Color(android.graphics.Color.parseColor(dynamicColor))
+            } catch (_: Exception) {
+                CourseColors[kotlin.math.abs(aggregatedCourse.courseName.hashCode()) % CourseColors.size]
+            }
+        } else {
+            try {
+                Color(android.graphics.Color.parseColor(aggregatedCourse.color))
+            } catch (_: Exception) {
+                CourseColors[kotlin.math.abs(aggregatedCourse.courseName.hashCode()) % CourseColors.size]
+            }
+        }
     }
     
     Card(
@@ -654,7 +677,7 @@ private fun AggregatedCourseCard(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = courseColor
                         ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
+                        border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                             brush = androidx.compose.ui.graphics.SolidColor(courseColor.copy(alpha = 0.5f))
                         )
                     ) {
@@ -700,7 +723,7 @@ private fun TimeSlotCard(
             },
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        border = ButtonDefaults.outlinedButtonBorder.copy(
+        border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
             brush = androidx.compose.ui.graphics.SolidColor(
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )

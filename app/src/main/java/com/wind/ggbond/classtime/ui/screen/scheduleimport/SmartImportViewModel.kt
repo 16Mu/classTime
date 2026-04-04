@@ -10,7 +10,7 @@ import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.Constants
 import com.wind.ggbond.classtime.util.InputValidator
 import com.wind.ggbond.classtime.util.extractor.SchoolExtractorFactory
@@ -50,7 +50,7 @@ class SmartImportViewModel @Inject constructor(
     private val schoolRepository: SchoolRepository,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
-    private val reminderScheduler: AlarmReminderScheduler,
+    private val reminderScheduler: IAlarmScheduler,
     private val extractorFactory: SchoolExtractorFactory
 ) : ViewModel() {
     

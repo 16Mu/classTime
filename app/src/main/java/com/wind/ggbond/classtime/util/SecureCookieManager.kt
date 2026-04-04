@@ -2,7 +2,6 @@ package com.wind.ggbond.classtime.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +53,7 @@ class SecureCookieManager(
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
         } catch (e: Exception) {
-            Log.e(TAG, "加密存储初始化失败，Cookie功能不可用", e)
+            AppLogger.e(TAG, "加密存储初始化失败，Cookie功能不可用", e)
             null  // 不回退到明文存储
         }
     }
@@ -78,7 +77,7 @@ class SecureCookieManager(
      */
     fun saveCookies(domain: String, cookies: String, lifetimeMs: Long) {
         val prefs = encryptedPrefs ?: run {
-            Log.e(TAG, "加密存储不可用，无法保存Cookie")
+            AppLogger.e(TAG, "加密存储不可用，无法保存Cookie")
             return
         }
         try {
@@ -87,9 +86,10 @@ class SecureCookieManager(
                 .putString(KEY_PREFIX_COOKIE + domain, cookies)
                 .putLong(KEY_PREFIX_EXPIRY + domain, expiryTime)
                 .apply()
-            Log.d(TAG, "Cookie已保存: domain=$domain")
+            AppLogger.sensitive(TAG, "Cookie", cookies)
+            AppLogger.d(TAG, "Cookie已保存: domain=$domain")
         } catch (e: Exception) {
-            Log.e(TAG, "保存Cookie失败: domain=$domain", e)
+            AppLogger.e(TAG, "保存Cookie失败: domain=$domain", e)
         }
     }
     
@@ -111,7 +111,7 @@ class SecureCookieManager(
                     cookies
                 } else {
                     // Cookie已过期，删除它
-                    Log.d(TAG, "Cookie已过期: domain=$domain")
+                    AppLogger.d(TAG, "Cookie已过期: domain=$domain")
                     removeCookies(domain)
                     null
                 }
@@ -119,7 +119,7 @@ class SecureCookieManager(
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "读取Cookie失败: domain=$domain", e)
+            AppLogger.e(TAG, "读取Cookie失败: domain=$domain", e)
             null
         }
     }
@@ -136,9 +136,9 @@ class SecureCookieManager(
                 .remove(KEY_PREFIX_COOKIE + domain)
                 .remove(KEY_PREFIX_EXPIRY + domain)
                 .apply()
-            Log.d(TAG, "Cookie已删除: domain=$domain")
+            AppLogger.d(TAG, "Cookie已删除: domain=$domain")
         } catch (e: Exception) {
-            Log.e(TAG, "删除Cookie失败: domain=$domain", e)
+            AppLogger.e(TAG, "删除Cookie失败: domain=$domain", e)
         }
     }
     
@@ -149,9 +149,9 @@ class SecureCookieManager(
         val prefs = encryptedPrefs ?: return
         try {
             prefs.edit().clear().apply()
-            Log.d(TAG, "所有Cookie已清除")
+            AppLogger.d(TAG, "所有Cookie已清除")
         } catch (e: Exception) {
-            Log.e(TAG, "清除所有Cookie失败", e)
+            AppLogger.e(TAG, "清除所有Cookie失败", e)
         }
     }
     
@@ -192,9 +192,9 @@ class SecureCookieManager(
             }
             
             editor.apply()
-            Log.d(TAG, "已清理 $removedCount 个过期Cookie")
+            AppLogger.d(TAG, "已清理 $removedCount 个过期Cookie")
         } catch (e: Exception) {
-            Log.e(TAG, "清理过期Cookie失败", e)
+            AppLogger.e(TAG, "清理过期Cookie失败", e)
         }
     }
     
@@ -215,7 +215,7 @@ class SecureCookieManager(
                 -1
             }
         } catch (e: Exception) {
-            Log.e(TAG, "获取Cookie剩余有效期失败: domain=$domain", e)
+            AppLogger.e(TAG, "获取Cookie剩余有效期失败: domain=$domain", e)
             -1
         }
     }
@@ -232,18 +232,18 @@ class SecureCookieManager(
     suspend fun validateCookies(domain: String, validateUrl: String): Boolean = withContext(Dispatchers.IO) {
         // 如果没有注入OkHttpClient，跳过网络验证
         if (okHttpClient == null) {
-            Log.w(TAG, "OkHttpClient未注入，跳过Cookie网络验证")
+            AppLogger.w(TAG, "OkHttpClient未注入，跳过Cookie网络验证")
             return@withContext getCookies(domain) != null
         }
         
         val cookies = getCookies(domain)
         if (cookies == null) {
-            Log.d(TAG, "Cookie不存在: $domain")
+            AppLogger.d(TAG, "Cookie不存在: $domain")
             return@withContext false
         }
         
         return@withContext try {
-            Log.d(TAG, "开始验证Cookie: $domain")
+            AppLogger.d(TAG, "开始验证Cookie: $domain")
             
             val request = Request.Builder()
                 .url(validateUrl)
@@ -255,17 +255,17 @@ class SecureCookieManager(
             val isValid = response.isSuccessful
             
             if (!isValid) {
-                Log.w(TAG, "Cookie验证失败: HTTP ${response.code}")
+                AppLogger.w(TAG, "Cookie验证失败: HTTP ${response.code}")
                 // ✅ 验证失败时自动删除Cookie
                 removeCookies(domain)
             } else {
-                Log.d(TAG, "✅ Cookie验证成功: $domain")
+                AppLogger.d(TAG, "✅ Cookie验证成功: $domain")
             }
             
             response.close()
             isValid
         } catch (e: Exception) {
-            Log.e(TAG, "Cookie验证异常: ${e.message}", e)
+            AppLogger.e(TAG, "Cookie验证异常: ${e.message}", e)
             // 网络异常不删除Cookie，可能只是临时网络问题
             false
         }

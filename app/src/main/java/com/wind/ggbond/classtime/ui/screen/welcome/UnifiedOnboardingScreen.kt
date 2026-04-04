@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.welcome
 
 import androidx.compose.animation.core.*
@@ -7,6 +8,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -169,7 +171,7 @@ fun UnifiedOnboardingScreen(
                     if (!isLastPage) {
                         Spacer(Modifier.width(4.dp))
                         Icon(
-                            Icons.Default.ArrowForward, null,
+                            Icons.AutoMirrored.Filled.ArrowForward, null,
                             modifier = Modifier.size(18.dp)
                         )
                     }

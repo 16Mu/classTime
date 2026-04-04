@@ -219,7 +219,7 @@ class WHZYJSXYCustomExtractor @Inject constructor() : SchoolScheduleExtractor {
             val key = "${course.courseName}|${course.teacher}|${course.classroom}|${course.dayOfWeek}|${course.startSection}"
             
             if (courseMap.containsKey(key)) {
-                val existing = courseMap[key]!!
+                val existing = courseMap.getValue(key)
                 val mergedWeeks = (existing.weeks + course.weeks).distinct().sorted()
                 courseMap[key] = existing.copy(
                     weeks = mergedWeeks,

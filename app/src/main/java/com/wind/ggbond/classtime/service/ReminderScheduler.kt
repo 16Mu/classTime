@@ -138,7 +138,7 @@ class LegacyReminderScheduler @Inject constructor(
         
         // ✅ 先取消所有旧提醒（批量操作）
         WorkManager.getInstance(context).cancelAllWorkByTag(BATCH_TAG)
-        reminderRepository.deleteAllReminders()
+        reminderRepository.deleteAll()
         
         // ✅ 并发生成所有WorkRequest
         val allWorkRequests = mutableListOf<OneTimeWorkRequest>()
@@ -175,7 +175,7 @@ class LegacyReminderScheduler @Inject constructor(
             WorkManager.getInstance(context).enqueue(allWorkRequests)
             
             // ✅ 批量保存提醒记录到数据库
-            reminderRepository.insertReminders(allReminders)
+            reminderRepository.insertAll(allReminders)
             
             Log.d(TAG, "✅ 批量创建完成: 共创建 ${allWorkRequests.size} 个提醒")
         } catch (e: Exception) {
@@ -362,7 +362,7 @@ class LegacyReminderScheduler @Inject constructor(
                             workRequestId = workRequest.id.toString()
                         )
                         
-                        reminderRepository.insertReminder(reminder)
+                        reminderRepository.insert(reminder)
                         
                         Log.d(TAG, "已创建提醒: ${course.courseName}, 周$weekNumber, ${reminderDateTime}")
                         
@@ -421,7 +421,7 @@ class LegacyReminderScheduler @Inject constructor(
     suspend fun cancelAllReminders() {
         try {
             WorkManager.getInstance(context).cancelAllWorkByTag(BATCH_TAG)
-            reminderRepository.deleteAllReminders()
+            reminderRepository.deleteAll()
             Log.d(TAG, "已取消所有提醒")
         } catch (e: Exception) {
             Log.e(TAG, "取消所有提醒失败: ${e.message}", e)
@@ -463,7 +463,7 @@ class LegacyReminderScheduler @Inject constructor(
      * 获取提醒统计信息
      */
     suspend fun getReminderStats(): ReminderStats {
-        val allReminders = reminderRepository.getAllReminders()
+        val allReminders = reminderRepository.getAll()
         val now = System.currentTimeMillis()
         val todayStart = LocalDate.now().atStartOfDay()
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -554,7 +554,7 @@ class LegacyReminderScheduler @Inject constructor(
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val todayEnd = todayStart + 24 * 60 * 60 * 1000
         
-        return reminderRepository.getAllReminders().filter {
+        return reminderRepository.getAll().filter {
             it.triggerTime in todayStart..todayEnd && it.isEnabled
         }
     }
@@ -566,7 +566,7 @@ class LegacyReminderScheduler @Inject constructor(
         val now = System.currentTimeMillis()
         val oneHourLater = now + 60 * 60 * 1000
         
-        return reminderRepository.getAllReminders().filter {
+        return reminderRepository.getAll().filter {
             it.triggerTime in now..oneHourLater && it.isEnabled
         }
     }
@@ -779,7 +779,7 @@ class LegacyReminderScheduler @Inject constructor(
                         workRequestId = workRequest.id.toString()
                     )
                     
-                    reminderRepository.insertReminder(reminder)
+                    reminderRepository.insert(reminder)
                     Log.d(TAG, "下节课提醒已创建: ${nextCourse.courseName}, 提醒时间: $reminderTime")
                 }
             } catch (e: Exception) {

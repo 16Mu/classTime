@@ -274,8 +274,9 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                 append("任课教师：${teacherText}\n")
             }
             append("上课时间：${dayOfWeekName} ${sectionText}\n")
-            // 添加更多详细信息
-            append("课程编号：${course.id}\n")
+            if (course.courseCode.isNotEmpty()) {
+                append("课程代码：${course.courseCode}\n")
+            }
             if (course.weeks.isNotEmpty()) {
                 append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
             }
@@ -318,8 +319,9 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                     append("任课教师：${teacherText}\n")
                 }
                 append("上课时间：${dayOfWeekName} ${sectionText}\n")
-                // 添加更多详细信息
-                append("课程编号：${course.id}\n")
+                if (course.courseCode.isNotEmpty()) {
+                    append("课程代码：${course.courseCode}\n")
+                }
                 if (course.weeks.isNotEmpty()) {
                     append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
                 }
@@ -331,8 +333,9 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                     append("任课教师：${teacherText}\n")
                 }
                 append("上课时间：${dayOfWeekName} ${sectionText}\n")
-                // 添加更多详细信息
-                append("课程编号：${course.id}\n")
+                if (course.courseCode.isNotEmpty()) {
+                    append("课程代码：${course.courseCode}\n")
+                }
                 if (course.weeks.isNotEmpty()) {
                     append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
                 }

@@ -22,7 +22,7 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.repository.ClassTimeRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.DateUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -33,17 +33,6 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
-/**
- * 课程提醒兜底检查 Worker
- *
- * 核心机制：每15分钟（WorkManager最小周期）由系统调度执行一次，
- * 检查未来15分钟内是否有需要触发的课程提醒。
- *
- * 即使AlarmManager被系统清除、App进程被杀死，
- * WorkManager仍由系统进程调度，存活率远高于AlarmManager。
- *
- * 同时会重新注册AlarmManager提醒，实现自愈。
- */
 @HiltWorker
 class ReminderCheckWorker @AssistedInject constructor(
     @Assisted private val context: Context,
@@ -51,7 +40,7 @@ class ReminderCheckWorker @AssistedInject constructor(
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
     private val classTimeRepository: ClassTimeRepository,
-    private val alarmReminderScheduler: AlarmReminderScheduler
+    private val alarmReminderScheduler: IAlarmScheduler
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {

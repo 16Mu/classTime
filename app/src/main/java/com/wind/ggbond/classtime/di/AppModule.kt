@@ -2,6 +2,9 @@ package com.wind.ggbond.classtime.di
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.wind.ggbond.classtime.data.repository.SettingsRepository
+import com.wind.ggbond.classtime.data.repository.SettingsRepositoryImpl
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -13,14 +16,21 @@ import javax.inject.Singleton
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object AppModule {
-    
-    @Provides
+abstract class AppModule {
+
+    @Binds
     @Singleton
-    fun provideGson(): Gson {
-        return GsonBuilder()
-            .setLenient()
-            .create()
+    abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    companion object {
+
+        @Provides
+        @Singleton
+        fun provideGson(): Gson {
+            return GsonBuilder()
+                .setLenient()
+                .create()
+        }
     }
 }
 

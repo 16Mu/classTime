@@ -155,17 +155,17 @@ class BackgroundWebViewFetchService @Inject constructor(
                             }, JS_EXECUTION_DELAY)
                         }
                         
-                        @Suppress("DEPRECATION")
-                        override fun onReceivedError(
-                            view: WebView?,
-                            errorCode: Int,
-                            description: String?,
-                            failingUrl: String?
+                                                override fun onReceivedError(
+                            view: WebView,
+                            request: android.webkit.WebResourceRequest,
+                            error: android.webkit.WebResourceError
                         ) {
-                            super.onReceivedError(view, errorCode, description, failingUrl)
-                            Log.e(TAG, "WebView加载错误: $description")
+                            super.onReceivedError(view, request, error)
+                            if (!request.isForMainFrame) return
+                            val description = error.description?.toString().orEmpty()
+                            Log.e(TAG, "WebView??????: $description")
                             safeResume {
-                                continuation.resumeWithException(Exception("页面加载失败: $description"))
+                                continuation.resumeWithException(Exception("?????????: $description"))
                             }
                         }
                     }

@@ -674,8 +674,36 @@ class SchoolExtractorFactory @Inject constructor(
             ytdxExtractor,
             ahyxgdzkxxExtractor,
             ysdxExtractor,
-            ccqcgygdzkxxExtractor
+            ccqcgygdzkxxExtractor,
             // === Agent 1 提取器列表结束 ===
+            // === Agent 3 提取器列表开始 ===
+            // 自研教务系统 (13所)
+            njzyydxExtractor,
+            hebgydxExtractor,
+            sddyykdxExtractor,
+            sdypzyxyExtractor,
+            sxgckjzydxExtractor,
+            whzyjsxyCustomExtractor,
+            hnzyydxYjsExtractor,
+            qzsfxyExtractor,
+            tzzyjsxyExtractor,
+            xajzkjdxExtractor,
+            gzgcyyjsxyExtractor,
+            qddxExtractor,
+            qqheyxyExtractor,
+            // 乘方教务系统 (2所)
+            gdjtzyjsxyExtractor,
+            gzzyydxExtractor,
+            // 其他系统 (8所)
+            whjgzyxyExtractor,
+            jzlgzyxyExtractor,
+            xaoyxyExtractor,
+            dytydzkjxxExtractor,
+            ccsfdxExtractor,
+            jxslzyxyExtractor,
+            cddxExtractor,
+            sckjzyxyExtractor
+            // === Agent 3 提取器列表结束 ===
         )
     }
 }

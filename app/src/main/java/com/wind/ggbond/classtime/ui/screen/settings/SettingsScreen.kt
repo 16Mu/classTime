@@ -1,9 +1,24 @@
 package com.wind.ggbond.classtime.ui.screen.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.ViewCompact
@@ -17,6 +32,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.compose.material.icons.filled.Info
@@ -29,6 +46,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.wind.ggbond.classtime.ui.viewmodel.UpdateViewModel
+import com.wind.ggbond.classtime.ui.components.UpdateDialog
+import com.wind.ggbond.classtime.ui.components.UpdateCheckLoadingDialog
+import com.wind.ggbond.classtime.util.VersionInfo
+import com.wind.ggbond.classtime.util.MonetColorPalette
+import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
+import android.content.Intent
+import android.net.Uri
 
 /**
  * 设置页面
@@ -37,13 +62,28 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    updateViewModel: UpdateViewModel = hiltViewModel(),
+    backgroundThemeManager: BackgroundThemeManager = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val reminderEnabled by viewModel.reminderEnabled.collectAsState()
     val defaultReminderMinutes by viewModel.defaultReminderMinutes.collectAsState()
     val compactModeEnabled by viewModel.compactModeEnabled.collectAsState()
     val showWeekendEnabled by viewModel.showWeekendEnabled.collectAsState()
     val bottomBarBlurEnabled by viewModel.bottomBarBlurEnabled.collectAsState()
+    val updateState by updateViewModel.updateState.collectAsState()
+    val currentVersion by updateViewModel.currentVersion.collectAsState()
+    // 莫奈课程取色状态
+    val monetEnabled by viewModel.monetEnabled.collectAsState()
+    val courseColorSaturation by viewModel.courseColorSaturation.collectAsState()
+    // 预览颜色列表
+    val previewColors by backgroundThemeManager.observeCourseColors(
+        saturationLevel = when (courseColorSaturation) {
+            0 -> MonetColorPalette.SaturationLevel.SOFT
+            2 -> MonetColorPalette.SaturationLevel.VIBRANT
+            else -> MonetColorPalette.SaturationLevel.STANDARD
+        }
+    ).collectAsState(initial = emptyList())
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     
@@ -89,7 +129,7 @@ fun SettingsScreen(
             
             item {
                 SettingsItem(
-                    icon = Icons.Default.List,
+                    icon = Icons.AutoMirrored.Filled.List,
                     title = "查看课程信息",
                     subtitle = "查看和编辑当前课程表中的所有课程",
                     onClick = { 
@@ -219,6 +259,122 @@ fun SettingsScreen(
                 )
             }
             
+            item {
+                SettingsItem(
+                    icon = Icons.Default.Image,
+                    title = "背景与主题",
+                    subtitle = "自定义背景图片、视频和主题配色",
+                    onClick = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        navController.navigate(com.wind.ggbond.classtime.ui.navigation.Screen.BackgroundSettings.route)
+                    }
+                )
+            }
+            
+            // ==================== 莫奈课程取色设置 ====================
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.updateMonetEnabled(!monetEnabled) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "莫奈课程取色",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "根据背景图片自动生成课程颜色",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = monetEnabled,
+                            onCheckedChange = { viewModel.updateMonetEnabled(it) }
+                        )
+                    }
+                    
+                    AnimatedVisibility(
+                        visible = monetEnabled,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp)
+                        ) {
+                            Text(
+                                text = "颜色风格",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                SaturationOption(
+                                    icon = "🌸",
+                                    name = "柔和",
+                                    desc = "低饱和度\n护眼舒适",
+                                    selected = courseColorSaturation == 0,
+                                    onClick = { viewModel.updateCourseColorSaturation(0) }
+                                )
+                                
+                                SaturationOption(
+                                    icon = "⚖️",
+                                    name = "标准",
+                                    desc = "中等饱和度\n平衡美观",
+                                    selected = courseColorSaturation == 1,
+                                    onClick = { viewModel.updateCourseColorSaturation(1) }
+                                )
+                                
+                                SaturationOption(
+                                    icon = "🎨",
+                                    name = "鲜艳",
+                                    desc = "高饱和度\n醒目活泼",
+                                    selected = courseColorSaturation == 2,
+                                    onClick = { viewModel.updateCourseColorSaturation(2) }
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                previewColors.forEach { colorHex ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(
+                                                try { Color(android.graphics.Color.parseColor(colorHex)) }
+                                                catch (e: Exception) { Color.Gray }
+                                            )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
             
             // 提醒设置
@@ -250,9 +406,11 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "应用版本",
-                    // P3-1: 动态获取版本号
                     subtitle = "v${com.wind.ggbond.classtime.BuildConfig.VERSION_NAME}",
-                    onClick = {}
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        updateViewModel.checkUpdate(force = true)
+                    }
                 )
             }
             
@@ -403,6 +561,41 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    when (val state = updateState) {
+        is UpdateViewModel.UpdateState.Checking -> {
+            UpdateCheckLoadingDialog("正在检查更新...")
+        }
+        is UpdateViewModel.UpdateState.UpdateAvailable -> {
+            UpdateDialog(
+                versionInfo = state.versionInfo,
+                currentVersion = currentVersion,
+                onDismiss = { updateViewModel.dismissUpdate() },
+                onDownload = { url ->
+                    updateViewModel.dismissUpdate()
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("SettingsScreen", "打开下载链接失败", e)
+                    }
+                }
+            )
+        }
+        is UpdateViewModel.UpdateState.Error -> {
+            AlertDialog(
+                onDismissRequest = { updateViewModel.resetState() },
+                title = { Text("检查失败") },
+                text = { Text(state.message) },
+                confirmButton = {
+                    TextButton(onClick = { updateViewModel.resetState() }) {
+                        Text("确定")
+                    }
+                }
+            )
+        }
+        else -> {}
     }
 }
 
@@ -639,6 +832,56 @@ fun CompactWarningCard(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun SaturationOption(
+    icon: String,
+    name: String,
+    desc: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(100.dp)
+            .clickable(onClick = onClick)
+            .then(
+                if (selected) {
+                    Modifier
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                } else {
+                    Modifier.background(Color.Transparent)
+                }
+            )
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(text = icon, fontSize = 24.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.primary 
+                      else MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = desc,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
     }
 }
 

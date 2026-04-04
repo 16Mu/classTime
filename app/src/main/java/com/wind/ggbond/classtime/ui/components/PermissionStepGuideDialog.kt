@@ -1,3 +1,4 @@
+// [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.components
 
 import androidx.compose.animation.*
@@ -26,6 +27,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.wind.ggbond.classtime.R
+import com.wind.ggbond.classtime.ui.theme.Spacing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -78,8 +82,8 @@ fun PermissionStepGuideDialog(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.9f),
-            shape = RoundedCornerShape(24.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            shape = RoundedCornerShape(Spacing.xl),
+            elevation = CardDefaults.cardElevation(defaultElevation = Spacing.sm)
         ) {
             Column(
                 modifier = Modifier
@@ -98,7 +102,7 @@ fun PermissionStepGuideDialog(
                                 )
                             )
                         )
-                        .padding(24.dp)
+                        .padding(Spacing.xl)
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -106,7 +110,7 @@ fun PermissionStepGuideDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Security,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.desc_permission_icon),
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
@@ -141,8 +145,8 @@ fun PermissionStepGuideDialog(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     itemsIndexed(guideResult.steps) { index, step ->
                         PermissionStepCard(
@@ -170,20 +174,20 @@ fun PermissionStepGuideDialog(
                     
                     // 底部说明
                     item {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(Spacing.sm))
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                             ),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(Spacing.md)
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                modifier = Modifier.padding(Spacing.lg),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.md)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Info,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.desc_info),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -193,7 +197,7 @@ fun PermissionStepGuideDialog(
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(Spacing.xs))
                                     Text(
                                         text = "• 所有步骤都必须完成才能开启提醒\n" +
                                                 "• 部分步骤需要您手动确认已完成\n" +
@@ -234,7 +238,7 @@ private fun ProgressSection(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(20.dp)
+            .padding(Spacing.xl)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -247,7 +251,7 @@ private fun ProgressSection(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
                     text = "$actualCompletedSteps / ${guideResult.totalSteps} 步骤已完成",
                     style = MaterialTheme.typography.bodyMedium,
@@ -294,21 +298,21 @@ private fun ProgressSection(
                                 MaterialTheme.colorScheme.tertiary
                             )
                         ),
-                        RoundedCornerShape(6.dp)
+                        RoundedCornerShape(Spacing.md)
                     )
             )
         }
         
         // 状态标签
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.md))
         if (allCriticalCompleted) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.desc_check),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -322,11 +326,11 @@ private fun ProgressSection(
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Icon(
                     imageVector = Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.desc_warning),
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
                 )
@@ -355,7 +359,7 @@ private fun CompactCompletedStepCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onExpandToggle() },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Spacing.md),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
@@ -364,8 +368,8 @@ private fun CompactCompletedStepCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = Spacing.md, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 完成图标（更小）
@@ -380,7 +384,7 @@ private fun CompactCompletedStepCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.desc_check),
                     tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -407,7 +411,7 @@ private fun CompactCompletedStepCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.desc_check),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(14.dp)
                     )
@@ -469,12 +473,12 @@ private fun PermissionStepCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onExpandToggle() }
-                .padding(16.dp)
+                .padding(Spacing.lg)
         ) {
             // 头部：状态图标 + 标题 + 标签
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 步骤编号或完成图标
@@ -494,7 +498,7 @@ private fun PermissionStepCard(
                     if (isActuallyCompleted) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.desc_check),
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(28.dp)
                         )
@@ -514,7 +518,7 @@ private fun PermissionStepCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Text(
                             text = step.title,
@@ -567,9 +571,9 @@ private fun PermissionStepCard(
                 Column(
                     modifier = Modifier.padding(top = 16.dp)
                 ) {
-                    Divider(
+                    HorizontalDivider(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(bottom = Spacing.lg)
                     )
                     
                     // 详细说明
@@ -579,7 +583,7 @@ private fun PermissionStepCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     Text(
                         text = step.detailedExplanation,
                         style = MaterialTheme.typography.bodyMedium,
@@ -620,13 +624,13 @@ private fun PermissionStepCard(
                     
                     // 操作按钮
                     if (!isActuallyCompleted) {
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(Spacing.xl))
                         
                         if (step.openSettings != null) {
                             Button(
                                 onClick = onOpenSettings,
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(Spacing.md),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.error
                                 )
@@ -635,7 +639,7 @@ private fun PermissionStepCard(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = null
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(Spacing.sm))
                                 Text(
                                     text = "前往设置",
                                     fontWeight = FontWeight.Bold
@@ -645,17 +649,17 @@ private fun PermissionStepCard(
                         
                         // 仅对需要手动确认的步骤（有 stepKey 标识）显示确认按钮
                         if (step.stepKey != null && step.isCritical) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(Spacing.sm))
                             OutlinedButton(
                                 onClick = onManualConfirm,
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(Spacing.md)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null
+                                    contentDescription = stringResource(R.string.desc_check)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(Spacing.sm))
                                 Text(
                                     text = "我已完成此步骤",
                                     fontWeight = FontWeight.Bold
@@ -666,21 +670,21 @@ private fun PermissionStepCard(
                     
                     // 完成提示
                     if (isActuallyCompleted) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(Spacing.md))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(
                                     MaterialTheme.colorScheme.primaryContainer,
-                                    RoundedCornerShape(8.dp)
+                                    RoundedCornerShape(Spacing.md)
                                 )
-                                .padding(12.dp)
+                                .padding(Spacing.md)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.desc_check),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -706,20 +710,20 @@ private fun BottomButtons(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 8.dp,
+        shadowElevation = Spacing.sm,
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             // 取消按钮
             OutlinedButton(
                 onClick = onCancel,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(Spacing.md)
             ) {
                 Text("暂不开启提醒")
             }
@@ -741,7 +745,7 @@ private fun BottomButtons(
                 if (allCriticalCompleted) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = null
+                        contentDescription = stringResource(R.string.desc_check)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
