@@ -68,19 +68,30 @@ class BackgroundThemeManager @Inject constructor(
      */
     fun getActiveBackgroundScheme(): Flow<BackgroundScheme?> {
         return dataStore.data.map { preferences ->
+            Log.d(TAG, "[getActiveBackgroundScheme] Flow emitted")
+            
             val index = preferences[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] 
                 ?: DataStoreManager.SettingsKeys.DEFAULT_ACTIVE_BACKGROUND_INDEX
+            Log.d(TAG, "[getActiveBackgroundScheme] index = $index")
             
             val json = preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY]
-            val schemes = BackgroundScheme.fromJsonArray(json)
+            Log.d(TAG, "[getActiveBackgroundScheme] json = $json")
             
-            if (index in schemes.indices) {
+            val schemes = BackgroundScheme.fromJsonArray(json)
+            Log.d(TAG, "[getActiveBackgroundScheme] schemes.size = ${schemes.size}")
+            
+            val result = if (index in schemes.indices) {
                 schemes[index]
             } else if (schemes.isNotEmpty()) {
+                Log.w(TAG, "[getActiveBackgroundScheme] Index out of bounds, using first scheme")
                 schemes.first()
             } else {
+                Log.w(TAG, "[getActiveBackgroundScheme] No schemes available, returning null")
                 null
             }
+            
+            Log.d(TAG, "[getActiveBackgroundScheme] result = ${result?.id}")
+            result
         }
     }
     
@@ -98,26 +109,34 @@ class BackgroundThemeManager @Inject constructor(
      * 添加新的背景方案
      */
     suspend fun addBackgroundScheme(scheme: BackgroundScheme): Boolean {
+        Log.d(TAG, "[addBackgroundScheme] START: scheme.id = ${scheme.id}")
         var result = false
         dataStore.edit { preferences ->
             val json = preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY]
+            Log.d(TAG, "[addBackgroundScheme] Current json = $json")
+            
             val schemes = BackgroundScheme.fromJsonArray(json).toMutableList()
+            Log.d(TAG, "[addBackgroundScheme] Current schemes.size = ${schemes.size}")
             
             if (schemes.size >= DataStoreManager.SettingsKeys.MAX_BACKGROUNDS_COUNT) {
+                Log.w(TAG, "[addBackgroundScheme] Max backgrounds reached")
                 return@edit
             }
             
             schemes.add(scheme)
-            preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY] = 
-                BackgroundScheme.toJsonArray(schemes)
+            val newJson = BackgroundScheme.toJsonArray(schemes)
+            preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY] = newJson
+            Log.d(TAG, "[addBackgroundScheme] New json = $newJson")
             
             if (schemes.size == 1) {
                 preferences[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] = 0
                 preferences[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY] = true
+                Log.d(TAG, "[addBackgroundScheme] First scheme, set index=0 and enabled=true")
             }
             
             result = true
         }
+        Log.d(TAG, "[addBackgroundScheme] END: result = $result")
         return result
     }
     

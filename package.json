@@ -1,0 +1,1 @@
+{"name": "kechengbiao-scripts", "version": "1.0.0", "description": "课程表项目工具脚本", "private": true, "scripts": {"school-parser": "node scripts/utils/school-parser.js"}, "devDependencies": {"commander": "^12.0.0"}}

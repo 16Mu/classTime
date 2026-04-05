@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.items
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.course.components.WeekSelectorDialog
@@ -131,8 +133,8 @@ fun BatchCourseCreateScreen(
                 // 直接导航到课表标签页，不使用 Screen.Main.createRoute
                 navController.navigate(BottomNavItem.Schedule.route) {
                     // 清空到根路由
-                    popUpTo(navController.graph.findStartDestination().id) {
-                        saveState = false
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = false
                     }
                     // 避免重复导航
                     launchSingleTop = true
@@ -249,7 +251,8 @@ fun BatchCourseCreateScreen(
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         viewModel.saveAll()
                     },
-                    onBack = { currentPhase = BatchPhase.COLOR_SELECTION }
+                    onBack = { currentPhase = BatchPhase.COLOR_SELECTION },
+                    viewModel = viewModel
                 )
             }
         }
@@ -683,96 +686,110 @@ private fun DetailedConfigPhase(
             tonalElevation = 2.dp,
             shadowElevation = 4.dp
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).systemBarsPadding(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).systemBarsPadding()
             ) {
-                if (currentStep > 1) {
-                    OutlinedButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onStepChange(currentStep - 1)
-                        },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp)
+                // 显示验证错误提示
+                if (!canProceed && validationMessage != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("上一步", style = MaterialTheme.typography.labelMedium)
-                    }
-                } else if (currentIndex > 0) {
-                    Spacer(Modifier.weight(1f))
-                }
-
-                if (currentStep < 3) {
-                    FilledTonalButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onStepChange(currentStep + 1)
-                        },
-                        enabled = canProceed,
-                        modifier = Modifier.weight(2f),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
                         )
-                    ) {
                         Text(
-                            text = when (currentStep) {
-                                1 -> "下一步：周次设置"
-                                2 -> "下一步：提醒与备注"
-                                else -> "下一步"
-                            },
-                            style = MaterialTheme.typography.labelMedium
+                            text = validationMessage,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
-                    }
-                } else if (currentIndex < courseItems.size - 1) {
-                    FilledTonalButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onNextCourse()
-                        },
-                        modifier = Modifier.weight(2f),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        )
-                    ) {
-                        Text("保存并下一门", style = MaterialTheme.typography.labelMedium)
-                        Spacer(Modifier.width(6.dp))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
-                    }
-                } else {
-                    FilledTonalButton(
-                        onClick = onComplete,
-                        modifier = Modifier.weight(2f),
-                        contentPadding = PaddingValues(vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                        )
-                    ) {
-                        Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("进入颜色选择", style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 
-                // 显示验证错误提示
-                if (!canProceed && validationMessage != null) {
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = validationMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (currentStep > 1) {
+                        OutlinedButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onStepChange(currentStep - 1)
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("上一步", style = MaterialTheme.typography.labelMedium)
+                        }
+                    } else if (currentIndex > 0) {
+                        Spacer(Modifier.weight(1f))
+                    }
+
+                    if (currentStep < 3) {
+                        FilledTonalButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onStepChange(currentStep + 1)
+                            },
+                            enabled = canProceed,
+                            modifier = Modifier.weight(2f),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(
+                                text = when (currentStep) {
+                                    1 -> "下一步：周次设置"
+                                    2 -> "下一步：提醒与备注"
+                                    else -> "下一步"
+                                },
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
+                        }
+                    } else if (currentIndex < courseItems.size - 1) {
+                        FilledTonalButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onNextCourse()
+                            },
+                            modifier = Modifier.weight(2f),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                            )
+                        ) {
+                            Text("保存并下一门", style = MaterialTheme.typography.labelMedium)
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = onComplete,
+                            modifier = Modifier.weight(2f),
+                            contentPadding = PaddingValues(vertical = 8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            )
+                        ) {
+                            Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("进入颜色选择", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
@@ -951,6 +968,7 @@ private fun ColorSelectionPhase(
                         }
                         
                         var isAssigning by remember { mutableStateOf(false) }
+                        val coroutineScope = rememberCoroutineScope()
                         
                         FilledTonalButton(
                             onClick = {
@@ -958,7 +976,7 @@ private fun ColorSelectionPhase(
                                 isAssigning = true
                                 viewModel.autoAssignAllColors()
                                 // 延迟重置状态，确保UI更新
-                                kotlinx.coroutines.GlobalScope.launch {
+                                coroutineScope.launch {
                                     kotlinx.coroutines.delay(500)
                                     isAssigning = false
                                 }
@@ -1162,12 +1180,25 @@ private fun ColorSelectionCard(
 private fun TimeScheduleStep(course: BatchCourseItem, courseId: Long, viewModel: BatchCourseCreateViewModel) {
     val haptic = LocalHapticFeedback.current
     val expandedSlotIds = remember { mutableStateOf(setOf<Long>()) }
+    val lazyListState = rememberLazyListState()
 
-    LaunchedEffect(course.timeSlots.size) {
-        if (course.timeSlots.isNotEmpty()) expandedSlotIds.value = setOf(course.timeSlots.last().id)
+    LaunchedEffect(course.timeSlots) {
+        if (course.timeSlots.isNotEmpty()) {
+            val latestSlot = course.timeSlots.maxByOrNull { it.id }
+            latestSlot?.let {
+                expandedSlotIds.value = setOf(it.id)
+                // 滚动到该时间段
+                val index = course.timeSlots.indexOf(it)
+                if (index >= 0) {
+                    // +1 because the first item is the Card header
+                    lazyListState.animateScrollToItem(index + 1)
+                }
+            }
+        }
     }
 
     LazyColumn(
+        state = lazyListState,
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1202,7 +1233,7 @@ private fun TimeScheduleStep(course: BatchCourseItem, courseId: Long, viewModel:
                                     },
                                     modifier = Modifier.animateItem()
                                 ) { expanded ->
-                                    if (expanded) TimeSlotEditRowExpanded(slotIndex = displayIndex, slot = slot, canDelete = course.timeSlots.size > 1, onDelete = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); viewModel.removeTimeSlot(courseId, slot.id) }, onUpdate = { day, start, end, room -> viewModel.updateSlotDayOfWeek(courseId, slot.id, day); viewModel.updateSlotStartSection(courseId, slot.id, start); viewModel.updateSlotEndSection(courseId, slot.id, end); if (room.isNotBlank()) viewModel.updateSlotClassroom(courseId, slot.id, room) }, defaultClassroom = course.defaultClassroom)
+                                    if (expanded) TimeSlotEditRowExpanded(slotIndex = displayIndex, slot = slot, canDelete = course.timeSlots.size > 1, onDelete = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); viewModel.removeTimeSlot(courseId, slot.id) }, onUpdate = { day, start, end, room -> viewModel.updateSlotDayOfWeek(courseId, slot.id, day); viewModel.updateSlotStartSection(courseId, slot.id, start); viewModel.updateSlotEndSection(courseId, slot.id, end); if (room.isNotBlank()) viewModel.updateSlotClassroom(courseId, slot.id, room) }, defaultClassroom = course.defaultClassroom, viewModel = viewModel)
                                     else TimeSlotDisplayCard(index = displayIndex, slot = slot, defaultClassroom = course.defaultClassroom, onClick = { expandedSlotIds.value = setOf(slot.id) })
                                 }
                             }
@@ -1254,9 +1285,11 @@ private fun WeekSelectionStep(course: BatchCourseItem, courseId: Long, viewModel
                     Text(text = "为每个时间段单独设置上课周次", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     course.timeSlots.forEachIndexed { index, slot ->
+                        // 反转索引，使最新的时间段显示在最上面
+                        val displayIndex = course.timeSlots.size - index
                         Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(32.dp)) { Box(contentAlignment = Alignment.Center) { Text(text = "${index + 1}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer) } }
+                                Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(32.dp)) { Box(contentAlignment = Alignment.Center) { Text(text = "$displayIndex", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer) } }
                                 Column(modifier = Modifier.weight(1f)) { Text(text = "${DateUtils.getDayOfWeekName(slot.dayOfWeek)} ${slot.startSection}-${slot.startSection + slot.sectionCount - 1}节", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium); Text(text = if (slot.customWeeks.isNotEmpty()) WeekParser.formatWeeksForDisplay(slot.customWeeks) else "未设置", style = MaterialTheme.typography.labelSmall, color = if (slot.customWeeks.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error) }
                                 FilledTonalButton(onClick = { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); viewModel.showWeekSelector(courseId, slot.id) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)) { Text(if (slot.customWeeks.isNotEmpty()) "修改" else "设置", style = MaterialTheme.typography.labelSmall) }
                             }
@@ -1832,9 +1865,11 @@ private fun TimeSlotEditRowExpanded(
     canDelete: Boolean,
     onDelete: () -> Unit,
     onUpdate: (Int, Int, Int, String) -> Unit,
-    defaultClassroom: String
+    defaultClassroom: String,
+    viewModel: BatchCourseCreateViewModel
 ) {
     val haptic = LocalHapticFeedback.current
+    val maxSectionCount by viewModel.maxSectionCount.collectAsState()
 
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -1862,29 +1897,63 @@ private fun TimeSlotEditRowExpanded(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 var startText by remember(slot.startSection) { mutableStateOf(slot.startSection.toString()) }
                 var endText by remember(slot.startSection, slot.sectionCount) { mutableStateOf((slot.startSection + slot.sectionCount - 1).toString()) }
+                var startError by remember { mutableStateOf<String?>(null) }
+                var endError by remember { mutableStateOf<String?>(null) }
                 
-                OutlinedTextField(value = startText, onValueChange = { newValue ->
-                    startText = newValue
-                    newValue.toIntOrNull()?.let { newStart ->
-                        if (newStart >= 1) {
-                            // 自动设置结束节次为起始+1，默认持续2节
-                            val newEnd = newStart + 1
-                            endText = newEnd.toString()
-                            onUpdate(slot.dayOfWeek, newStart, 2, slot.classroom)
+                OutlinedTextField(
+                    value = startText,
+                    onValueChange = { newValue ->
+                        startText = newValue
+                        newValue.toIntOrNull()?.let { newStart ->
+                            if (newStart < 1 || newStart > maxSectionCount) {
+                                startError = "节次范围应为1-$maxSectionCount"
+                            } else {
+                                startError = null
+                                // 自动设置结束节次为起始+1，默认持续2节
+                                val newEnd = newStart + 1
+                                endText = newEnd.toString()
+                                onUpdate(slot.dayOfWeek, newStart, 2, slot.classroom)
+                            }
+                        } ?: run {
+                            startError = "请输入有效数字"
                         }
-                    }
-                }, label = { Text("起始") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(10.dp), leadingIcon = { Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp)) })
+                    },
+                    label = { Text("起始") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    leadingIcon = { Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp)) },
+                    isError = startError != null,
+                    supportingText = startError?.let { { Text(it, style = MaterialTheme.typography.labelSmall) } }
+                )
                 Text(text = "~", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
-                OutlinedTextField(value = endText, onValueChange = { newValue ->
-                    endText = newValue
-                    newValue.toIntOrNull()?.let { newEnd ->
-                        if (newEnd >= slot.startSection) {
-                            // 计算持续节次（结束-起始+1）
-                            val sectionCount = newEnd - slot.startSection + 1
-                            onUpdate(slot.dayOfWeek, slot.startSection, sectionCount, slot.classroom)
+                OutlinedTextField(
+                    value = endText,
+                    onValueChange = { newValue ->
+                        endText = newValue
+                        newValue.toIntOrNull()?.let { newEnd ->
+                            if (newEnd < 1 || newEnd > maxSectionCount) {
+                                endError = "节次范围应为1-$maxSectionCount"
+                            } else if (newEnd < slot.startSection) {
+                                endError = "结束节次不能小于起始节次"
+                            } else {
+                                endError = null
+                                // 计算持续节次（结束-起始+1）
+                                val sectionCount = newEnd - slot.startSection + 1
+                                onUpdate(slot.dayOfWeek, slot.startSection, sectionCount, slot.classroom)
+                            }
+                        } ?: run {
+                            endError = "请输入有效数字"
                         }
-                    }
-                }, label = { Text("结束") }, modifier = Modifier.weight(1f), singleLine = true, shape = RoundedCornerShape(10.dp), trailingIcon = { Icon(Icons.Default.Timer, null, modifier = Modifier.size(16.dp)) })
+                    },
+                    label = { Text("结束") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    trailingIcon = { Icon(Icons.Default.Timer, null, modifier = Modifier.size(16.dp)) },
+                    isError = endError != null,
+                    supportingText = endError?.let { { Text(it, style = MaterialTheme.typography.labelSmall) } }
+                )
             }
 
             var classroom by remember(slot.classroom) { mutableStateOf(slot.classroom) }
@@ -1898,4 +1967,69 @@ private fun toHexString(color: Color): String {
     val green = (color.green * 255).toInt()
     val blue = (color.blue * 255).toInt()
     return "#%02X%02X%02X".format(red, green, blue)
+}
+
+
+@Composable
+private fun QuickEditDialog(
+    courseItem: BatchCourseItem,
+    onDismiss: () -> Unit,
+    onConfirm: (BatchCourseItem) -> Unit
+) {
+    var name by remember { mutableStateOf(courseItem.courseName) }
+    var teacher by remember { mutableStateOf(courseItem.teacher) }
+    var classroom by remember { mutableStateOf(courseItem.defaultClassroom) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("快速编辑") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("课程名称") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+                OutlinedTextField(
+                    value = teacher,
+                    onValueChange = { teacher = it },
+                    label = { Text("教师") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+                OutlinedTextField(
+                    value = classroom,
+                    onValueChange = { classroom = it },
+                    label = { Text("教室") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        courseItem.copy(
+                            courseName = name,
+                            teacher = teacher,
+                            defaultClassroom = classroom
+                        )
+                    )
+                }
+            ) {
+                Text("确认")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }

@@ -47,14 +47,31 @@ data class BackgroundScheme(
         }
         
         fun fromJsonArray(json: String?): List<BackgroundScheme> {
-            if (json.isNullOrBlank()) return emptyList()
+            android.util.Log.d("BackgroundScheme", "[fromJsonArray] Input json = $json")
+            
+            if (json.isNullOrBlank()) {
+                android.util.Log.d("BackgroundScheme", "[fromJsonArray] JSON is null or blank, returning empty list")
+                return emptyList()
+            }
             
             return try {
                 val array = org.json.JSONArray(json)
-                (0 until array.length()).mapNotNull { index ->
-                    fromJson(array.optString(index, ""))
+                android.util.Log.d("BackgroundScheme", "[fromJsonArray] JSON array length = ${array.length()}")
+                
+                val result = (0 until array.length()).mapNotNull { index ->
+                    val itemJson = array.optString(index, "")
+                    android.util.Log.d("BackgroundScheme", "[fromJsonArray] Parsing item $index: $itemJson")
+                    val scheme = fromJson(itemJson)
+                    if (scheme == null) {
+                        android.util.Log.w("BackgroundScheme", "[fromJsonArray] Failed to parse item $index")
+                    }
+                    scheme
                 }
+                
+                android.util.Log.d("BackgroundScheme", "[fromJsonArray] Parsed ${result.size} schemes")
+                result
             } catch (e: Exception) {
+                android.util.Log.e("BackgroundScheme", "[fromJsonArray] Exception parsing JSON", e)
                 emptyList()
             }
         }

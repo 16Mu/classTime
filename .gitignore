@@ -103,6 +103,9 @@ schemas/
 # 构建缓存
 .buildcache/
 
+# Kotlin 编译缓存
+.kotlin/
+
 # IDE 编辑器文件
 .vscode/
 *.code-workspace
@@ -140,6 +143,19 @@ appengine-generated/
 # Cursor 编辑器
 .cursor/
 .cursorignore
+
+# Trae IDE 配置
+.trae/
+.kiro/
+
+# Node.js 依赖
+node_modules/
+
+# 构建输出和临时文件
+build_output.txt
+output/
+data/
+reports/
 
 # TortoiseGit 特定文件
 *.tgitconfig

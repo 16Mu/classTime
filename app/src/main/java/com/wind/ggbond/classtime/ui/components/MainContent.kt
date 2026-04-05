@@ -52,6 +52,14 @@ fun MainContent(
     val dimAmount by backgroundThemeManager.getDimAmount().collectAsState(initial = 40)
     val darkTheme = isSystemInDarkTheme()
 
+    // Add logging for activeScheme changes
+    LaunchedEffect(activeScheme) {
+        android.util.Log.d("MainContent", "[activeScheme] Changed: ${activeScheme?.id ?: "null"}")
+        if (activeScheme == null) {
+            android.util.Log.w("MainContent", "[activeScheme] activeScheme is null")
+        }
+    }
+
     val dynamicColorScheme = if (isDynamicThemeEnabled) {
         if (darkTheme) backgroundThemeManager.generateDarkColorScheme(seedColor)
         else backgroundThemeManager.generateLightColorScheme(seedColor)
@@ -63,54 +71,59 @@ fun MainContent(
         darkTheme = darkTheme,
         customDynamicColorScheme = dynamicColorScheme
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = androidx.compose.material3.MaterialTheme.colorScheme.background
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (isDynamicThemeEnabled && activeScheme != null) {
-                    when (activeScheme!!.type) {
-                        BackgroundType.IMAGE, BackgroundType.GIF -> {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(activeScheme!!.uri)
-                                    .build(),
-                                contentDescription = "背景",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .then(
-                                        if (blurRadius > 0) Modifier.blur(blurRadius.dp / 10f)
-                                        else Modifier
-                                    ),
-                                contentScale = ContentScale.Crop
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = dimAmount / 100f))
-                            )
-                        }
-                        BackgroundType.VIDEO -> {}
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Render wallpaper layer first (bottom layer)
+            if (isDynamicThemeEnabled && activeScheme != null) {
+                when (activeScheme!!.type) {
+                    BackgroundType.IMAGE, BackgroundType.GIF -> {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(activeScheme!!.uri)
+                                .build(),
+                            contentDescription = "背景",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .then(
+                                    if (blurRadius > 0) Modifier.blur(blurRadius.dp / 10f)
+                                    else Modifier
+                                ),
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = dimAmount / 100f))
+                        )
                     }
+                    BackgroundType.VIDEO -> {}
                 }
-                when (val state = initState) {
-                    is InitializationState.Loading -> {
-                        LoadingScreen()
-                    }
-                    is InitializationState.Success -> {
-                        SuccessContent(
-                            appInitializer = appInitializer,
-                            backgroundThemeManager = backgroundThemeManager,
-                            intent = intent,
-                            mainViewModel = mainViewModel
-                        )
-                    }
-                    is InitializationState.Error -> {
-                        ErrorScreen(
-                            message = state.message,
-                            onRetry = onRetry
-                        )
-                    }
+            } else {
+                // When no wallpaper is configured, show default background
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.material3.MaterialTheme.colorScheme.background)
+                )
+            }
+            
+            // Render app content on top of wallpaper
+            when (val state = initState) {
+                is InitializationState.Loading -> {
+                    LoadingScreen()
+                }
+                is InitializationState.Success -> {
+                    SuccessContent(
+                        appInitializer = appInitializer,
+                        backgroundThemeManager = backgroundThemeManager,
+                        intent = intent,
+                        mainViewModel = mainViewModel
+                    )
+                }
+                is InitializationState.Error -> {
+                    ErrorScreen(
+                        message = state.message,
+                        onRetry = onRetry
+                    )
                 }
             }
         }

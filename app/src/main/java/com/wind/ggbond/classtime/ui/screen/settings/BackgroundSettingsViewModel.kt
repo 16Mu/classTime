@@ -114,11 +114,23 @@ class BackgroundSettingsViewModel @Inject constructor(
                     dimAmount = _uiState.value.dimAmount,
                     name = "图片背景 ${_uiState.value.backgroundSchemes.size + 1}"
                 )
-                backgroundThemeManager.addBackgroundScheme(scheme)
+                
+                // Wait for DataStore write to complete before proceeding
+                val success = backgroundThemeManager.addBackgroundScheme(scheme)
+                
+                if (!success) {
+                    android.util.Log.e("BackgroundSettings", "Failed to add background scheme to DataStore")
+                    _uiState.update { it.copy(isLoading = false, showImagePicker = false) }
+                    return@launch
+                }
 
+                // Wait for seed color write to complete
                 backgroundThemeManager.setSeedColor(seedColor)
 
+                // Calculate the new index (after the scheme is added)
                 val newIndex = _uiState.value.backgroundSchemes.size
+                
+                // Wait for active index write to complete
                 backgroundThemeManager.setActiveBackgroundIndex(newIndex)
 
                 _uiState.update {
@@ -163,11 +175,23 @@ class BackgroundSettingsViewModel @Inject constructor(
                     dimAmount = _uiState.value.dimAmount,
                     name = "视频背景 ${_uiState.value.backgroundSchemes.size + 1}"
                 )
-                backgroundThemeManager.addBackgroundScheme(scheme)
                 
+                // Wait for DataStore write to complete before proceeding
+                val success = backgroundThemeManager.addBackgroundScheme(scheme)
+                
+                if (!success) {
+                    android.util.Log.e("BackgroundSettings", "Failed to add background scheme to DataStore")
+                    _uiState.update { it.copy(isLoading = false, showVideoPicker = false) }
+                    return@launch
+                }
+                
+                // Wait for seed color write to complete
                 backgroundThemeManager.setSeedColor(seedColor)
                 
+                // Calculate the new index (after the scheme is added)
                 val newIndex = _uiState.value.backgroundSchemes.size
+                
+                // Wait for active index write to complete
                 backgroundThemeManager.setActiveBackgroundIndex(newIndex)
                 
                 _uiState.update { 
@@ -211,11 +235,23 @@ class BackgroundSettingsViewModel @Inject constructor(
                     dimAmount = _uiState.value.dimAmount,
                     name = "GIF 背景 ${_uiState.value.backgroundSchemes.size + 1}"
                 )
-                backgroundThemeManager.addBackgroundScheme(scheme)
+                
+                // Wait for DataStore write to complete before proceeding
+                val success = backgroundThemeManager.addBackgroundScheme(scheme)
+                
+                if (!success) {
+                    android.util.Log.e("BackgroundSettings", "Failed to add background scheme to DataStore")
+                    _uiState.update { it.copy(isLoading = false, showGifPicker = false) }
+                    return@launch
+                }
 
+                // Wait for seed color write to complete
                 backgroundThemeManager.setSeedColor(seedColor)
 
+                // Calculate the new index (after the scheme is added)
                 val newIndex = _uiState.value.backgroundSchemes.size
+                
+                // Wait for active index write to complete
                 backgroundThemeManager.setActiveBackgroundIndex(newIndex)
 
                 _uiState.update {

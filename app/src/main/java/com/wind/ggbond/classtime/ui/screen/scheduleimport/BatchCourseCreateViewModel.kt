@@ -71,6 +71,32 @@ sealed class BatchSaveState {
 }
 
 /**
+ * 冲突类型枚举
+ */
+enum class ConflictType {
+    /** 课程内部时间段冲突 */
+    INTERNAL_SLOT_CONFLICT,
+    /** 批次内课程间冲突 */
+    BATCH_COURSE_CONFLICT,
+    /** 与课表已有课程冲突 */
+    SCHEDULE_CONFLICT
+}
+
+/**
+ * 冲突详情信息
+ */
+data class ConflictInfo(
+    val conflictType: ConflictType,              // 冲突类型
+    val conflictingSlot: TimeSlot? = null,        // 冲突的时间段（内部/批次冲突时）
+    val conflictingCourseName: String = "",       // 冲突的课程名称
+    val conflictingCourseId: Long = 0,            // 冲突的课程ID
+    val conflictWeeks: List<Int> = emptyList(),   // 冲突的周次
+    val conflictSections: IntRange = IntRange.EMPTY, // 冲突的节次范围
+    val dayOfWeek: Int = 0,                       // 冲突发生的星期几
+    val message: String = ""                      // 可读的冲突描述
+)
+
+/**
  * 批量创建课程的ViewModel
  * 支持一次创建多门课程，每门课程可设置多个时间段
  */
@@ -79,7 +105,8 @@ class BatchCourseCreateViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
     private val reminderScheduler: IAlarmScheduler,
-    private val textCourseParser: TextCourseParser
+    private val textCourseParser: TextCourseParser,
+    private val classTimeRepository: com.wind.ggbond.classtime.data.repository.ClassTimeRepository
 ) : ViewModel() {
 
     companion object {
@@ -108,10 +135,27 @@ class BatchCourseCreateViewModel @Inject constructor(
 
     // 当前课表中已有课程的颜色（用于智能分配）
     private var existingColors: List<String> = emptyList()
+    
+    // 最大节次数
+    private val _maxSectionCount = MutableStateFlow(14) // 默认14节
+    val maxSectionCount: StateFlow<Int> = _maxSectionCount.asStateFlow()
+
+    // 当前冲突状态
+    private val _currentConflict = MutableStateFlow<ConflictInfo?>(null)
+    val currentConflict: StateFlow<ConflictInfo?> = _currentConflict.asStateFlow()
 
     init {
         // 初始化时检查课表状态
         checkCurrentScheduleState()
+        // 初始化时获取最大节次数
+        viewModelScope.launch {
+            try {
+                val classTimes = classTimeRepository.getClassTimesByConfigSync()
+                _maxSectionCount.value = classTimes.maxOfOrNull { it.sectionNumber } ?: 14
+            } catch (e: Exception) {
+                Log.w(TAG, "获取最大节次数失败: ${e.message}")
+            }
+        }
     }
 
     // ===================== 课表状态检查 =====================
@@ -503,28 +547,31 @@ class BatchCourseCreateViewModel @Inject constructor(
     }
 
     /**
-     * 更新时间段的星期
+     * 更新时间段的星期（带冲突检测）
      */
     fun updateSlotDayOfWeek(courseId: Long, slotId: Long, dayOfWeek: Int) {
         updateTimeSlot(courseId, slotId) { it.copy(dayOfWeek = dayOfWeek) }
+        detectAndSetConflict(courseId, slotId)
     }
 
     /**
-     * 更新时间段的起始节次
+     * 更新时间段的起始节次（带冲突检测）
      */
     fun updateSlotStartSection(courseId: Long, slotId: Long, startSection: Int) {
         updateTimeSlot(courseId, slotId) {
             it.copy(startSection = startSection.coerceAtLeast(1))
         }
+        detectAndSetConflict(courseId, slotId)
     }
 
     /**
-     * 更新时间段的持续节次
+     * 更新时间段的持续节次（带冲突检测）
      */
     fun updateSlotEndSection(courseId: Long, slotId: Long, sectionCount: Int) {
         updateTimeSlot(courseId, slotId) {
             it.copy(sectionCount = sectionCount.coerceAtLeast(1))
         }
+        detectAndSetConflict(courseId, slotId)
     }
 
     /**
@@ -554,6 +601,19 @@ class BatchCourseCreateViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 检测冲突并更新冲突状态（异步）
+     */
+    private fun detectAndSetConflict(courseId: Long, slotId: Long) {
+        viewModelScope.launch {
+            val course = _courseItems.value.find { it.id == courseId } ?: return@launch
+            val slot = course.timeSlots.find { it.id == slotId } ?: return@launch
+
+            val conflict = checkTimeSlotConflict(courseId, slotId, slot)
+            _currentConflict.value = conflict
+        }
+    }
+
     // ===================== 周次选择器 =====================
 
     /**
@@ -573,7 +633,7 @@ class BatchCourseCreateViewModel @Inject constructor(
     }
 
     /**
-     * 确认周次选择
+     * 确认周次选择（带冲突检测）
      */
     fun confirmWeekSelection(weeks: List<Int>) {
         val state = _showWeekSelector.value ?: return
@@ -581,6 +641,8 @@ class BatchCourseCreateViewModel @Inject constructor(
         if (slotId != null) {
             // 更新时间段自定义周次
             updateSlotCustomWeeks(courseId, slotId, weeks)
+            // 检测冲突（周次变更后需要重新检测）
+            detectAndSetConflict(courseId, slotId)
         } else {
             // 时间段没有周次选择功能，不处理
         }
@@ -600,6 +662,186 @@ class BatchCourseCreateViewModel @Inject constructor(
         } else {
             // 没有全局周次概念，返回空列表
             emptyList()
+        }
+    }
+
+    // ===================== 冲突检测 =====================
+
+    /**
+     * 实时检测时间段冲突
+     * 检测顺序：内部冲突 -> 批次冲突 -> 课表冲突
+     *
+     * @param courseId 课程ID
+     * @param slotId 时间段ID（新增时传-1）
+     * @param slot 要检测的时间段
+     * @return 冲突信息，无冲突返回null
+     */
+    suspend fun checkTimeSlotConflict(courseId: Long, slotId: Long, slot: TimeSlot): ConflictInfo? {
+        val course = _courseItems.value.find { it.id == courseId } ?: return null
+
+        // 如果周次为空，不检测冲突
+        if (slot.customWeeks.isEmpty()) return null
+
+        val newSections = slot.startSection..(slot.startSection + slot.sectionCount - 1)
+
+        // 1. 检测课程内部时间段冲突
+        for (existingSlot in course.timeSlots) {
+            if (existingSlot.id == slotId) continue // 跳过自身
+
+            val internalConflict = checkSlotConflict(slot, existingSlot, course.weeks, course.weeks)
+            if (internalConflict != null) {
+                return internalConflict.copy(
+                    conflictType = ConflictType.INTERNAL_SLOT_CONFLICT,
+                    conflictingCourseName = course.courseName,
+                    conflictingCourseId = course.id,
+                    message = "「${course.courseName}」内部时间段冲突：${internalConflict.message}"
+                )
+            }
+        }
+
+        // 2. 检测批次内其他课程冲突
+        for (otherCourse in _courseItems.value) {
+            if (otherCourse.id == courseId) continue
+
+            for (otherSlot in otherCourse.timeSlots) {
+                val batchConflict = checkSlotConflict(slot, otherSlot, course.weeks, otherCourse.weeks)
+                if (batchConflict != null) {
+                    return batchConflict.copy(
+                        conflictType = ConflictType.BATCH_COURSE_CONFLICT,
+                        conflictingSlot = otherSlot,
+                        conflictingCourseName = otherCourse.courseName,
+                        conflictingCourseId = otherCourse.id,
+                        message = "「${course.courseName}」与「${otherCourse.courseName}」时间冲突：${batchConflict.message}"
+                    )
+                }
+            }
+        }
+
+        // 3. 检测与课表已有课程冲突
+        val schedule = scheduleRepository.getCurrentSchedule() ?: return null
+        val conflicts = courseRepository.detectConflictWithWeeks(
+            scheduleId = schedule.id,
+            dayOfWeek = slot.dayOfWeek,
+            startSection = slot.startSection,
+            sectionCount = slot.sectionCount,
+            weeks = slot.customWeeks
+        )
+
+        if (conflicts.isNotEmpty()) {
+            val conflict = conflicts.first()
+            val conflictWeeks = conflict.weeks.filter { it in slot.customWeeks }
+            val conflictSections = maxOf(slot.startSection, conflict.startSection)..
+                    minOf(slot.startSection + slot.sectionCount - 1, conflict.startSection + conflict.sectionCount - 1)
+
+            return ConflictInfo(
+                conflictType = ConflictType.SCHEDULE_CONFLICT,
+                conflictingCourseName = conflict.courseName,
+                conflictingCourseId = conflict.id,
+                conflictWeeks = conflictWeeks,
+                conflictSections = conflictSections,
+                dayOfWeek = slot.dayOfWeek,
+                message = "「${course.courseName}」与已有课程「${conflict.courseName}」冲突：" +
+                        "星期${getDayOfWeekName(slot.dayOfWeek)} 第${conflictSections.first}-${conflictSections.last}节 " +
+                        "周次${WeekParser.formatWeekList(conflictWeeks)}"
+            )
+        }
+
+        return null
+    }
+
+    /**
+     * 检测两个时间段是否冲突
+     */
+    private fun checkSlotConflict(
+        newSlot: TimeSlot,
+        existingSlot: TimeSlot,
+        newGlobalWeeks: List<Int>,
+        existingGlobalWeeks: List<Int>
+    ): ConflictInfo? {
+        // 星期不同，不冲突
+        if (newSlot.dayOfWeek != existingSlot.dayOfWeek) return null
+
+        // 获取实际使用的周次
+        val newWeeks = newSlot.customWeeks.ifEmpty { newGlobalWeeks }
+        val existingWeeks = existingSlot.customWeeks.ifEmpty { existingGlobalWeeks }
+
+        // 任一周次为空，不冲突
+        if (newWeeks.isEmpty() || existingWeeks.isEmpty()) return null
+
+        // 计算节次范围
+        val newSections = newSlot.startSection..(newSlot.startSection + newSlot.sectionCount - 1)
+        val existingSections = existingSlot.startSection..(existingSlot.startSection + existingSlot.sectionCount - 1)
+
+        // 节次无交集，不冲突
+        val sectionsOverlap = newSections.first <= existingSections.last && existingSections.first <= newSections.last
+        if (!sectionsOverlap) return null
+
+        // 周次无交集，不冲突
+        val overlapWeeks = newWeeks.intersect(existingWeeks.toSet()).toList()
+        if (overlapWeeks.isEmpty()) return null
+
+        // 计算冲突的节次范围
+        val conflictSections = maxOf(newSections.first, existingSections.first)..
+                minOf(newSections.last, existingSections.last)
+
+        return ConflictInfo(
+            conflictType = ConflictType.INTERNAL_SLOT_CONFLICT,
+            conflictingSlot = existingSlot,
+            conflictWeeks = overlapWeeks,
+            conflictSections = conflictSections,
+            dayOfWeek = newSlot.dayOfWeek,
+            message = "星期${getDayOfWeekName(newSlot.dayOfWeek)} 第${conflictSections.first}-${conflictSections.last}节 " +
+                    "周次${WeekParser.formatWeekList(overlapWeeks)}"
+        )
+    }
+
+    /**
+     * 全面验证并检测冲突（保存前调用）
+     * @return 错误信息，null表示验证通过
+     */
+    suspend fun validateAllWithConflictCheck(): String? {
+        // 先进行基础验证
+        val basicError = validateAll()
+        if (basicError != null) return basicError
+
+        val courses = _courseItems.value
+
+        // 检测所有课程的冲突
+        for (course in courses) {
+            for (slot in course.timeSlots) {
+                val conflict = checkTimeSlotConflict(course.id, slot.id, slot)
+                if (conflict != null) {
+                    _currentConflict.value = conflict
+                    return conflict.message
+                }
+            }
+        }
+
+        // 清除冲突状态
+        _currentConflict.value = null
+        return null
+    }
+
+    /**
+     * 清除当前冲突状态
+     */
+    fun clearConflict() {
+        _currentConflict.value = null
+    }
+
+    /**
+     * 获取星期几的中文名称
+     */
+    private fun getDayOfWeekName(dayOfWeek: Int): String {
+        return when (dayOfWeek) {
+            1 -> "一"
+            2 -> "二"
+            3 -> "三"
+            4 -> "四"
+            5 -> "五"
+            6 -> "六"
+            7 -> "日"
+            else -> dayOfWeek.toString()
         }
     }
 
@@ -645,17 +887,16 @@ class BatchCourseCreateViewModel @Inject constructor(
      * 保存所有课程到数据库
      */
     fun saveAll() {
-        // 验证
-        val error = validateAll()
-        if (error != null) {
-            _saveState.value = BatchSaveState.Error(error)
-            return
-        }
-
         _saveState.value = BatchSaveState.Saving
 
         viewModelScope.launch {
             try {
+                // 使用全面验证（包含冲突检测）
+                val error = validateAllWithConflictCheck()
+                if (error != null) {
+                    _saveState.value = BatchSaveState.Error(error)
+                    return@launch
+                }
                 // 获取当前课表
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule == null) {
