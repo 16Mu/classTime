@@ -25,7 +25,8 @@ android {
 
     buildTypes {
         debug {
-            // Ensure BuildConfig is generated for debug builds
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
         release {
             isMinifyEnabled = true
