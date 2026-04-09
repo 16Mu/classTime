@@ -3,6 +3,7 @@ package com.wind.ggbond.classtime.data.repository
 import android.content.Context
 import com.wind.ggbond.classtime.data.local.dao.CourseDao
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.CourseColorPalette
 import com.wind.ggbond.classtime.widget.WidgetRefreshHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -206,13 +207,17 @@ class CourseRepository @Inject constructor(
         val colorMapping = CourseColorPalette.assignColorsForCourses(courseNames)
         
         var updatedCount = 0
+        val toUpdate = mutableListOf<Course>()
         courses.forEach { course ->
             val newColor = colorMapping[course.courseName] ?: CourseColorPalette.getColorByIndex(0)
-            // 只更新颜色不同的课程
             if (course.color != newColor) {
-                updateCourse(course.copy(color = newColor))
+                toUpdate.add(course.copy(color = newColor))
                 updatedCount++
             }
+        }
+        if (toUpdate.isNotEmpty()) {
+            courseDao.updateCourses(toUpdate)
+            notifyWidgetRefresh()
         }
         
         return updatedCount
@@ -226,7 +231,6 @@ class CourseRepository @Inject constructor(
      * @return 更新的课程数量
      */
     suspend fun enableAllCoursesReminder(scheduleId: Long, defaultReminderMinutes: Int): Int {
-        // 添加重试机制，确保能够获取到课程数据
         var courses: List<Course> = emptyList()
         var retryCount = 0
         val maxRetries = 3
@@ -235,54 +239,38 @@ class CourseRepository @Inject constructor(
             courses = try {
                 getAllCoursesBySchedule(scheduleId).first()
             } catch (e: Exception) {
-                android.util.Log.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries", e)
+                AppLogger.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries")
                 emptyList()
             }
             
             if (courses.isEmpty()) {
                 retryCount++
                 if (retryCount < maxRetries) {
-                    // 等待100ms后重试
                     kotlinx.coroutines.delay(100)
                 }
             }
         }
         
         if (courses.isEmpty()) {
-            android.util.Log.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
+            AppLogger.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
             return 0
         }
         
-        android.util.Log.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量开启提醒")
-        
-        var updatedCount = 0
-        
-        courses.forEach { course ->
-            // 如果课程的提醒未开启，则开启并设置提醒时间
-            if (!course.reminderEnabled) {
-                val updatedCourse = course.copy(
-                    reminderEnabled = true,
-                    reminderMinutes = if (course.reminderMinutes > 0) course.reminderMinutes else defaultReminderMinutes,
-                    updatedAt = System.currentTimeMillis()
-                )
-                updateCourse(updatedCourse)
-                updatedCount++
-                android.util.Log.d("CourseRepository", "已开启课程提醒: ${course.courseName}")
-            }
-        }
-        
-        android.util.Log.d("CourseRepository", "批量开启提醒完成，共更新 $updatedCount 门课程")
-        return updatedCount
+        AppLogger.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量开启提醒")
+
+        courseDao.updateReminderBySchedule(
+            scheduleId = scheduleId,
+            enabled = true,
+            minutes = defaultReminderMinutes,
+            updatedAt = System.currentTimeMillis()
+        )
+        notifyWidgetRefresh()
+
+        AppLogger.d("CourseRepository", "批量开启提醒完成")
+        return courses.size
     }
     
-    /**
-     * ✅ 新增：批量关闭所有课程的提醒
-     * 
-     * @param scheduleId 课表ID
-     * @return 更新的课程数量
-     */
     suspend fun disableAllCoursesReminder(scheduleId: Long): Int {
-        // 添加重试机制，确保能够获取到课程数据
         var courses: List<Course> = emptyList()
         var retryCount = 0
         val maxRetries = 3
@@ -291,42 +279,34 @@ class CourseRepository @Inject constructor(
             courses = try {
                 getAllCoursesBySchedule(scheduleId).first()
             } catch (e: Exception) {
-                android.util.Log.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries", e)
+                AppLogger.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries")
                 emptyList()
             }
             
             if (courses.isEmpty()) {
                 retryCount++
                 if (retryCount < maxRetries) {
-                    // 等待100ms后重试
                     kotlinx.coroutines.delay(100)
                 }
             }
         }
         
         if (courses.isEmpty()) {
-            android.util.Log.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
+            AppLogger.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
             return 0
         }
         
-        android.util.Log.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量关闭提醒")
-        
-        var updatedCount = 0
-        
-        courses.forEach { course ->
-            // 如果课程的提醒已开启，则关闭
-            if (course.reminderEnabled) {
-                val updatedCourse = course.copy(
-                    reminderEnabled = false,
-                    updatedAt = System.currentTimeMillis()
-                )
-                updateCourse(updatedCourse)
-                updatedCount++
-                android.util.Log.d("CourseRepository", "已关闭课程提醒: ${course.courseName}")
-            }
-        }
-        
-        android.util.Log.d("CourseRepository", "批量关闭提醒完成，共更新 $updatedCount 门课程")
+        AppLogger.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量关闭提醒")
+
+        val updatedCount = courseDao.updateReminderBySchedule(
+            scheduleId = scheduleId,
+            enabled = false,
+            minutes = 0,
+            updatedAt = System.currentTimeMillis()
+        )
+        if (updatedCount > 0) notifyWidgetRefresh()
+
+        AppLogger.d("CourseRepository", "批量关闭提醒完成，共更新 $updatedCount 门课程")
         return updatedCount
     }
 }

@@ -1,6 +1,5 @@
 package com.wind.ggbond.classtime.domain.usecase
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.util.CourseColorPalette
@@ -9,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 @Singleton
@@ -32,7 +32,7 @@ class ClipboardUseCase @Inject constructor(
     
     fun copyCourse(course: Course, sourceWeekNumber: Int) {
         _clipboard.value = Pair(course, sourceWeekNumber)
-        Log.d(TAG, "✅ 课程已复制到剪贴板: ${course.courseName} (周$sourceWeekNumber)")
+        AppLogger.d(TAG, "✅ 课程已复制到剪贴板: ${course.courseName} (周$sourceWeekNumber)")
     }
     
     suspend fun pasteCourse(
@@ -52,7 +52,7 @@ class ClipboardUseCase @Inject constructor(
             )
             
             if (conflicts.isNotEmpty()) {
-                Log.w(TAG, "粘贴失败：目标时间段已有课程")
+                AppLogger.w(TAG, "粘贴失败：目标时间段已有课程")
                 return false
             }
             
@@ -67,10 +67,10 @@ class ClipboardUseCase @Inject constructor(
             
             courseRepository.insertCourse(newCourse)
             
-            Log.d(TAG, "课程已粘贴到周$targetWeekNumber 星期$dayOfWeek 第$startSection: ${newCourse.courseName}")
+            AppLogger.d(TAG, "课程已粘贴到周$targetWeekNumber 星期$dayOfWeek 第$startSection: ${newCourse.courseName}")
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "粘贴课程失败", e)
+            AppLogger.e(TAG, "粘贴课程失败", e)
             return false
         }
     }
@@ -135,9 +135,9 @@ class ClipboardUseCase @Inject constructor(
                 courseRepository.insertCourse(newCourse)
                 successCount++
                 
-                Log.d(TAG, "✅ 导入课程成功: ${parsed.courseName}")
+                AppLogger.d(TAG, "✅ 导入课程成功: ${parsed.courseName}")
             } catch (e: Exception) {
-                Log.e(TAG, "导入课程失败: ${parsed.courseName}", e)
+                AppLogger.e(TAG, "导入课程失败: ${parsed.courseName}", e)
                 errorMessages.add("${parsed.courseName}: ${e.message}")
             }
         }

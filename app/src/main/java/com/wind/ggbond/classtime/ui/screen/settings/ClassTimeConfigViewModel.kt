@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 
 /**
  * 上下课时间配置 ViewModel
@@ -102,8 +103,6 @@ class ClassTimeConfigViewModel @Inject constructor(
             scheduleRepository.getCurrentScheduleFlow().collect { schedule ->
                 _currentSchedule.value = schedule
                 _currentConfigName.value = schedule?.classTimeConfigName ?: "default"
-                // 重新加载时间配置
-                loadClassTimes()
             }
         }
     }
@@ -333,21 +332,15 @@ class ClassTimeConfigViewModel @Inject constructor(
         val totalSections = morningSections + afternoonSections
         val configName = _currentConfigName.value
         
-        // 如果总节次为0，清空所有课程时间
         if (totalSections == 0) {
             classTimeRepository.deleteAllByConfig(configName)
             return
         }
         
-        // 删除所有现有时间
-        classTimeRepository.deleteAllByConfig(configName)
-        
-        // 生成新的时间表
         val newTimes = mutableListOf<ClassTime>()
         val breakMinutes = _breakDuration.value.toLong()
-        val defaultDuration = _classDuration.value.toLong() // 使用用户设置的课程时长
+        val defaultDuration = _classDuration.value.toLong()
         
-        // 上午课程 (从8:00开始)
         var currentStartTime = LocalTime.of(8, 0)
         for (i in 1..morningSections) {
             val endTime = currentStartTime.plusMinutes(defaultDuration)
@@ -362,13 +355,9 @@ class ClassTimeConfigViewModel @Inject constructor(
             currentStartTime = endTime.plusMinutes(breakMinutes)
         }
         
-        // 下午课程 (从14:00开始，保证午休间隔)
         if (afternoonSections > 0) {
-            // 无论上午是否有课，下午统一从14:00开始（保证午休时间）
-            // 如果上午课程结束时间晚于14:00，则在上午结束后加30分钟午休
             val afternoonDefaultStart = LocalTime.of(14, 0)
             currentStartTime = if (morningSections > 0 && currentStartTime.isAfter(afternoonDefaultStart)) {
-                // 上午课已超过14:00，加30分钟午休
                 currentStartTime.plusMinutes(30)
             } else {
                 afternoonDefaultStart
@@ -389,9 +378,13 @@ class ClassTimeConfigViewModel @Inject constructor(
             }
         }
         
-        // 插入新的课程时间
-        if (newTimes.isNotEmpty()) {
-            classTimeRepository.insertAll(newTimes)
+        try {
+            classTimeRepository.deleteAllByConfig(configName)
+            if (newTimes.isNotEmpty()) {
+                classTimeRepository.insertAll(newTimes)
+            }
+        } catch (e: Exception) {
+            AppLogger.e("ClassTimeConfig", "重新生成课程时间失败", e)
         }
     }
     

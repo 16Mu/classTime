@@ -48,6 +48,14 @@ fun ReminderSettingsScreen(
     val showMinutesSelector by viewModel.showMinutesSelector.collectAsState()
     val showReminderTestDialog by viewModel.showReminderTestDialog.collectAsState()
     val haptic = LocalHapticFeedback.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        viewModel.messageEvent.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     // 页面每次可见时刷新权限状态
     LaunchedEffect(Unit) {
@@ -55,6 +63,7 @@ fun ReminderSettingsScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加

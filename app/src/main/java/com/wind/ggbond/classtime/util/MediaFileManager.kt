@@ -2,22 +2,12 @@ package com.wind.ggbond.classtime.util
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/**
- * 媒体文件管理器 - 负责将用户选择的媒体文件复制到应用私有存储
- * 
- * 优势：
- * 1. 不依赖外部文件的生命周期
- * 2. 用户删除原文件不影响应用
- * 3. 不需要持久化 URI 权限
- * 4. 应用卸载时自动清理
- */
 class MediaFileManager(private val context: Context) {
     
     companion object {
@@ -25,138 +15,168 @@ class MediaFileManager(private val context: Context) {
         private const val BACKGROUNDS_DIR = "backgrounds"
     }
     
-    /**
-     * 获取背景文件存储目录
-     */
     private fun getBackgroundsDir(): File {
         val dir = File(context.filesDir, BACKGROUNDS_DIR)
         if (!dir.exists()) {
-            dir.mkdirs()
+            val created = dir.mkdirs()
+            AppLogger.d(TAG, "Created directory: ${dir.absolutePath}, success=$created")
+        } else {
+            AppLogger.d(TAG, "Directory exists: ${dir.absolutePath}")
         }
         return dir
     }
     
-    /**
-     * 将 URI 指向的文件复制到应用私有存储
-     * 
-     * @param sourceUri 源文件 URI
-     * @param fileExtension 文件扩展名（如 "jpg", "png", "gif", "mp4"）
-     * @return 复制后的本地文件 URI，失败返回 null
-     */
     suspend fun copyMediaToPrivateStorage(
         sourceUri: Uri,
         fileExtension: String
     ): Uri? = withContext(Dispatchers.IO) {
+        AppLogger.d(TAG, "文件复制 START | sourceUri=$sourceUri | extension=$fileExtension")
+        
         try {
-            Log.d(TAG, "Copying media from URI: $sourceUri")
-            
-            // 生成唯一文件名
             val fileName = "${UUID.randomUUID()}.$fileExtension"
             val destFile = File(getBackgroundsDir(), fileName)
+            AppLogger.d(TAG, "目标文件路径: ${destFile.absolutePath}")
             
-            // 复制文件
+            var bytesCopied = 0L
+            
             context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                AppLogger.d(TAG, "成功打开源文件的输入流")
+                
                 FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
+                    bytesCopied = input.copyTo(output)
+                    val sizeInKB = bytesCopied / 1024
+                    AppLogger.d(TAG, "文件复制完成 | $bytesCopied bytes ($sizeInKB KB)")
                 }
             } ?: run {
-                Log.e(TAG, "Failed to open input stream for URI: $sourceUri")
+                AppLogger.e(TAG, "无法打开源文件的输入流 | URI: $sourceUri")
                 return@withContext null
             }
             
-            Log.d(TAG, "Media copied successfully to: ${destFile.absolutePath}")
-            
-            // 返回本地文件的 URI
-            Uri.fromFile(destFile)
+            if (destFile.exists()) {
+                val fileSize = destFile.length()
+                AppLogger.d(TAG, "SUCCESS: 目标文件已创建 | ${fileSize / 1024} KB")
+                Uri.fromFile(destFile)
+            } else {
+                AppLogger.e(TAG, "复制完成后目标文件不存在 | ${destFile.absolutePath}")
+                null
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy media to private storage", e)
+            AppLogger.e(TAG, "文件复制异常 | sourceUri=$sourceUri", e)
             null
         }
     }
     
-    /**
-     * 删除指定的背景文件
-     * 
-     * @param fileUri 文件 URI
-     * @return 是否删除成功
-     */
     suspend fun deleteBackgroundFile(fileUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        AppLogger.d(TAG, "deleteBackgroundFile START: fileUri=$fileUri")
+        
         try {
-            val file = File(fileUri.path ?: return@withContext false)
-            if (file.exists() && file.parentFile?.name == BACKGROUNDS_DIR) {
-                val deleted = file.delete()
-                Log.d(TAG, "Deleted background file: ${file.name}, success: $deleted")
-                deleted
+            val filePath = fileUri.path
+            
+            val file = File(filePath ?: run {
+                AppLogger.e(TAG, "No file path in URI")
+                return@withContext false
+            })
+            
+            if (file.exists()) {
+                val backgroundsDir = File(context.filesDir, BACKGROUNDS_DIR)
+                
+                if (file.canonicalPath.startsWith(backgroundsDir.canonicalPath)) {
+                    val deleted = file.delete()
+                    AppLogger.d(TAG, "deleteBackgroundFile Result: deleted=$deleted")
+                    deleted
+                } else {
+                    AppLogger.w(TAG, "SECURITY: File not in backgrounds directory, refusing delete")
+                    false
+                }
             } else {
-                Log.w(TAG, "File does not exist or not in backgrounds directory: ${file.absolutePath}")
+                AppLogger.w(TAG, "WARNING: File does not exist: ${file.absolutePath}")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to delete background file", e)
+            AppLogger.e(TAG, "deleteBackgroundFile EXCEPTION", e)
             false
         }
     }
     
-    /**
-     * 清理所有背景文件
-     * 
-     * @return 删除的文件数量
-     */
     suspend fun clearAllBackgrounds(): Int = withContext(Dispatchers.IO) {
+        AppLogger.d(TAG, "clearAllBackgrounds START")
+        
         try {
             val dir = getBackgroundsDir()
-            val files = dir.listFiles() ?: return@withContext 0
+            val files = dir.listFiles()
+            
+            if (files == null) {
+                AppLogger.w(TAG, "Cannot list files in directory")
+                return@withContext 0
+            }
+            
+            AppLogger.d(TAG, "Found ${files.size} files to clear")
             
             var deletedCount = 0
+            
             files.forEach { file ->
                 if (file.delete()) {
                     deletedCount++
+                    AppLogger.d(TAG, "Deleted: ${file.name}")
+                } else {
+                    AppLogger.w(TAG, "Failed to delete: ${file.name}")
                 }
             }
             
-            Log.d(TAG, "Cleared $deletedCount background files")
+            AppLogger.d(TAG, "END: Deleted $deletedCount files")
             deletedCount
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear backgrounds", e)
+            AppLogger.e(TAG, "clearAllBackgrounds EXCEPTION", e)
             0
         }
     }
     
-    /**
-     * 获取背景文件的大小（字节）
-     */
-    fun getBackgroundFileSize(fileUri: Uri): Long {
-        return try {
-            val file = File(fileUri.path ?: return 0L)
-            if (file.exists()) file.length() else 0L
+    suspend fun getBackgroundFileSize(fileUri: Uri): Long = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val filePath = fileUri.path
+            val file = File(filePath ?: return@withContext 0L)
+            
+            if (file.exists()) {
+                val size = file.length()
+                AppLogger.d(TAG, "getBackgroundFileSize File exists, size=$size bytes")
+                size
+            } else {
+                AppLogger.w(TAG, "getBackgroundFileSize File does not exist")
+                0L
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get file size", e)
+            AppLogger.e(TAG, "getBackgroundFileSize EXCEPTION", e)
             0L
         }
     }
     
-    /**
-     * 获取所有背景文件的总大小（字节）
-     */
-    fun getTotalBackgroundsSize(): Long {
-        return try {
+    suspend fun getTotalBackgroundsSize(): Long = withContext(Dispatchers.IO) {
+        return@withContext try {
             val dir = getBackgroundsDir()
-            val files = dir.listFiles() ?: return 0L
-            files.sumOf { it.length() }
+            val files = dir.listFiles() ?: run {
+                AppLogger.d(TAG, "getTotalBackgroundsSize No files found")
+                return@withContext 0L
+            }
+            
+            val totalSize = files.sumOf { it.length() }
+            AppLogger.d(TAG, "getTotalBackgroundsSize END: ${files.size} files, total=${totalSize / 1024} KB")
+            totalSize
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get total size", e)
+            AppLogger.e(TAG, "getTotalBackgroundsSize EXCEPTION", e)
             0L
         }
     }
     
-    /**
-     * 检查文件是否存在
-     */
-    fun fileExists(fileUri: Uri): Boolean {
-        return try {
-            val file = File(fileUri.path ?: return false)
-            file.exists()
+    suspend fun fileExists(fileUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        val filePath = fileUri.path
+        
+        return@withContext try {
+            val file = File(filePath ?: return@withContext false)
+            val exists = file.exists()
+            AppLogger.d(TAG, "fileExists uri=$fileUri, exists=$exists")
+            exists
         } catch (e: Exception) {
+            AppLogger.e(TAG, "fileExists EXCEPTION", e)
             false
         }
     }

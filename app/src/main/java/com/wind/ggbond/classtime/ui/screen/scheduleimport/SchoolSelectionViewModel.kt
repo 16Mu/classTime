@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.Collator
 import java.util.Locale
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -74,10 +75,10 @@ class SchoolSelectionViewModel @Inject constructor(
     val schoolGroups: StateFlow<List<SchoolGroup>> = schoolRepository
         .getAllProvinces()
         .onEach { provinces ->
-            android.util.Log.d("SchoolSelectionViewModel", "getAllProvinces 更新，省份数量：${provinces.size}")
+            AppLogger.d("SchoolSelectionViewModel", "getAllProvinces 更新，省份数量：${provinces.size}")
         }
         .flatMapLatest { provinces ->
-            android.util.Log.d("SchoolSelectionViewModel", "flatMapLatest 处理，省份：$provinces")
+            AppLogger.d("SchoolSelectionViewModel", "flatMapLatest 处理，省份：$provinces")
             if (provinces.isEmpty()) {
                 flowOf(emptyList())
             } else {
@@ -85,7 +86,7 @@ class SchoolSelectionViewModel @Inject constructor(
                     provinces.map { province ->
                         schoolRepository.getSchoolsByProvince(province)
                             .onEach { schools ->
-                                android.util.Log.d("SchoolSelectionViewModel", "省份 $province 的学校数量：${schools.size}")
+                                AppLogger.d("SchoolSelectionViewModel", "省份 $province 的学校数量：${schools.size}")
                             }
                             .map { schools -> province to schools }
                     }
@@ -93,7 +94,7 @@ class SchoolSelectionViewModel @Inject constructor(
                     val groups = provinceSchoolsArray
                         .map { (province, schools) -> SchoolGroup(province, schools) }
                         .sortedWith(compareBy(Collator.getInstance(Locale.CHINESE)) { it.province })
-                    android.util.Log.d("SchoolSelectionViewModel", "schoolGroups 更新，分组数量：${groups.size}")
+                    AppLogger.d("SchoolSelectionViewModel", "schoolGroups 更新，分组数量：${groups.size}")
                     groups
                 }
             }
@@ -146,15 +147,15 @@ class SchoolSelectionViewModel @Inject constructor(
     init {
         // 初始化学校数据
         viewModelScope.launch {
-            android.util.Log.d("SchoolSelectionViewModel", "开始初始化学校数据...")
+            AppLogger.d("SchoolSelectionViewModel", "开始初始化学校数据...")
             _isLoading.value = true
             try {
                 // 检查数据库中是否已有数据
                 val initialCount = schoolRepository.getAllSchools().first().size
-                android.util.Log.d("SchoolSelectionViewModel", "初始化前数据库中的学校数量：$initialCount")
+                AppLogger.d("SchoolSelectionViewModel", "初始化前数据库中的学校数量：$initialCount")
                 
                 // 从 assets 加载数据
-                android.util.Log.d("SchoolSelectionViewModel", "开始从 assets 加载学校数据...")
+                AppLogger.d("SchoolSelectionViewModel", "开始从 assets 加载学校数据...")
                 schoolRepository.initializeSchoolsFromAssets()
                 
                 // 等待一小段时间确保数据库写入完成
@@ -162,27 +163,27 @@ class SchoolSelectionViewModel @Inject constructor(
                 
                 // 验证数据是否加载成功
                 val schoolCount = schoolRepository.getAllSchools().first().size
-                android.util.Log.d("SchoolSelectionViewModel", "数据加载完成，学校数量：$schoolCount")
+                AppLogger.d("SchoolSelectionViewModel", "数据加载完成，学校数量：$schoolCount")
                 
                 // 检查省份列表
                 val provinces = schoolRepository.getAllProvinces().first()
-                android.util.Log.d("SchoolSelectionViewModel", "省份列表：$provinces")
+                AppLogger.d("SchoolSelectionViewModel", "省份列表：$provinces")
                 
                 // 检查是否有启用的学校
                 val enabledSchools = schoolRepository.getAllSchools().first()
-                android.util.Log.d("SchoolSelectionViewModel", "启用的学校数量：${enabledSchools.size}")
+                AppLogger.d("SchoolSelectionViewModel", "启用的学校数量：${enabledSchools.size}")
                 
                 if (enabledSchools.isNotEmpty()) {
-                    android.util.Log.d("SchoolSelectionViewModel", "第一个启用的学校：${enabledSchools.first().name}")
+                    AppLogger.d("SchoolSelectionViewModel", "第一个启用的学校：${enabledSchools.first().name}")
                 } else {
-                    android.util.Log.w("SchoolSelectionViewModel", "⚠️ 没有启用的学校！")
+                    AppLogger.w("SchoolSelectionViewModel", "⚠️ 没有启用的学校！")
                 }
                 
             } catch (e: Exception) {
-                android.util.Log.e("SchoolSelectionViewModel", "数据加载失败", e)
+                AppLogger.e("SchoolSelectionViewModel", "数据加载失败", e)
             } finally {
                 _isLoading.value = false
-                android.util.Log.d("SchoolSelectionViewModel", "初始化完成，loading状态：${_isLoading.value}")
+                AppLogger.d("SchoolSelectionViewModel", "初始化完成，loading状态：${_isLoading.value}")
             }
         }
     }
@@ -225,7 +226,7 @@ class SchoolSelectionViewModel @Inject constructor(
                     prefs[DataStoreManager.SettingsKeys.RECENT_SCHOOLS_KEY] = gson.toJson(trimmedIds)
                 }
             } catch (e: Exception) {
-                android.util.Log.e("SchoolSelectionViewModel", "保存最近使用学校失败", e)
+                AppLogger.e("SchoolSelectionViewModel", "保存最近使用学校失败", e)
             }
         }
     }

@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Schedule
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.data.repository.ClassTimeRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
@@ -49,6 +50,7 @@ class ExportService @Inject constructor(
     suspend fun exportToJson(scheduleId: Long): ExportResult {
         return try {
             val schedule = scheduleRepository.getScheduleById(scheduleId)
+                ?: return ExportResult(success = false, errorMessage = "未找到课表信息")
             val courseList = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             val classTimes = classTimeRepository.getClassTimesByConfigSync()
             
@@ -85,6 +87,7 @@ class ExportService @Inject constructor(
                 "courses" to courseList.map { course ->
                     mapOf(
                         "courseName" to course.courseName,
+                        "courseCode" to course.courseCode,
                         "teacher" to course.teacher,
                         "classroom" to course.classroom,
                         "dayOfWeek" to course.dayOfWeek,
@@ -150,6 +153,7 @@ class ExportService @Inject constructor(
     suspend fun exportToCsv(scheduleId: Long): ExportResult {
         return try {
             val schedule = scheduleRepository.getScheduleById(scheduleId)
+                ?: return ExportResult(success = false, errorMessage = "未找到课表信息")
             val courseList = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             val classTimes = classTimeRepository.getClassTimesByConfigSync()
             
@@ -174,6 +178,7 @@ class ExportService @Inject constructor(
     suspend fun exportToText(scheduleId: Long): ExportResult {
         return try {
             val schedule = scheduleRepository.getScheduleById(scheduleId)
+                ?: return ExportResult(success = false, errorMessage = "未找到课表信息")
             val courseList = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             val classTimes = classTimeRepository.getClassTimesByConfigSync()
             
@@ -198,6 +203,7 @@ class ExportService @Inject constructor(
     suspend fun exportToHtml(scheduleId: Long): ExportResult {
         return try {
             val schedule = scheduleRepository.getScheduleById(scheduleId)
+                ?: return ExportResult(success = false, errorMessage = "未找到课表信息")
             val courseList = courseRepository.getAllCoursesBySchedule(scheduleId).first()
             val classTimes = classTimeRepository.getClassTimesByConfigSync()
             
@@ -223,7 +229,12 @@ class ExportService @Inject constructor(
         try {
             val file = File(filePath)
             if (!file.exists()) {
-                Toast.makeText(context, "文件不存在", Toast.LENGTH_SHORT).show()
+                android.widget.Toast.makeText(context, "文件不存在", android.widget.Toast.LENGTH_SHORT).show()
+                return
+            }
+            val exportDir = File(context.cacheDir, "export")
+            if (!file.canonicalPath.startsWith(exportDir.canonicalPath)) {
+                AppLogger.e("ExportService", "非法文件路径: $filePath")
                 return
             }
             
@@ -239,7 +250,9 @@ class ExportService @Inject constructor(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (e: Exception) {
-            Toast.makeText(context, "分享失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, "分享失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+            }
         }
     }
     

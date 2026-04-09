@@ -1,7 +1,7 @@
 package com.wind.ggbond.classtime.util
 
-import android.util.Log
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -47,7 +47,7 @@ class TextCourseParser @Inject constructor() {
      * @return 解析结果列表（支持多门课程）
      */
     fun parse(text: String): List<ParsedTextCourse> {
-        Log.d(TAG, "开始解析文本: ${text.take(100)}...")
+        AppLogger.d(TAG, "开始解析文本: ${text.take(100)}...")
         
         // 清理文本：去除多余空白，保留换行
         val cleanText = text.trim()
@@ -57,7 +57,7 @@ class TextCourseParser @Inject constructor() {
         
         // 尝试分割多门课程
         val courseTexts = splitMultipleCourses(cleanText)
-        Log.d(TAG, "识别到 ${courseTexts.size} 门课程")
+        AppLogger.d(TAG, "识别到 ${courseTexts.size} 门课程")
         
         return courseTexts.mapNotNull { courseText ->
             parseSingleCourse(courseText)
@@ -207,7 +207,7 @@ class TextCourseParser @Inject constructor() {
             rawText = text
         )
         
-        Log.d(TAG, "解析结果: $result")
+        AppLogger.d(TAG, "解析结果: $result")
         return result
     }
     
@@ -255,8 +255,8 @@ class TextCourseParser @Inject constructor() {
         // 清理多余空格
         val cleaned = weekText.trim()
         
-        Log.d(TAG, "原始文本: $line")
-        Log.d(TAG, "处理后周次: $cleaned")
+        AppLogger.d(TAG, "原始文本: $line")
+        AppLogger.d(TAG, "处理后周次: $cleaned")
         
         return cleaned
     }

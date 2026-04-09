@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
@@ -31,14 +33,14 @@ class MediaFileManagerTest {
 
     @Before
     fun setup() {
-        // 创建临时文件目录
+        mockkObject(AppLogger)
+        every { AppLogger.d(any(), any()) } returns Unit
+        every { AppLogger.e(any(), any()) } returns Unit
+        every { AppLogger.w(any(), any()) } returns Unit
+        every { AppLogger.i(any(), any()) } returns Unit
         filesDir = tempFolder.newFolder("app_files")
-        
-        // Mock Context
         context = mockk<Context>(relaxed = true)
         every { context.filesDir } returns filesDir
-        
-        // 创建 MediaFileManager
         mediaFileManager = MediaFileManager(context)
     }
 
@@ -112,25 +114,21 @@ class MediaFileManagerTest {
     }
 
     @Test
-    fun `test getBackgroundFileSize returns correct size`() {
-        // 创建测试文件
+    fun `test getBackgroundFileSize returns correct size`() = runTest {
         val backgroundsDir = File(filesDir, "backgrounds")
         backgroundsDir.mkdirs()
         val testFile = File(backgroundsDir, "test.jpg")
         val testContent = "test content with some length"
         testFile.writeText(testContent)
         
-        // 获取文件大小
         val fileUri = Uri.fromFile(testFile)
         val size = mediaFileManager.getBackgroundFileSize(fileUri)
         
-        // 验证结果
         assertEquals("File size should match", testContent.length.toLong(), size)
     }
 
     @Test
-    fun `test getTotalBackgroundsSize calculates total correctly`() {
-        // 创建多个测试文件
+    fun `test getTotalBackgroundsSize calculates total correctly`() = runTest {
         val backgroundsDir = File(filesDir, "backgrounds")
         backgroundsDir.mkdirs()
         
@@ -143,41 +141,33 @@ class MediaFileManagerTest {
         file1.writeText(content1)
         file2.writeText(content2)
         
-        // 获取总大小
         val totalSize = mediaFileManager.getTotalBackgroundsSize()
         
-        // 验证结果
         val expectedSize = content1.length.toLong() + content2.length.toLong()
         assertEquals("Total size should match sum of all files", expectedSize, totalSize)
     }
 
     @Test
-    fun `test fileExists returns true for existing file`() {
-        // 创建测试文件
+    fun `test fileExists returns true for existing file`() = runTest {
         val backgroundsDir = File(filesDir, "backgrounds")
         backgroundsDir.mkdirs()
         val testFile = File(backgroundsDir, "test.jpg")
         testFile.writeText("test")
         
-        // 检查文件是否存在
         val fileUri = Uri.fromFile(testFile)
         val exists = mediaFileManager.fileExists(fileUri)
         
-        // 验证结果
         assertTrue("File should exist", exists)
     }
 
     @Test
-    fun `test fileExists returns false for non-existing file`() {
-        // 创建不存在的文件 URI
+    fun `test fileExists returns false for non-existing file`() = runTest {
         val backgroundsDir = File(filesDir, "backgrounds")
         val nonExistingFile = File(backgroundsDir, "nonexisting.jpg")
         val fileUri = Uri.fromFile(nonExistingFile)
         
-        // 检查文件是否存在
         val exists = mediaFileManager.fileExists(fileUri)
         
-        // 验证结果
         assertFalse("File should not exist", exists)
     }
 }

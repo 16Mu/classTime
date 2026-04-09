@@ -47,6 +47,12 @@ interface SchoolDao {
     
     @Query("SELECT * FROM schools WHERE isEnabled = 1 AND province = :province ORDER BY name")
     fun getSchoolsByProvince(province: String): Flow<List<SchoolEntity>>
+
+    @Transaction
+    suspend fun replaceAllSchools(schools: List<SchoolEntity>) {
+        deleteAllSchools()
+        insertSchools(schools)
+    }
 }
 
 

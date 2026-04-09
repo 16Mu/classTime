@@ -28,19 +28,15 @@ class CourseUseCase @Inject constructor(
         courses: List<Course>,
         weekNumber: Int
     ): Map<Int, List<Course>> {
-        return weekCoursesCache[weekNumber] ?: run {
-            val coursesMap = (1..7).associateWith { dayOfWeek ->
+        return weekCoursesCache.computeIfAbsent(weekNumber) {
+            if (weekCoursesCache.size >= CACHE_MAX_SIZE) {
+                weekCoursesCache.keys.firstOrNull()?.let { key -> weekCoursesCache.remove(key) }
+            }
+            (1..7).associateWith { dayOfWeek ->
                 courses.filter {
                     it.dayOfWeek == dayOfWeek && weekNumber in it.weeks
                 }.sortedBy { it.startSection }
             }
-            
-            if (weekCoursesCache.size >= CACHE_MAX_SIZE) {
-                weekCoursesCache.keys.firstOrNull()?.let { weekCoursesCache.remove(it) }
-            }
-            
-            weekCoursesCache[weekNumber] = coursesMap
-            coursesMap
         }
     }
     
@@ -53,22 +49,17 @@ class CourseUseCase @Inject constructor(
             currentWeek - 2, currentWeek - 1,
             currentWeek + 1, currentWeek + 2
         )
-        
-        val preparedMaps = mutableMapOf<Int, Map<Int, List<Course>>>()
-        
+
         weeksToPreload.forEach { week ->
-            if (week in 1..totalWeeks && !weekCoursesCache.containsKey(week)) {
-                val coursesMap = (1..7).associateWith { dayOfWeek ->
-                    coursesList.filter {
-                        it.dayOfWeek == dayOfWeek && week in it.weeks
-                    }.sortedBy { it.startSection }
+            if (week in 1..totalWeeks) {
+                weekCoursesCache.computeIfAbsent(week) {
+                    (1..7).associateWith { dayOfWeek ->
+                        coursesList.filter {
+                            it.dayOfWeek == dayOfWeek && week in it.weeks
+                        }.sortedBy { it.startSection }
+                    }
                 }
-                preparedMaps[week] = coursesMap
             }
-        }
-        
-        preparedMaps.forEach { (week, map) ->
-            weekCoursesCache.putIfAbsent(week, map)
         }
     }
     
@@ -77,14 +68,17 @@ class CourseUseCase @Inject constructor(
     }
     
     suspend fun deleteCourse(course: Course) {
+        weekCoursesCache.clear()
         courseRepository.deleteCourse(course)
     }
     
     suspend fun updateCourse(course: Course) {
+        weekCoursesCache.clear()
         courseRepository.updateCourse(course)
     }
     
     suspend fun insertCourse(course: Course): Long {
+        weekCoursesCache.clear()
         return courseRepository.insertCourse(course)
     }
     
@@ -99,6 +93,9 @@ class CourseUseCase @Inject constructor(
         sectionCount: Int,
         excludeCourseId: Long? = null
     ): List<Course> {
+        require(dayOfWeek in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) { "dayOfWeek 超出范围: $dayOfWeek" }
+        require(startSection >= Constants.Course.MIN_SECTION_NUMBER) { "startSection 超出范围: $startSection" }
+        require(sectionCount >= 1) { "sectionCount 必须大于0: $sectionCount" }
         return courseRepository.detectConflict(
             scheduleId,
             dayOfWeek,
@@ -116,6 +113,9 @@ class CourseUseCase @Inject constructor(
         weeks: List<Int>,
         excludeCourseId: Long? = null
     ): List<Course> {
+        require(dayOfWeek in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) { "dayOfWeek 超出范围: $dayOfWeek" }
+        require(startSection >= Constants.Course.MIN_SECTION_NUMBER) { "startSection 超出范围: $startSection" }
+        require(sectionCount >= 1) { "sectionCount 必须大于0: $sectionCount" }
         return courseRepository.detectConflictWithWeeks(
             scheduleId,
             dayOfWeek,

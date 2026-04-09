@@ -1,6 +1,8 @@
 // [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -27,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
-import com.wind.ggbond.classtime.ui.components.glassModifier
+import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
 
 @Composable
 fun LoadingScreen() {
@@ -55,10 +57,12 @@ fun BottomNavigationBar(
     currentRoute: String?,
     blurEnabled: Boolean = true
 ) {
-    val containerColor = if (blurEnabled) {
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
-    } else {
-        MaterialTheme.colorScheme.surface
+    val isWallpaperEnabled = LocalWallpaperEnabled.current
+
+    val containerColor = when {
+        isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+        blurEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+        else -> MaterialTheme.colorScheme.surface
     }
 
     androidx.compose.material3.NavigationBar(
@@ -66,21 +70,33 @@ fun BottomNavigationBar(
             .height(60.dp)
             .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             .then(
-                if (blurEnabled) {
-                    Modifier.glassModifier(
-                        alpha = 0.85f,
-                        tintColor = containerColor,
-                        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                        borderWidth = 0.5.dp,
-                        borderColor = Color.White.copy(alpha = 0.25f),
-                        blurEnabled = true
-                    )
+                if (blurEnabled || isWallpaperEnabled) {
+                    Modifier
+                        .background(
+                            color = containerColor,
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                        )
+                        .then(
+                            if (isWallpaperEnabled) {
+                                Modifier.border(
+                                    width = 0.5.dp,
+                                    color = Color.White.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                                )
+                            } else {
+                                Modifier.border(
+                                    width = 0.5.dp,
+                                    color = Color.White.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                                )
+                            }
+                        )
                 } else {
                     Modifier
                 }
             ),
         containerColor = containerColor,
-        tonalElevation = if (blurEnabled) 0.dp else 2.dp
+        tonalElevation = 0.dp
     ) {
         BottomNavItem.items.forEach { item ->
             val selected = currentRoute == item.route
@@ -89,7 +105,7 @@ fun BottomNavigationBar(
                 NavigationBarItem(
                     icon = {
                         Icon(
-                            imageVector = item.icon,
+                            imageVector = if (selected) item.selectedIcon else item.icon,
                             contentDescription = item.label,
                             modifier = Modifier.size(24.dp)
                         )

@@ -10,6 +10,9 @@ import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 @HiltViewModel
@@ -66,6 +69,8 @@ class CourseAdjustmentViewModel @Inject constructor(
     // 保存状态
     private val _saveState = MutableStateFlow<SaveState>(SaveState.Idle)
     val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
+    
+    private var conflictCheckJob: Job? = null
     
     sealed class SaveState {
         object Idle : SaveState()
@@ -158,11 +163,12 @@ class CourseAdjustmentViewModel @Inject constructor(
      * 检查时间冲突
      */
     private fun checkConflict() {
-        viewModelScope.launch {
+        conflictCheckJob?.cancel()
+        conflictCheckJob = viewModelScope.launch {
+            delay(300)
             try {
                 val course = _course.value ?: return@launch
                 
-                // 检查新时间段是否有其他课程或调课记录
                 val conflictingAdjustments = adjustmentRepository.checkNewTimeConflict(
                     scheduleId = course.scheduleId,
                     weekNumber = _newWeekNumber.value,
@@ -171,7 +177,6 @@ class CourseAdjustmentViewModel @Inject constructor(
                     sectionCount = _newSectionCount.value
                 )
                 
-                // 检查是否有原始课程冲突
                 val conflictingCourses = courseRepository.getCoursesInTimeRange(
                     scheduleId = course.scheduleId,
                     dayOfWeek = _newDayOfWeek.value,
@@ -192,7 +197,7 @@ class CourseAdjustmentViewModel @Inject constructor(
                     _conflictMessage.value = ""
                 }
             } catch (e: Exception) {
-                android.util.Log.e("CourseAdjustmentVM", "检查冲突失败", e)
+                AppLogger.e("CourseAdjustmentVM", "检查冲突失败", e)
             }
         }
     }
@@ -229,18 +234,19 @@ class CourseAdjustmentViewModel @Inject constructor(
                     newDayOfWeek = _newDayOfWeek.value,
                     newStartSection = _newStartSection.value,
                     newSectionCount = _newSectionCount.value,
+                    newClassroom = _newClassroom.value,
                     reason = _reason.value
                 )
                 
                 // 保存到数据库
                 val savedId = adjustmentRepository.saveAdjustment(adjustment)
                 
-                android.util.Log.d("CourseAdjustmentVM", "========== 调课记录已保存 ==========")
-                android.util.Log.d("CourseAdjustmentVM", "✓ 调课记录ID: $savedId")
-                android.util.Log.d("CourseAdjustmentVM", "✓ 课程: ${course.courseName}")
-                android.util.Log.d("CourseAdjustmentVM", "✓ 原时间: 第${_originalWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}节")
-                android.util.Log.d("CourseAdjustmentVM", "✓ 新时间: 第${_newWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(_newDayOfWeek.value)} 第${_newStartSection.value}节")
-                android.util.Log.d("CourseAdjustmentVM", "====================================")
+                AppLogger.d("CourseAdjustmentVM", "========== 调课记录已保存 ==========")
+                AppLogger.d("CourseAdjustmentVM", "✓ 调课记录ID: $savedId")
+                AppLogger.d("CourseAdjustmentVM", "✓ 课程: ${course.courseName}")
+                AppLogger.d("CourseAdjustmentVM", "✓ 原时间: 第${_originalWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}节")
+                AppLogger.d("CourseAdjustmentVM", "✓ 新时间: 第${_newWeekNumber.value}周 ${com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(_newDayOfWeek.value)} 第${_newStartSection.value}节")
+                AppLogger.d("CourseAdjustmentVM", "====================================")
                 
                 val savedAdjustment = adjustment.copy(id = savedId)
                 reminderScheduler.rescheduleRemindersForAdjustment(savedAdjustment)

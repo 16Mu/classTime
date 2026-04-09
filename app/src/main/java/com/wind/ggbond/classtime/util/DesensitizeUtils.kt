@@ -66,7 +66,7 @@ object DesensitizeUtils {
      */
     fun maskStudentId(value: String?): String {
         return if (value.isNullOrEmpty() || value.length <= 4) MASK_PARTIAL
-        else value.take(2) + "**" + value.takeLast(2)
+        else value.take(2) + MASK_PARTIAL + value.takeLast(2)
     }
 
     /**

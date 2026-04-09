@@ -4,9 +4,9 @@ import android.app.*
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.wind.ggbond.classtime.MainActivity
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.R
 
 /**
@@ -57,13 +57,13 @@ class KeepAliveService : Service() {
     
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "保活服务已创建")
+        AppLogger.d(TAG, "保活服务已创建")
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "保活服务已启动")
+        AppLogger.d(TAG, "保活服务已启动")
         // 重新创建通知，确保显示
         startForeground(NOTIFICATION_ID, createNotification())
         // 返回 START_STICKY，确保服务被杀死后自动重启
@@ -76,7 +76,7 @@ class KeepAliveService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "保活服务被销毁，尝试重启...")
+        AppLogger.d(TAG, "保活服务被销毁，尝试重启...")
         // 服务被杀死时尝试重新启动
         try {
             val restartIntent = Intent(applicationContext, KeepAliveService::class.java)
@@ -86,7 +86,7 @@ class KeepAliveService : Service() {
                 applicationContext.startService(restartIntent)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "重启保活服务失败", e)
+            AppLogger.e(TAG, "重启保活服务失败", e)
         }
     }
     
@@ -96,7 +96,7 @@ class KeepAliveService : Service() {
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.d(TAG, "App被从最近任务移除，重新注册兜底任务")
+        AppLogger.d(TAG, "App被从最近任务移除，重新注册兜底任务")
         // 重新注册WorkManager兜底任务（这是最后的保障）
         com.wind.ggbond.classtime.worker.ReminderCheckWorker.enqueue(applicationContext)
     }

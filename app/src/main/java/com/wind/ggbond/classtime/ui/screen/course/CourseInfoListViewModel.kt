@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
-import android.util.Log
 
 /**
  * 单个时间段数据模型
@@ -116,7 +116,7 @@ class CourseInfoListViewModel @Inject constructor(
                                     _currentSchedule.value = firstSchedule
                                 }
                             } catch (e: Exception) {
-                                Log.e(TAG, "Error loading fallback schedule", e)
+                                AppLogger.e(TAG, "Error loading fallback schedule", e)
                             } finally {
                                 _isLoading.value = false
                             }
@@ -125,13 +125,13 @@ class CourseInfoListViewModel @Inject constructor(
                         }
                     }
                     .catch { e ->
-                        Log.e(TAG, "Error in schedule flow", e)
+                        AppLogger.e(TAG, "Error in schedule flow", e)
                         _isLoading.value = false
                     }
                     .collect { /* 消费Flow以触发数据加载 */ }
                     
             } catch (e: Exception) {
-                Log.e(TAG, "Critical error loading schedule", e)
+                AppLogger.e(TAG, "Critical error loading schedule", e)
                 _currentSchedule.value = null
                 _isLoading.value = false
             }

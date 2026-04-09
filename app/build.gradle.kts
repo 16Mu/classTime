@@ -14,8 +14,8 @@ android {
         applicationId = "com.wind.ggbond.classtime"
         minSdk = 26
         targetSdk = 34
-        versionCode = 34
-        versionName = "v1.2.0-[GGBond]-[Wind]-[Release]"
+        versionCode = 35
+        versionName = "v1.2.1-[GGBond]-[Wind]-[Release]"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -15,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.launch
 
 class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
@@ -23,7 +24,7 @@ class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
         const val ACTION_REFRESH = "com.wind.ggbond.classtime.ACTION_REFRESH_LARGE_WIDGET"
 
         private val errorHandler = CoroutineExceptionHandler { _, throwable ->
-            android.util.Log.e("LargeTodayWidgetProvider", "协程异常", throwable)
+            AppLogger.e("LargeTodayWidgetProvider", "协程异常", throwable)
         }
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + errorHandler)
@@ -46,7 +47,7 @@ class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
                 }
                 context.sendBroadcast(intent)
             } catch (e: Exception) {
-                android.util.Log.e("LargeTodayWidgetProvider", "refreshAllWidgets 异常", e)
+                AppLogger.e("LargeTodayWidgetProvider", "refreshAllWidgets 异常", e)
             }
         }
     }
@@ -147,7 +148,7 @@ class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
                     appWidgetManager.updateAppWidget(appWidgetId, headerViews)
                     appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lv_courses)
                 } catch (e: Exception) {
-                    android.util.Log.e("LargeTodayWidgetProvider", "异步更新异常", e)
+                    AppLogger.e("LargeTodayWidgetProvider", "异步更新异常", e)
                     val errorViews = RemoteViews(context.packageName, R.layout.widget_large_today_course)
                     errorViews.setRemoteAdapter(R.id.lv_courses, serviceIntent)
                     errorViews.setEmptyView(R.id.lv_courses, R.id.empty_container)
@@ -160,7 +161,7 @@ class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("LargeTodayWidgetProvider", "updateAppWidget 异常", e)
+            AppLogger.e("LargeTodayWidgetProvider", "updateAppWidget 异常", e)
             val errorViews = RemoteViews(context.packageName, R.layout.widget_large_today_course)
             errorViews.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
             errorViews.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)

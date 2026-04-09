@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.bugfix
+﻿package com.wind.ggbond.classtime.bugfix
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -16,7 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -61,14 +62,14 @@ import java.io.File
 class ScheduleWallpaperPreservationTest {
 
     private lateinit var testScope: TestScope
-    private lateinit var testDispatcher: StandardTestDispatcher
+    private lateinit var testDispatcher: kotlinx.coroutines.test.TestDispatcher
     private lateinit var testDataStore: DataStore<Preferences>
     private lateinit var context: Context
     private lateinit var backgroundThemeManager: BackgroundThemeManager
 
     @Before
     fun setup() {
-        testDispatcher = StandardTestDispatcher()
+        testDispatcher = UnconfinedTestDispatcher()
         testScope = TestScope(testDispatcher)
         Dispatchers.setMain(testDispatcher)
 

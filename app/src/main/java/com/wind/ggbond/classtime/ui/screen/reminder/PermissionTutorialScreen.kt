@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.util.BackgroundPermissionHelper
+import com.wind.ggbond.classtime.util.AppLogger
+import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.util.PermissionGuideManager
 
 /**
@@ -64,6 +66,8 @@ fun PermissionTutorialScreen(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // 解析权限类型
     val permissionType = remember {
@@ -97,6 +101,7 @@ fun PermissionTutorialScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
@@ -270,7 +275,9 @@ fun PermissionTutorialScreen(
                                     true
                                 )
                                 isConfirmed.value = true
-                                android.widget.Toast.makeText(context, "已标记为完成", android.widget.Toast.LENGTH_SHORT).show()
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("已标记为完成")
+                                }
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
@@ -525,7 +532,7 @@ private fun openAppDetailsSettings(context: Context) {
         }
         context.startActivity(intent)
     } catch (e: Exception) {
-        android.util.Log.e("PermissionTutorial", "打开应用详情页失败", e)
+        AppLogger.e("PermissionTutorial", "打开应用详情页失败", e)
     }
 }
 

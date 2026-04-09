@@ -62,8 +62,7 @@ class ScheduleRepository @Inject constructor(
      * 先清除所有课表的当前状态，再将指定课表设为当前
      */
     suspend fun setCurrentSchedule(scheduleId: Long) {
-        scheduleDao.clearCurrentSchedule()
-        scheduleDao.setCurrentSchedule(scheduleId)
+        scheduleDao.switchCurrentSchedule(scheduleId)
     }
 }
 

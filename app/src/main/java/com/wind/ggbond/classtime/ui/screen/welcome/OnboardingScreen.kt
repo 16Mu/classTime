@@ -72,9 +72,9 @@ fun OnboardingScreen(
                         }
                     },
                     onSetupReminders = {
-                        // 跳转到设置页面
+                        // 跳转到"我的"页面（Tab3）
                         onComplete()
-                        navController.navigate(Screen.Settings.route) {
+                        navController.navigate(com.wind.ggbond.classtime.ui.navigation.BottomNavItem.Profile.route) {
                             popUpTo(Screen.Main.route) { inclusive = false }
                         }
                     }

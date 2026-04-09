@@ -219,7 +219,7 @@ fun PermissionGuideScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF4CAF50).copy(alpha = 0.15f)
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -229,7 +229,7 @@ fun PermissionGuideScreen(
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = Color(0xFF4CAF50),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(Modifier.width(8.dp))
@@ -237,7 +237,7 @@ fun PermissionGuideScreen(
                                 text = "✓ 权限已授予",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4CAF50)
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }

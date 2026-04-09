@@ -3,7 +3,6 @@ package com.wind.ggbond.classtime.ui.screen.main.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -19,7 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,9 +32,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.DateUtils
 import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.secondaryContentColorForBackground
+import com.wind.ggbond.classtime.ui.theme.WallpaperAwareSurface
+import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
 
 /**
  * 周视图组件
@@ -51,13 +52,18 @@ fun WeekView(
     modifier: Modifier = Modifier,
     getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
     semesterStartDate: java.time.LocalDate? = null,
-    courseColorMap: Map<String, String> = emptyMap()
+    courseColorMap: Map<String, String> = emptyMap(),
+    isWallpaperEnabled: Boolean = false
 ) {
-    // 根据是否显示周末动态确定天数范围
     val dayCount = if (showWeekend) 7 else 5
     
-    LazyColumn(
+    Box(
         modifier = modifier
+            .fillMaxSize()
+            .wallpaperAwareBackground(MaterialTheme.colorScheme.background)
+    ) {
+    LazyColumn(
+        modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 8.dp)
     ) {
@@ -85,6 +91,7 @@ fun WeekView(
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
+    }
     }
 }
 
@@ -118,7 +125,7 @@ fun DaySchedule(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .wallpaperAwareBackground(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -153,7 +160,7 @@ fun DaySchedule(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp, horizontal = 12.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                    .wallpaperAwareBackground(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
                     .padding(vertical = 8.dp, horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -236,9 +243,14 @@ fun CourseCard(
     // 优化：缓存颜色解析和计算
     val baseColor = remember(course.courseName, courseColorMap) {
         val dynamicColor = courseColorMap[course.courseName]
+
         if (dynamicColor != null) {
-            try { Color(android.graphics.Color.parseColor(dynamicColor)) }
-            catch (e: Exception) { Color(android.graphics.Color.parseColor(course.color)) }
+            try {
+                Color(android.graphics.Color.parseColor(dynamicColor))
+            } catch (e: Exception) {
+                AppLogger.w("CourseCard", "Monet颜色解析失败: ${course.courseName}")
+                Color(android.graphics.Color.parseColor(course.color))
+            }
         } else {
             Color(android.graphics.Color.parseColor(course.color))
         }
@@ -258,7 +270,7 @@ fun CourseCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(displayColor)
+            .wallpaperAwareBackground(displayColor)
             .then(
                 if (isOngoing) {
                     Modifier.border(
@@ -324,20 +336,17 @@ fun CourseCard(
                 ) {
                     Text(
                         text = course.courseName,
-                        fontSize = 18.sp,  // 增大到18sp
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 24.sp,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                         color = titleColor
                     )
                     
-                    // 调课标记 - 低调小图标
                     if (adjustmentInfo != null) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "⟳",
-                            fontSize = 12.sp,
+                            style = MaterialTheme.typography.labelSmall,
                             color = titleColor.copy(alpha = 0.5f),
                             modifier = Modifier.padding(top = 2.dp)
                         )
@@ -349,12 +358,11 @@ fun CourseCard(
                 // 节次信息 - 紧凑显示
                 Text(
                     text = "第${course.startSection}${if (course.sectionCount > 1) "-${course.startSection + course.sectionCount - 1}" else ""}节",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                     color = titleColor.copy(alpha = 0.85f),
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(titleColor.copy(alpha = 0.1f))
+                        .wallpaperAwareBackground(titleColor.copy(alpha = 0.1f))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
@@ -365,26 +373,21 @@ fun CourseCard(
             if (course.classroom.isNotEmpty()) {
                 Text(
                     text = course.classroom,
-                    fontSize = 12.sp,  // 减小到12sp
-                    fontWeight = FontWeight.Normal,
-                    lineHeight = 16.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = subColor  // 70%透明度
+                    color = subColor
                 )
             }
             
-            // 教师信息 - 次要信息，小字号12sp（与地点同级）
             if (course.teacher.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = course.teacher,
-                    fontSize = 12.sp,  // 减小到12sp
-                    fontWeight = FontWeight.Normal,
-                    lineHeight = 16.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = subColor  // 70%透明度，与地点同级
+                    color = subColor
                 )
             }
             
@@ -399,12 +402,11 @@ fun CourseCard(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF10B981))
+                            .wallpaperAwareBackground(MaterialTheme.colorScheme.primary)
                     )
                     Text(
                         text = "正在上课",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                         color = titleColor.copy(alpha = 0.8f)
                     )
                 }

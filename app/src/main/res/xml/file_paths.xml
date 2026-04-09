@@ -6,6 +6,7 @@
     
     <!-- 缓存目录 -->
     <external-cache-path name="cache" path="." />
+    <cache-path name="internal_cache" path="." />
     
     <!-- 内部文件目录 -->
     <files-path name="internal_files" path="." />

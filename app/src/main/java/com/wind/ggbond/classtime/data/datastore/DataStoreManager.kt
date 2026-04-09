@@ -73,8 +73,8 @@ object DataStoreManager {
         // 最后更新时间（用于去重）
         val LAST_AUTO_UPDATE_TIME_KEY = longPreferencesKey("last_auto_update_time") // 上次自动更新时间（毫秒时间戳）
         
-        // 底部导航栏高斯模糊开关
-        val BOTTOM_BAR_BLUR_ENABLED_KEY = booleanPreferencesKey("bottom_bar_blur_enabled")
+        // 全局毛玻璃效果开关（控制底部栏、浮动按钮等所有组件）
+        val GLASS_EFFECT_ENABLED_KEY = booleanPreferencesKey("glass_effect_enabled")
         
         // 最近使用的学校（JSON格式：["schoolId1", "schoolId2", ...]，最多保存5个）
         val RECENT_SCHOOLS_KEY = stringPreferencesKey("recent_schools")
@@ -98,6 +98,9 @@ object DataStoreManager {
         val CUSTOM_BACKGROUND_URI_KEY = stringPreferencesKey("custom_background_uri")
         // 最后更新检查时间
         val LAST_UPDATE_CHECK_TIME_KEY = longPreferencesKey("last_update_check_time")
+        
+        // 已读公告的版本（用于判断是否需要弹出新版本公告）
+        val LAST_READ_ANNOUNCEMENT_VERSION_KEY = stringPreferencesKey("last_read_announcement_version")
 
         // ==================== 莫奈课程颜色相关配置 ====================
         /** 是否启用莫奈课程颜色（默认关闭） */
@@ -112,7 +115,7 @@ object DataStoreManager {
         const val DEFAULT_SCHEDULED_UPDATE_ENABLED = false  // 默认关闭定时更新
         const val DEFAULT_SCHEDULED_UPDATE_TIME = "07:00"  // 默认早上7点
         const val MAX_RECENT_SCHOOLS = 5  // 最多保存5个最近使用的学校
-        const val DEFAULT_BOTTOM_BAR_BLUR_ENABLED = true  // 默认开启底部栏高斯模糊
+        const val DEFAULT_GLASS_EFFECT_ENABLED = true  // 默认开启全局毛玻璃效果
         const val UPDATE_DEDUP_INTERVAL_MS = 5 * 60 * 1000  // 防重复间隔：5分钟
         
         // 背景主题默认值

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -37,13 +38,23 @@ import com.wind.ggbond.classtime.ui.screen.course.CourseDetailViewModel
 import com.wind.ggbond.classtime.ui.theme.CourseColors
 import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.topGradientOverlayAlpha
+import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
 import com.wind.ggbond.classtime.util.DateUtils
 import com.wind.ggbond.classtime.util.WeekParser
+import kotlinx.coroutines.launch
+
+private val EditTransitionSpec: ContentTransform = fadeIn(animationSpec = tween(300)) +
+    expandVertically(animationSpec = tween(300)) togetherWith
+    fadeOut(animationSpec = tween(200)) + shrinkVertically(animationSpec = tween(200))
+
+@Composable
+private fun textFieldColors(primary: Color = MaterialTheme.colorScheme.primary) = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+)
 
 /**
  * 课程详情底部弹出卡片
- * 参考主流APP设计，从底部滑出占据屏幕2/3高度
- * 支持莫奈动态取色：通过 dynamicColor 参数传入 MonetColorPalette 动态颜色
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,14 +62,16 @@ fun CourseDetailBottomSheet(
     courseId: Long,
     onDismiss: () -> Unit,
     onDelete: (Long) -> Unit,
-    onRequestAdjustment: ((Long) -> Unit)? = null,  // 请求调课（传courseId，Dialog在上层弹出）
-    onRequestAddExam: ((Long) -> Unit)? = null,      // 请求添加考试（传courseId，Dialog在上层弹出）
-    startInEditMode: Boolean = false,                // 是否直接进入编辑模式
+    onRequestAdjustment: ((Long) -> Unit)? = null,
+    onRequestAddExam: ((Long) -> Unit)? = null,
+    startInEditMode: Boolean = false,
     viewModel: CourseDetailViewModel = hiltViewModel(),
-    dynamicColor: String? = null                     // 莫奈动态取色支持，为null时使用课程原始颜色
+    dynamicColor: String? = null,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     
     LaunchedEffect(courseId) {
         viewModel.loadCourse(courseId)
@@ -162,7 +175,8 @@ fun CourseDetailBottomSheet(
                 CourseHeaderCard(
                     course = c,
                     isEditMode = isEditMode,
-                    dynamicColor = dynamicColor,  // 传递莫奈动态颜色
+                    dynamicColor = dynamicColor,
+                    coroutineScope = coroutineScope,
                     onEdit = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         // 切换到编辑模式而不是跳转页面
@@ -188,11 +202,9 @@ fun CourseDetailBottomSheet(
                         }
                         
                         if (validationError != null) {
-                            android.widget.Toast.makeText(
-                                context,
-                                validationError,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(validationError!!)
+                            }
                             return@CourseHeaderCard
                         }
                         
@@ -214,19 +226,15 @@ fun CourseDetailBottomSheet(
                         )
                         
                         if (success) {
-                            android.widget.Toast.makeText(
-                                context,
-                                "保存成功",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("保存成功")
+                            }
                             isEditMode = false
                             onDismiss()
                         } else {
-                            android.widget.Toast.makeText(
-                                context,
-                                "保存失败，请检查输入",
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("保存失败，请检查输入")
+                            }
                         }
                     },
                     onCancel = {
@@ -250,12 +258,7 @@ fun CourseDetailBottomSheet(
                     AnimatedContent(
                         targetState = isEditMode,
                         label = "info_edit_animation",
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) + 
-                            expandVertically(animationSpec = tween(300)) togetherWith
-                            fadeOut(animationSpec = tween(200)) + 
-                            shrinkVertically(animationSpec = tween(200))
-                        }
+                        transitionSpec = { EditTransitionSpec }
                     ) { editMode ->
                         if (editMode) {
                             // 编辑模式 - 全字段编辑
@@ -305,12 +308,7 @@ fun CourseDetailBottomSheet(
                     AnimatedContent(
                         targetState = isEditMode,
                         label = "time_edit_animation",
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) + 
-                            expandVertically(animationSpec = tween(300)) togetherWith
-                            fadeOut(animationSpec = tween(200)) + 
-                            shrinkVertically(animationSpec = tween(200))
-                        }
+                        transitionSpec = { EditTransitionSpec }
                     ) { editMode ->
                         if (editMode) {
                             // 编辑模式 - 时间安排编辑
@@ -362,12 +360,7 @@ fun CourseDetailBottomSheet(
                     AnimatedContent(
                         targetState = isEditMode,
                         label = "reminder_edit_animation",
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) + 
-                            expandVertically(animationSpec = tween(300)) togetherWith
-                            fadeOut(animationSpec = tween(200)) + 
-                            shrinkVertically(animationSpec = tween(200))
-                        }
+                        transitionSpec = { EditTransitionSpec }
                     ) { editMode ->
                         if (editMode) {
                             // 编辑模式 - 提醒设置可编辑
@@ -387,12 +380,7 @@ fun CourseDetailBottomSheet(
                     AnimatedContent(
                         targetState = isEditMode,
                         label = "note_edit_animation",
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) + 
-                            expandVertically(animationSpec = tween(300)) togetherWith
-                            fadeOut(animationSpec = tween(200)) + 
-                            shrinkVertically(animationSpec = tween(200))
-                        }
+                        transitionSpec = { EditTransitionSpec }
                     ) { editMode ->
                         if (editMode) {
                             // 编辑模式 - 备注可编辑
@@ -495,13 +483,13 @@ fun CourseDetailBottomSheet(
         LaunchedEffect(adjustmentSaveState) {
             when (val state = adjustmentSaveState) {
                 is com.wind.ggbond.classtime.ui.screen.course.CourseAdjustmentViewModel.SaveState.Success -> {
-                    android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_SHORT).show()
+                    snackbarHostState.showSnackbar(state.message)
                     viewModel.hideAdjustmentDialog()
                     adjustmentViewModel.resetSaveState()
-                    onDismiss()  // ✅ 修复：临时调课成功后自动关闭底部卡片
+                    onDismiss()
                 }
                 is com.wind.ggbond.classtime.ui.screen.course.CourseAdjustmentViewModel.SaveState.Error -> {
-                    android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_SHORT).show()
+                    snackbarHostState.showSnackbar(state.message)
                     adjustmentViewModel.resetSaveState()
                 }
                 else -> {}
@@ -541,13 +529,8 @@ fun CourseDetailBottomSheet(
             onDismiss = { viewModel.hideAddExamDialog() },
             onConfirm = { exam ->
                 viewModel.saveExam(exam)
-                android.widget.Toast.makeText(
-                    context,
-                    "考试已添加",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
+                coroutineScope.launch { snackbarHostState.showSnackbar("考试已添加") }
                 viewModel.hideAddExamDialog()
-                onDismiss()  // ✅ 修复：添加考试后自动关闭底部卡片
             }
         )
     }
@@ -565,33 +548,21 @@ private fun CourseHeaderCard(
     onDelete: () -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
-    dynamicColor: String? = null  // 莫奈动态取色支持，为null时使用course.color
+    dynamicColor: String? = null,
+    coroutineScope: CoroutineScope = rememberCoroutineScope()
 ) {
     // 优先使用动态颜色，否则回退到课程原始颜色
     val displayColor = dynamicColor ?: course.color
     
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .height(140.dp),
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = try {
-                Color(android.graphics.Color.parseColor(displayColor))
-            } catch (e: Exception) {
-                MaterialTheme.colorScheme.primaryContainer
-            }
-        )
+            .height(140.dp)
+            .clip(MaterialTheme.shapes.large)
+            .wallpaperAwareBackground(parseDisplayColor(displayColor))
     ) {
-        val bg = try {
-            Color(android.graphics.Color.parseColor(displayColor))
-        } catch (e: Exception) {
-            MaterialTheme.colorScheme.primaryContainer
-        }
+        val bg = parseDisplayColor(displayColor)
         val contentColor = contentColorForBackground(bg)
         val overlayAlpha = topGradientOverlayAlpha(bg)
         
@@ -1761,5 +1732,12 @@ private fun toHexString(color: Color): String {
     val green = (color.green * 255).toInt()
     val blue = (color.blue * 255).toInt()
     return "#%02X%02X%02X".format(red, green, blue)
+}
+
+@Composable
+private fun parseDisplayColor(hex: String): Color = try {
+    Color(android.graphics.Color.parseColor(hex))
+} catch (_: Exception) {
+    MaterialTheme.colorScheme.primaryContainer
 }
 

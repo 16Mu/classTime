@@ -30,19 +30,17 @@ import androidx.glance.text.TextStyle
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.widget.data.CourseBrief
 import com.wind.ggbond.classtime.widget.data.DayCourseInfo
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.widget.data.WeekOverviewData
-import com.wind.ggbond.classtime.widget.WidgetDataProvider
 
 class WeekOverviewWidget : GlanceAppWidget() {
-
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val weekData = try {
             WidgetDataProvider.getWeekOverview(context)
         } catch (e: Exception) {
-            android.util.Log.e("WeekOverviewWidget", "加载数据失败", e)
+            AppLogger.e("WeekOverviewWidget", "加载失败", e)
             WeekOverviewData.empty("数据加载失败")
         }
-
         provideContent {
             GlanceTheme {
                 WeekOverviewContent(data = weekData)
@@ -63,23 +61,19 @@ private fun WeekOverviewContent(data: WeekOverviewData) {
             .clickable(actionStartActivity<MainActivity>())
             .padding(12.dp)
     ) {
-        HeaderRow(data)
-
+        HeaderRow(data = data)
         Spacer(modifier = GlanceModifier.height(5.dp))
-
         Box(
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .height(1.dp)
                 .background(dayNightColorProvider(day = WidgetColors.dividerDay, night = WidgetColors.dividerNight))
         ) {}
-
         Spacer(modifier = GlanceModifier.height(5.dp))
-
         if (data.days.isNotEmpty()) {
-            WeekBody(days = data.days, todayDayOfWeek = data.todayDayOfWeek)
+            WeekBody(days = data.days, todayDow = data.todayDayOfWeek)
         } else {
-            EmptyState(message = data.emptyMessage ?: "本周无课程")
+            EmptyState(msg = data.emptyMessage ?: "本周无课程")
         }
     }
 }
@@ -106,13 +100,11 @@ private fun HeaderRow(data: WeekOverviewData) {
                 fontSize = 10.sp
             )
         )
-
         Spacer(modifier = GlanceModifier.defaultWeight())
-
-        val totalCourses = data.days.sumOf { it.courseCount }
-        if (totalCourses > 0) {
+        val total = data.days.sumOf { it.courseCount }
+        if (total > 0) {
             Text(
-                text = "${totalCourses}节",
+                text = "${total}节",
                 style = TextStyle(
                     color = dayNightColorProvider(day = WidgetColors.accentTextDay, night = WidgetColors.accentTextNight),
                     fontSize = 10.sp,
@@ -124,18 +116,15 @@ private fun HeaderRow(data: WeekOverviewData) {
 }
 
 @Composable
-private fun WeekBody(days: List<DayCourseInfo>, todayDayOfWeek: Int) {
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
-        days.forEachIndexed { index, day ->
-            val isToday = (index + 1) == todayDayOfWeek
-
+private fun WeekBody(days: List<DayCourseInfo>, todayDow: Int) {
+    Column(modifier = GlanceModifier.fillMaxSize()) {
+        days.forEachIndexed { i, d ->
             DayBlock(
-                label = "周${WEEKDAY_LABELS[index.coerceIn(0, 6)]}",
-                courses = day.courses,
-                isToday = isToday
+                label = "周${WEEKDAY_LABELS[i.coerceIn(0, 6)]}",
+                courses = d.courses,
+                isToday = i + 1 == todayDow
             )
-
-            if (index < days.size - 1) {
+            if (i < days.size - 1) {
                 Spacer(modifier = GlanceModifier.height(3.dp))
             }
         }
@@ -144,40 +133,30 @@ private fun WeekBody(days: List<DayCourseInfo>, todayDayOfWeek: Int) {
 
 @Composable
 private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean) {
-    val blockBg = if (isToday) {
-        dayNightColorProvider(day = Color(0xFFE8F0FE), night = Color(0xFF1A237E))
-    } else {
-        dayNightColorProvider(day = Color.Transparent, night = Color.Transparent)
-    }
-
     Column(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .background(blockBg)
+            .background(
+                if (isToday) dayNightColorProvider(day = Color(0xFFE8F0FE), night = Color(0xFF1A237E))
+                else dayNightColorProvider(day = Color.Transparent, night = Color.Transparent)
+            )
             .cornerRadius(8.dp)
             .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val labelColor = if (isToday) {
-                dayNightColorProvider(day = Color(0xFF1565C0), night = Color(0xFF64B5F6))
-            } else {
-                dayNightColorProvider(day = WidgetColors.textSecondaryDay, night = WidgetColors.textSecondaryNight)
-            }
             Text(
                 text = label,
                 style = TextStyle(
-                    color = labelColor,
+                    color = if (isToday) dayNightColorProvider(day = Color(0xFF1565C0), night = Color(0xFF64B5F6))
+                    else dayNightColorProvider(day = WidgetColors.textSecondaryDay, night = WidgetColors.textSecondaryNight),
                     fontSize = 11.sp,
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
                 )
             )
-
             Spacer(modifier = GlanceModifier.width(5.dp))
-
             if (courses.isNotEmpty()) {
-                val sectionsStr = courses.joinToString("·") { it.sectionLabel }
                 Text(
-                    text = sectionsStr,
+                    text = courses.joinToString("·") { it.sectionLabel },
                     style = TextStyle(
                         color = dayNightColorProvider(day = WidgetColors.textTertiaryDay, night = WidgetColors.textTertiaryNight),
                         fontSize = 9.sp
@@ -186,13 +165,10 @@ private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean
                 )
             }
         }
-
+        Spacer(modifier = GlanceModifier.height(2.dp))
         if (courses.isNotEmpty()) {
-            Spacer(modifier = GlanceModifier.height(2.dp))
-
-            val namesStr = courses.joinToString("  ") { it.name }
             Text(
-                text = namesStr,
+                text = courses.joinToString("  ") { it.name },
                 style = TextStyle(
                     color = dayNightColorProvider(day = WidgetColors.textPrimaryDay, night = WidgetColors.textPrimaryNight),
                     fontSize = 10.sp
@@ -213,11 +189,9 @@ private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean
 }
 
 @Composable
-private fun EmptyState(message: String) {
+private fun EmptyState(msg: String) {
     Box(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .padding(vertical = 16.dp),
+        modifier = GlanceModifier.fillMaxSize().padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -231,7 +205,7 @@ private fun EmptyState(message: String) {
             )
             Spacer(modifier = GlanceModifier.height(3.dp))
             Text(
-                text = message,
+                text = msg,
                 style = TextStyle(
                     color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
                     fontSize = 12.sp

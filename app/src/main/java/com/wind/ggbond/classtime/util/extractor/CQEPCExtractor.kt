@@ -1,11 +1,11 @@
 package com.wind.ggbond.classtime.util.extractor
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.util.WeekParser
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -176,8 +176,8 @@ class CQEPCExtractor @Inject constructor() : SchoolScheduleExtractor {
         val courses = mutableListOf<ParsedCourse>()
         
         try {
-            Log.d(TAG, "开始解析课程数据...")
-            Log.d(TAG, "原始数据: ${jsonData.take(200)}...")
+            AppLogger.d(TAG, "开始解析课程数据...")
+            AppLogger.d(TAG, "原始数据: ${jsonData.take(200)}...")
             
             // 清理JSON数据
             val cleanJson = jsonData
@@ -188,19 +188,19 @@ class CQEPCExtractor @Inject constructor() : SchoolScheduleExtractor {
                 .replace("\\n", "")
                 .replace("\\r", "")
             
-            Log.d(TAG, "清理后数据: ${cleanJson.take(200)}...")
+            AppLogger.d(TAG, "清理后数据: ${cleanJson.take(200)}...")
             
             val jsonObject = JSONObject(cleanJson)
             
             // 检查是否有错误信息
             if (jsonObject.has("error")) {
                 val errorMsg = jsonObject.getString("error")
-                Log.e(TAG, "JavaScript提取时发生错误: $errorMsg")
+                AppLogger.e(TAG, "JavaScript提取时发生错误: $errorMsg")
                 throw Exception("提取失败: $errorMsg")
             }
             
             val coursesArray = jsonObject.getJSONArray("courses")
-            Log.d(TAG, "找到 ${coursesArray.length()} 门课程")
+            AppLogger.d(TAG, "找到 ${coursesArray.length()} 门课程")
             
             for (i in 0 until coursesArray.length()) {
                 val courseObj = coursesArray.getJSONObject(i)
@@ -240,9 +240,9 @@ class CQEPCExtractor @Inject constructor() : SchoolScheduleExtractor {
                 )
             }
             
-            Log.d(TAG, "解析完成，共 ${courses.size} 门课程")
+            AppLogger.d(TAG, "解析完成，共 ${courses.size} 门课程")
         } catch (e: Exception) {
-            Log.e(TAG, "解析课程数据失败", e)
+            AppLogger.e(TAG, "解析课程数据失败", e)
             throw e // 重新抛出异常，让上层处理
         }
         

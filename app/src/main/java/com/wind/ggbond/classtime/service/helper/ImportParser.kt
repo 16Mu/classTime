@@ -1,8 +1,8 @@
 package com.wind.ggbond.classtime.service.helper
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
+import com.wind.ggbond.classtime.util.AppLogger
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -16,415 +16,158 @@ import javax.inject.Singleton
 @Singleton
 class ImportParser @Inject constructor() {
 
-    private val TAG = "ImportParser"
+    companion object {
+        private const val TAG = "ImportParser"
+        private val TEACHER_PATTERNS = listOf(
+            Regex("教师[：:](\\S+)"), Regex("Teacher[：:](\\S+)"),
+            Regex("任课教师[：:](\\S+)"), Regex("授课教师[：:](\\S+)")
+        )
+        private val SECTION_PATTERNS = listOf(
+            Regex("第(\\d+)-(\\d+)节"), Regex("(\\d+)-(\\d+)节"),
+            Regex("节次[：:](\\d+)-(\\d+)"), Regex("Section[：:](\\d+)-(\\d+)")
+        )
+        private val WEEK_PATTERNS = listOf(
+            Regex("(\\d+)-(\\d+)周(?:\\(([单双])\\))?"),
+            Regex("周次[：:](\\d+)-(\\d+)"), Regex("Week[：:](\\d+)-(\\d+)")
+        )
+        private val DAY_MAP = mapOf(
+            "周一" to 1, "星期一" to 1, "Monday" to 1, "1" to 1,
+            "周二" to 2, "星期二" to 2, "Tuesday" to 2, "2" to 2,
+            "周三" to 3, "星期三" to 3, "Wednesday" to 3, "3" to 3,
+            "周四" to 4, "星期四" to 4, "Thursday" to 4, "4" to 4,
+            "周五" to 5, "星期五" to 5, "Friday" to 5, "5" to 5,
+            "周六" to 6, "星期六" to 6, "Saturday" to 6, "6" to 6,
+            "周日" to 7, "星期日" to 7, "Sunday" to 7, "7" to 7,
+        )
+    }
 
-    data class IcsEventData(
-        val courseName: String,
-        val teacher: String,
-        val classroom: String,
-        val startDateTime: LocalDateTime,
-        val endDateTime: LocalDateTime?,
-        val rrule: String,
-        val sectionInfo: Pair<Int, Int>?,
-        val weekInfo: List<Int>?
-    )
+    data class IcsEventData(val courseName: String, val teacher: String, val classroom: String,
+        val startDateTime: LocalDateTime, val endDateTime: LocalDateTime?, val rrule: String,
+        val sectionInfo: Pair<Int, Int>?, val weekInfo: List<Int>?)
 
-    fun parseIcsContentFull(
-        content: String,
-        scheduleId: Long,
-        semesterStartDate: LocalDate,
-        classTimes: List<ClassTime>,
-        existingColors: MutableList<String>
-    ): List<Course> {
+    fun parseIcsContentFull(content: String, scheduleId: Long, semesterStartDate: LocalDate,
+        classTimes: List<ClassTime>, existingColors: MutableList<String>): List<Course> {
         val courseMap = mutableMapOf<String, MutableList<IcsEventData>>()
-        val events = content.split("BEGIN:VEVENT")
-
-        Log.d(TAG, "解析ICS文件，共 ${events.size - 1} 个事件")
-
-        events.drop(1).forEach { event ->
+        content.split("BEGIN:VEVENT").drop(1).forEach { event ->
             try {
                 val summary = extractIcsField(event, "SUMMARY")
-                val location = extractIcsField(event, "LOCATION")
-                val description = extractIcsField(event, "DESCRIPTION")
-                val dtStart = extractIcsField(event, "DTSTART")
-                val dtEnd = extractIcsField(event, "DTEND")
-                val rrule = extractIcsField(event, "RRULE")
-
-                if (summary.isEmpty() || dtStart.isEmpty()) {
-                    Log.w(TAG, "跳过无效事件: summary=$summary, dtStart=$dtStart")
-                    return@forEach
-                }
-
-                val startDateTime = parseIcsDateTime(dtStart)
-                val endDateTime = if (dtEnd.isNotEmpty()) parseIcsDateTime(dtEnd) else null
-
-                if (startDateTime == null) {
-                    Log.w(TAG, "无法解析开始时间: $dtStart")
-                    return@forEach
-                }
-
-                val teacher = extractTeacherFromDescription(description)
-                val sectionInfo = extractSectionFromDescription(description)
-                val weekInfo = extractWeekFromDescription(description)
-
-                val eventData = IcsEventData(
-                    courseName = summary,
-                    teacher = teacher,
-                    classroom = location,
-                    startDateTime = startDateTime,
-                    endDateTime = endDateTime,
-                    rrule = rrule,
-                    sectionInfo = sectionInfo,
-                    weekInfo = weekInfo
-                )
-
-                val key = "$summary|$teacher|$location"
-                courseMap.getOrPut(key) { mutableListOf() }.add(eventData)
-
-            } catch (e: Exception) {
-                Log.w(TAG, "解析事件失败: ${e.message}")
-            }
+                if (summary.isEmpty() || extractIcsField(event, "DTSTART").isEmpty()) return@forEach
+                val startDateTime = parseIcsDateTime(extractIcsField(event, "DTSTART")) ?: return@forEach
+                courseMap.getOrPut("$summary|${extractIcsField(event, "LOCATION")}|${extractTeacherFromDescription(extractIcsField(event, "DESCRIPTION"))}") { mutableListOf() }
+                    .add(IcsEventData(summary, extractTeacherFromDescription(extractIcsField(event, "DESCRIPTION")),
+                        extractIcsField(event, "LOCATION"), startDateTime,
+                        extractIcsField(event, "DTEND").takeIf { it.isNotEmpty() }?.let { parseIcsDateTime(it) },
+                        extractIcsField(event, "RRULE"),
+                        extractSectionFromDescription(extractIcsField(event, "DESCRIPTION")),
+                        extractWeekFromDescription(extractIcsField(event, "DESCRIPTION"))))
+            } catch (e: Exception) { AppLogger.w(TAG, "解析事件失败: ${e.message}") }
         }
-
-        Log.d(TAG, "分组后共 ${courseMap.size} 门不同课程")
 
         val courses = mutableListOf<Course>()
-
         courseMap.forEach { (_, eventList) ->
             val timeSlotMap = mutableMapOf<String, MutableList<IcsEventData>>()
-
-            eventList.forEach { event ->
-                val dayOfWeek = event.startDateTime.dayOfWeek.value
-                val startTime = event.startDateTime.toLocalTime()
-                val key = "$dayOfWeek|$startTime"
-                timeSlotMap.getOrPut(key) { mutableListOf() }.add(event)
-            }
-
+            eventList.forEach { e -> timeSlotMap.getOrPut("${e.startDateTime.dayOfWeek.value}|${e.startDateTime.toLocalTime()}") { mutableListOf() }.add(e) }
             timeSlotMap.forEach { (_, events) ->
-                val firstEvent = events.first()
-
-                val dayOfWeek = firstEvent.startDateTime.dayOfWeek.value
-
-                val startTime = firstEvent.startDateTime.toLocalTime()
-                val endTime = firstEvent.endDateTime?.toLocalTime()
-                val (startSection, sectionCount) = if (firstEvent.sectionInfo != null) {
-                    firstEvent.sectionInfo
-                } else {
-                    matchSectionByTime(startTime, endTime, classTimes)
-                }
-
-                val weeks = if (firstEvent.weekInfo != null) {
-                    firstEvent.weekInfo
-                } else {
-                    calculateWeeksFromEvents(events, semesterStartDate)
-                }
-
-                if (weeks.isEmpty()) {
-                    Log.w(TAG, "课程 ${firstEvent.courseName} 周次为空，跳过")
-                    return@forEach
-                }
-
-                val weekExpression = formatWeekExpression(weeks)
-
-                val assignedColor = com.wind.ggbond.classtime.util.CourseColorPalette.getColorForCourse(firstEvent.courseName, existingColors)
-                existingColors.add(assignedColor)
-
-                val course = Course(
-                    courseName = firstEvent.courseName,
-                    teacher = firstEvent.teacher,
-                    classroom = firstEvent.classroom,
-                    dayOfWeek = dayOfWeek,
-                    startSection = startSection,
-                    sectionCount = sectionCount,
-                    weeks = weeks,
-                    weekExpression = weekExpression,
-                    color = assignedColor,
-                    scheduleId = scheduleId,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                )
-
-                courses.add(course)
-                Log.d(TAG, "创建课程: ${course.courseName}, 周${course.dayOfWeek} 第${course.startSection}-${course.startSection + course.sectionCount - 1}节, ${course.weekExpression}")
+                val first = events.first()
+                val (startSec, secCount) = first.sectionInfo ?: matchSectionByTime(first.startDateTime.toLocalTime(), first.endDateTime?.toLocalTime(), classTimes)
+                val weeks = first.weekInfo ?: calculateWeeksFromEvents(events, semesterStartDate)
+                if (weeks.isEmpty()) return@forEach
+                val color = com.wind.ggbond.classtime.util.CourseColorPalette.getColorForCourse(first.courseName, existingColors).also { existingColors.add(it) }
+                courses.add(Course(courseName = first.courseName, teacher = first.teacher, classroom = first.classroom,
+                    dayOfWeek = first.startDateTime.dayOfWeek.value, startSection = startSec, sectionCount = secCount,
+                    weeks = weeks, weekExpression = formatWeekExpression(weeks), color = color, scheduleId = scheduleId,
+                    createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
             }
         }
-
-        return courses
+        AppLogger.d(TAG, "ICS解析完成: ${courses.size} 门课程"); return courses
     }
 
     fun extractIcsField(event: String, fieldName: String): String {
-        val lines = event.lines()
-        var result = StringBuilder()
-        var isCapturing = false
-
-        for (line in lines) {
-            val trimmedLine = line.trim()
-
-            if (trimmedLine.startsWith("$fieldName:") || trimmedLine.startsWith("$fieldName;")) {
-                isCapturing = true
-                val colonIndex = trimmedLine.indexOf(':')
-                if (colonIndex >= 0) {
-                    result.append(trimmedLine.substring(colonIndex + 1))
-                }
-            } else if (isCapturing) {
-                if (line.startsWith(" ") || line.startsWith("\t")) {
-                    result.append(line.substring(1))
-                } else {
-                    break
-                }
-            }
+        var result = StringBuilder(); var capturing = false
+        for (line in event.lines()) {
+            val t = line.trim()
+            if (t.startsWith("$fieldName:") || t.startsWith("$fieldName;")) {
+                capturing = true; t.indexOf(':').takeIf { it >= 0 }?.let { result.append(t.substring(it + 1)) }
+            } else if (capturing) { if (line.startsWith(' ') || line.startsWith('\t')) result.append(line.substring(1)) else break }
         }
-
-        return result.toString()
-            .replace("\\n", "\n")
-            .replace("\\,", ",")
-            .replace("\\\\", "\\")
-            .trim()
+        return result.toString().replace("\\n", "\n").replace("\\,", ",").replace("\\\\", "\\").trim()
     }
 
-    fun parseIcsDateTime(dtString: String): LocalDateTime? {
-        return try {
-            var dateTimeStr = dtString
+    fun parseIcsDateTime(dtString: String): LocalDateTime? = try {
+        var s = dtString.let { if (it.contains(":")) it.substringAfter(":") else it }
+        val utc = s.endsWith("Z"); s = s.removeSuffix("Z")
+        val dt = LocalDateTime.parse(s, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss"))
+        if (utc) dt.atZone(ZoneId.of("UTC")).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime() else dt
+    } catch (e: Exception) { AppLogger.w(TAG, "日期解析失败: $dtString, ${e.message}"); null }
 
-            if (dateTimeStr.contains(":")) {
-                dateTimeStr = dateTimeStr.substringAfter(":")
-            }
+    fun extractTeacherFromDescription(description: String): String =
+        TEACHER_PATTERNS.mapNotNull { it.find(description)?.groupValues?.get(1)?.trim() }.firstOrNull() ?: ""
 
-            val isUtc = dateTimeStr.endsWith("Z")
-            dateTimeStr = dateTimeStr.removeSuffix("Z")
+    fun extractSectionFromDescription(description: String): Pair<Int, Int>? =
+        SECTION_PATTERNS.mapNotNull { p -> p.find(description)?.let { m ->
+            m.groupValues[1].toIntOrNull()?.let { s -> m.groupValues[2].toIntOrNull()?.let { e -> Pair(s, e - s + 1) } }
+        }}.firstOrNull()
 
-            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
-            var dateTime = LocalDateTime.parse(dateTimeStr, formatter)
+    fun extractWeekFromDescription(description: String): List<Int>? =
+        WEEK_PATTERNS.mapNotNull { p -> p.find(description)?.let { m ->
+            m.groupValues[1].toIntOrNull()?.let { s -> m.groupValues[2].toIntOrNull()?.let { e ->
+                val odd = m.groupValues.getOrNull(3); (s..e).filter { w -> when (odd) { "单" -> w % 2 == 1; "双" -> w % 2 == 0; else -> true } }.toList()
+            }}
+        }}.firstOrNull()
 
-            if (isUtc) {
-                val utcZone = ZoneId.of("UTC")
-                val localZone = ZoneId.systemDefault()
-                dateTime = dateTime.atZone(utcZone).withZoneSameInstant(localZone).toLocalDateTime()
-            }
-
-            dateTime
-        } catch (e: Exception) {
-            Log.w(TAG, "解析日期时间失败: $dtString, ${e.message}")
-            null
+    fun matchSectionByTime(startTime: LocalTime, endTime: LocalTime?, classTimes: List<ClassTime>): Pair<Int, Int> {
+        if (classTimes.isEmpty()) return Pair(1, 2)
+        var startSec = 1; var minDiff = Long.MAX_VALUE
+        classTimes.forEach { ct -> kotlin.math.abs(ChronoUnit.MINUTES.between(startTime, ct.startTime)).also { d -> if (d < minDiff) { minDiff = d; startSec = ct.sectionNumber } } }
+        var count = 2; endTime?.let { et ->
+            minDiff = Long.MAX_VALUE; var endSec = startSec
+            classTimes.forEach { ct -> kotlin.math.abs(ChronoUnit.MINUTES.between(et, ct.endTime)).also { d -> if (d < minDiff) { minDiff = d; endSec = ct.sectionNumber } } }
+            count = maxOf(1, endSec - startSec + 1)
         }
+        return Pair(startSec, count)
     }
 
-    fun extractTeacherFromDescription(description: String): String {
-        val patterns = listOf(
-            Regex("教师[：:](\\S+)"),
-            Regex("Teacher[：:](\\S+)"),
-            Regex("任课教师[：:](\\S+)"),
-            Regex("授课教师[：:](\\S+)")
-        )
-
-        for (pattern in patterns) {
-            val match = pattern.find(description)
-            if (match != null) {
-                return match.groupValues[1].trim()
-            }
-        }
-
-        return ""
-    }
-
-    fun extractSectionFromDescription(description: String): Pair<Int, Int>? {
-        val patterns = listOf(
-            Regex("第(\\d+)-(\\d+)节"),
-            Regex("(\\d+)-(\\d+)节"),
-            Regex("节次[：:](\\d+)-(\\d+)"),
-            Regex("Section[：:](\\d+)-(\\d+)")
-        )
-
-        for (pattern in patterns) {
-            val match = pattern.find(description)
-            if (match != null) {
-                val start = match.groupValues[1].toIntOrNull() ?: continue
-                val end = match.groupValues[2].toIntOrNull() ?: continue
-                return Pair(start, end - start + 1)
-            }
-        }
-
-        return null
-    }
-
-    fun extractWeekFromDescription(description: String): List<Int>? {
-        val patterns = listOf(
-            Regex("(\\d+)-(\\d+)周(?:\\(([单双])\\))?"),
-            Regex("周次[：:](\\d+)-(\\d+)"),
-            Regex("Week[：:](\\d+)-(\\d+)")
-        )
-
-        for (pattern in patterns) {
-            val match = pattern.find(description)
-            if (match != null) {
-                val start = match.groupValues[1].toIntOrNull() ?: continue
-                val end = match.groupValues[2].toIntOrNull() ?: continue
-                val oddEven = match.groupValues.getOrNull(3)
-
-                val weeks = mutableListOf<Int>()
-                for (week in start..end) {
-                    when (oddEven) {
-                        "单" -> if (week % 2 == 1) weeks.add(week)
-                        "双" -> if (week % 2 == 0) weeks.add(week)
-                        else -> weeks.add(week)
-                    }
-                }
-                return weeks
-            }
-        }
-
-        return null
-    }
-
-    fun matchSectionByTime(
-        startTime: LocalTime,
-        endTime: LocalTime?,
-        classTimes: List<ClassTime>
-    ): Pair<Int, Int> {
-        if (classTimes.isEmpty()) {
-            return Pair(1, 2)
-        }
-
-        var startSection = 1
-        var minDiff = Long.MAX_VALUE
-
-        for (classTime in classTimes) {
-            val diff = kotlin.math.abs(ChronoUnit.MINUTES.between(startTime, classTime.startTime))
-            if (diff < minDiff) {
-                minDiff = diff
-                startSection = classTime.sectionNumber
-            }
-        }
-
-        var sectionCount = 2
-
-        if (endTime != null) {
-            var endSection = startSection
-            minDiff = Long.MAX_VALUE
-
-            for (classTime in classTimes) {
-                val diff = kotlin.math.abs(ChronoUnit.MINUTES.between(endTime, classTime.endTime))
-                if (diff < minDiff) {
-                    minDiff = diff
-                    endSection = classTime.sectionNumber
-                }
-            }
-
-            sectionCount = maxOf(1, endSection - startSection + 1)
-        }
-
-        return Pair(startSection, sectionCount)
-    }
-
-    fun calculateWeeksFromEvents(
-        events: List<IcsEventData>,
-        semesterStartDate: LocalDate
-    ): List<Int> {
-        val weeks = mutableSetOf<Int>()
-
-        val semesterStartMonday = semesterStartDate.with(DayOfWeek.MONDAY)
-
-        events.forEach { event ->
-            val eventDate = event.startDateTime.toLocalDate()
-            val eventMonday = eventDate.with(DayOfWeek.MONDAY)
-
-            val weeksBetween = ChronoUnit.WEEKS.between(semesterStartMonday, eventMonday).toInt() + 1
-
-            if (weeksBetween in 1..25) {
-                weeks.add(weeksBetween)
-            }
-        }
-
+    fun calculateWeeksFromEvents(events: List<IcsEventData>, semesterStartDate: LocalDate): List<Int> {
+        val weeks = mutableSetOf<Int>(); val monday = semesterStartDate.with(DayOfWeek.MONDAY)
+        events.forEach { e -> ChronoUnit.WEEKS.between(monday, e.startDateTime.toLocalDate().with(DayOfWeek.MONDAY)).toInt().let { w -> if (w + 1 in 1..25) weeks.add(w + 1) } }
         return weeks.sorted()
     }
 
     fun formatWeekExpression(weeks: List<Int>): String {
         if (weeks.isEmpty()) return ""
-
-        val sortedWeeks = weeks.sorted()
-        val ranges = mutableListOf<String>()
-        var rangeStart = sortedWeeks[0]
-        var rangeEnd = sortedWeeks[0]
-
-        for (i in 1 until sortedWeeks.size) {
-            if (sortedWeeks[i] == rangeEnd + 1) {
-                rangeEnd = sortedWeeks[i]
-            } else {
-                ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd")
-                rangeStart = sortedWeeks[i]
-                rangeEnd = sortedWeeks[i]
-            }
-        }
-
-        ranges.add(if (rangeStart == rangeEnd) "$rangeStart" else "$rangeStart-$rangeEnd")
-
-        return ranges.joinToString(",") + "周"
+        val sorted = weeks.sorted(); val ranges = mutableListOf<String>(); var rs = sorted[0]; var re = sorted[0]
+        for (i in 1 until sorted.size) { if (sorted[i] == re + 1) re = sorted[i] else { ranges.add(if (rs == re) "$rs" else "$rs-$re"); rs = sorted[i]; re = sorted[i] }}
+        ranges.add(if (rs == re) "$rs" else "$rs-$re"); return ranges.joinToString(",") + "周"
     }
 
     fun parseCsvLine(line: String): List<String> {
         val fields = mutableListOf<String>()
-        var currentField = StringBuilder()
-        var inQuotes = false
-
-        line.forEach { char ->
+        var cur = StringBuilder()
+        var q = false
+        line.forEach { c ->
             when {
-                char == '"' -> inQuotes = !inQuotes
-                char == ',' && !inQuotes -> {
-                    fields.add(currentField.toString())
-                    currentField = StringBuilder()
+                c == '"' -> q = !q
+                c == ',' && !q -> {
+                    fields.add(cur.toString())
+                    cur = StringBuilder()
                 }
-                else -> currentField.append(char)
+                else -> cur.append(c)
             }
         }
-        fields.add(currentField.toString())
-
+        fields.add(cur.toString())
         return fields
     }
 
-    fun parseDayOfWeek(dayStr: String): Int {
-        return when (dayStr) {
-            "周一", "星期一", "Monday" -> 1
-            "周二", "星期二", "Tuesday" -> 2
-            "周三", "星期三", "Wednesday" -> 3
-            "周四", "星期四", "Thursday" -> 4
-            "周五", "星期五", "Friday" -> 5
-            "周六", "星期六", "Saturday" -> 6
-            "周日", "星期日", "Sunday" -> 7
-            else -> dayStr.toIntOrNull() ?: 1
-        }
-    }
+    fun parseDayOfWeek(dayStr: String): Int = DAY_MAP[dayStr.trim()] ?: dayStr.trim().toIntOrNull() ?: 1
+    fun parseSection(sectionStr: String): Int = Regex("\\d+").find(sectionStr)?.value?.toIntOrNull() ?: 1
 
-    fun parseSection(sectionStr: String): Int {
-        val match = Regex("\\d+").find(sectionStr)
-        return match?.value?.toIntOrNull() ?: 1
-    }
-
-    fun parseWeeks(weekExpression: String): List<Int> {
-        val weeks = mutableListOf<Int>()
-
-        try {
-            if (weekExpression.contains("-") && weekExpression.contains("周")) {
-                val parts = weekExpression.replace("周", "").split("-")
-                if (parts.size == 2) {
-                    val start = parts[0].toIntOrNull() ?: 1
-                    val end = parts[1].toIntOrNull() ?: 16
-                    for (i in start..end) {
-                        weeks.add(i)
-                    }
-                }
-            } else if (weekExpression.matches(Regex("\\d+"))) {
-                weekExpression.toIntOrNull()?.let { weeks.add(it) }
-            } else {
-                for (i in 1..16) {
-                    weeks.add(i)
-                }
+    fun parseWeeks(expr: String): List<Int> = try {
+        when {
+            expr.contains("-") && expr.contains("周") -> expr.replace("周", "").split("-").let { p ->
+                if (p.size == 2) (IntRange(p[0].toIntOrNull() ?: 1, p[1].toIntOrNull() ?: 16)).toList() else emptyList()
             }
-        } catch (e: Exception) {
-            for (i in 1..16) {
-                weeks.add(i)
-            }
+            expr.matches(Regex("\\d+")) -> listOf(expr.toInt())
+            else -> emptyList()
         }
-
-        return weeks
-    }
+    } catch (_: Exception) { emptyList() }
 }

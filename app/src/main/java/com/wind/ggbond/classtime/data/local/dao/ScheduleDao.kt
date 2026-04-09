@@ -52,6 +52,12 @@ interface ScheduleDao {
     // 设置指定课表为当前课表
     @Query("UPDATE schedules SET isCurrent = 1 WHERE id = :scheduleId")
     suspend fun setCurrentSchedule(scheduleId: Long)
+
+    @Transaction
+    suspend fun switchCurrentSchedule(scheduleId: Long) {
+        clearCurrentSchedule()
+        setCurrentSchedule(scheduleId)
+    }
 }
 
 

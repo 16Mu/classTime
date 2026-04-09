@@ -1,7 +1,6 @@
 package com.wind.ggbond.classtime.util
 
 import android.content.Context
-import android.util.Log
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -12,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -35,7 +35,7 @@ class ScheduledUpdateManager @Inject constructor(
      */
     suspend fun enableScheduledUpdate() {
         try {
-            Log.d("ScheduledUpdateManager", "启用定时更新")
+            AppLogger.d("ScheduledUpdateManager", "启用定时更新")
             
             // 创建周期性工作请求
             // 最小周期为 15 分钟（WorkManager 限制）
@@ -50,10 +50,10 @@ class ScheduledUpdateManager @Inject constructor(
                 updateRequest
             )
             
-            Log.d("ScheduledUpdateManager", "✅ 定时更新任务已启用")
+            AppLogger.d("ScheduledUpdateManager", "✅ 定时更新任务已启用")
             
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "启用定时更新失败", e)
+            AppLogger.e("ScheduledUpdateManager", "启用定时更新失败", e)
         }
     }
 
@@ -64,14 +64,14 @@ class ScheduledUpdateManager @Inject constructor(
      */
     suspend fun disableScheduledUpdate() {
         try {
-            Log.d("ScheduledUpdateManager", "禁用定时更新")
+            AppLogger.d("ScheduledUpdateManager", "禁用定时更新")
             
             WorkManager.getInstance(context).cancelUniqueWork("scheduled_update")
             
-            Log.d("ScheduledUpdateManager", "✅ 定时更新任务已禁用")
+            AppLogger.d("ScheduledUpdateManager", "✅ 定时更新任务已禁用")
             
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "禁用定时更新失败", e)
+            AppLogger.e("ScheduledUpdateManager", "禁用定时更新失败", e)
         }
     }
 
@@ -83,7 +83,7 @@ class ScheduledUpdateManager @Inject constructor(
      */
     suspend fun updateScheduledTime(time: String) {
         try {
-            Log.d("ScheduledUpdateManager", "更新定时更新时间: $time")
+            AppLogger.d("ScheduledUpdateManager", "更新定时更新时间: $time")
             
             val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
             settingsDataStore.updateData { prefs ->
@@ -97,10 +97,10 @@ class ScheduledUpdateManager @Inject constructor(
             disableScheduledUpdate()
             enableScheduledUpdate()
             
-            Log.d("ScheduledUpdateManager", "✅ 定时更新时间已更新: $time")
+            AppLogger.d("ScheduledUpdateManager", "✅ 定时更新时间已更新: $time")
             
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "更新定时更新时间失败", e)
+            AppLogger.e("ScheduledUpdateManager", "更新定时更新时间失败", e)
         }
     }
 
@@ -115,7 +115,7 @@ class ScheduledUpdateManager @Inject constructor(
             preferences[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_TIME_KEY]
                 ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_TIME
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "获取定时更新时间失败", e)
+            AppLogger.e("ScheduledUpdateManager", "获取定时更新时间失败", e)
             DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_TIME
         }
     }
@@ -131,7 +131,7 @@ class ScheduledUpdateManager @Inject constructor(
             preferences[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_ENABLED_KEY]
                 ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_ENABLED
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "检查定时更新状态失败", e)
+            AppLogger.e("ScheduledUpdateManager", "检查定时更新状态失败", e)
             false
         }
     }
@@ -141,7 +141,7 @@ class ScheduledUpdateManager @Inject constructor(
      */
     suspend fun setScheduledUpdateEnabled(enabled: Boolean) {
         try {
-            Log.d("ScheduledUpdateManager", "设置定时更新状态: $enabled")
+            AppLogger.d("ScheduledUpdateManager", "设置定时更新状态: $enabled")
             
             val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
             settingsDataStore.updateData { prefs ->
@@ -156,10 +156,10 @@ class ScheduledUpdateManager @Inject constructor(
                 disableScheduledUpdate()
             }
             
-            Log.d("ScheduledUpdateManager", "✅ 定时更新状态已更新: $enabled")
+            AppLogger.d("ScheduledUpdateManager", "✅ 定时更新状态已更新: $enabled")
             
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateManager", "设置定时更新状态失败", e)
+            AppLogger.e("ScheduledUpdateManager", "设置定时更新状态失败", e)
         }
     }
 }

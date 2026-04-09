@@ -9,5 +9,5 @@ interface IUpdateManager {
 
     suspend fun checkAndTriggerAutoUpdate(): UpdateDecision
 
-    fun isUpdateEnabled(): Boolean
+    suspend fun isUpdateEnabled(): Boolean
 }

@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -62,16 +63,19 @@ class AnnouncementChecker @Inject constructor() {
 
     suspend fun fetchAnnouncements(context: Context): Result<List<AnnouncementInfo>> {
         return withContext(Dispatchers.IO) {
+            var response: Response? = null
             try {
                 val currentVersion = getCurrentVersion(context)
                 AppLogger.d(TAG, "当前版本: $currentVersion, 开始拉取公告...")
 
                 val request = Request.Builder()
                     .url(ANNOUNCEMENT_URL)
-                    .header("User-Agent", "Classtime-App/${com.wind.ggbond.classtime.BuildConfig.VERSION_NAME}")
+                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 10) Classtime-App/${com.wind.ggbond.classtime.BuildConfig.VERSION_NAME}")
+                    .header("Accept", "application/json")
+                    .header("Referer", "https://gitee.com/ggbondpy/classTime")
                     .build()
 
-                val response = client.newCall(request).execute()
+                response = client.newCall(request).execute()
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: return@withContext Result.success(emptyList())
                     val json = JSONObject(body)
@@ -114,6 +118,8 @@ class AnnouncementChecker @Inject constructor() {
             } catch (e: Exception) {
                 AppLogger.e(TAG, "获取公告异常: ${e.message}")
                 Result.failure(e)
+            } finally {
+                response?.close()
             }
         }
     }

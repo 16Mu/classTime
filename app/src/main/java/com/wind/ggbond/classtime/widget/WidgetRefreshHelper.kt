@@ -3,18 +3,18 @@ package com.wind.ggbond.classtime.widget
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
-import android.util.Log
 import com.wind.ggbond.classtime.service.contract.IWidgetRefresher
+import com.wind.ggbond.classtime.util.AppLogger
 import androidx.glance.appwidget.updateAll
+import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.Worker
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 object WidgetRefreshHelper : IWidgetRefresher {
@@ -42,9 +42,9 @@ object WidgetRefreshHelper : IWidgetRefresher {
                 NextClassWidget().updateAll(context)
                 // 刷新 4x4 大尺寸小组件 (RemoteViews)
                 LargeTodayCourseWidgetProvider.refreshAllWidgets(context)
-                Log.d(TAG, "所有 Widget 已刷新")
+                AppLogger.d(TAG, "所有 Widget 已刷新")
             } catch (e: Exception) {
-                Log.e(TAG, "刷新 Widget 失败", e)
+                AppLogger.e(TAG, "刷新 Widget 失败", e)
             }
         }
     }
@@ -83,7 +83,7 @@ object WidgetRefreshHelper : IWidgetRefresher {
      */
     override fun startPeriodicRefresh(context: Context) {
         if (!hasActiveWidgets(context)) {
-            Log.d(TAG, "无活跃 Widget，跳过周期刷新任务启动")
+            AppLogger.d(TAG, "无活跃 Widget，跳过周期刷新任务启动")
             return
         }
 
@@ -97,7 +97,7 @@ object WidgetRefreshHelper : IWidgetRefresher {
             refreshRequest
         )
 
-        Log.d(TAG, "周期刷新任务已启动（每 15 分钟）")
+        AppLogger.d(TAG, "周期刷新任务已启动（每 15 分钟）")
     }
 
     /**
@@ -109,7 +109,7 @@ object WidgetRefreshHelper : IWidgetRefresher {
      */
     override fun stopPeriodicRefresh(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_REFRESH_WORK_NAME)
-        Log.d(TAG, "周期刷新任务已停止")
+        AppLogger.d(TAG, "周期刷新任务已停止")
     }
 }
 
@@ -122,29 +122,24 @@ object WidgetRefreshHelper : IWidgetRefresher {
 class WidgetRefreshWorker(
     context: Context,
     workerParams: WorkerParameters
-) : Worker(context, workerParams) {
+) : CoroutineWorker(context, workerParams) {
 
-    override fun doWork(): Result {
+    override suspend fun doWork(): Result {
         return try {
-            // 检查是否还有活跃的 Widget
             if (!WidgetRefreshHelper.hasActiveWidgets(applicationContext)) {
-                // 无活跃 Widget，停止周期任务
                 WidgetRefreshHelper.stopPeriodicRefresh(applicationContext)
                 return Result.success()
             }
 
-            // 执行刷新
-            runBlocking {
-                // 刷新 Glance 小组件
+            withContext(Dispatchers.IO) {
                 TodayCourseWidget().updateAll(applicationContext)
                 NextClassWidget().updateAll(applicationContext)
-                // 刷新 RemoteViews 小组件
                 LargeTodayCourseWidgetProvider.refreshAllWidgets(applicationContext)
             }
-            Log.d("WidgetRefreshWorker", "Widget 周期刷新完成")
+            AppLogger.d("WidgetRefreshWorker", "Widget 周期刷新完成")
             Result.success()
         } catch (e: Exception) {
-            Log.e("WidgetRefreshWorker", "Widget 周期刷新失败", e)
+            AppLogger.e("WidgetRefreshWorker", "Widget 周期刷新失败", e)
             Result.retry()
         }
     }

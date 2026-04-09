@@ -5,26 +5,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Exam
-import com.wind.ggbond.classtime.ui.components.AppDialog
-import com.wind.ggbond.classtime.ui.theme.Spacing
 import com.wind.ggbond.classtime.util.DateUtils
 import java.time.LocalDate
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 
 /**
- * 添加/编辑考试对话�?
+ * 添加/编辑考试对话框
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,8 +31,6 @@ fun AddExamDialog(
     onConfirm: (Exam) -> Unit,
     existingExam: Exam? = null
 ) {
-    val haptic = LocalHapticFeedback.current
-    
     var examType by remember { mutableStateOf(existingExam?.examType ?: "期末考试") }
     var weekNumber by remember { mutableStateOf(existingExam?.weekNumber ?: currentWeek) }
     var dayOfWeek by remember { mutableStateOf<Int?>(existingExam?.dayOfWeek) }
@@ -53,10 +46,10 @@ fun AddExamDialog(
     // 是否精确模式（设置具体节次）
     var isPreciseMode by remember { mutableStateOf(existingExam?.isPreciseMode() ?: false) }
     
-    // 展开的部�?
+    // 展开的部分
     var showAdvancedOptions by remember { mutableStateOf(false) }
     
-    AppDialog(
+    AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -65,13 +58,12 @@ fun AddExamDialog(
                 fontWeight = FontWeight.Bold
             )
         },
-        content = {
+        text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 520.dp)
+                    .heightIn(max = 500.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(bottom = 8.dp)
             ) {
                 // 课程名称显示
                 Card(
@@ -113,7 +105,7 @@ fun AddExamDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("���п���", "��ĩ����", "���ò���", "����").forEach { type ->
+                    listOf("期中考试", "期末考试", "随堂测验", "补考").forEach { type ->
                         FilterChip(
                             selected = examType == type,
                             onClick = { examType = type },
@@ -132,7 +124,7 @@ fun AddExamDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // 使用字符串状态管理，避免删除键光标跳�?
+                // 使用字符串状态管理，避免删除键光标跳动
                 var weekNumberText by remember(weekNumber) { mutableStateOf(weekNumber.toString()) }
                 OutlinedTextField(
                     value = weekNumberText,
@@ -144,7 +136,7 @@ fun AddExamDialog(
                             }
                         }
                     },
-                    label = { Text("�ڼ���") },
+                    label = { Text("第几周") },
                     leadingIcon = { Icon(Icons.Default.DateRange, null) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -153,7 +145,7 @@ fun AddExamDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // 精确模式开�?
+                // 精确模式开关
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -172,7 +164,7 @@ fun AddExamDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "��ȷ���ڴ�",
+                                text = "精确到节次",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -226,7 +218,7 @@ fun AddExamDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // 使用字符串状态管理，避免删除键光标跳�?
+                        // 使用字符串状态管理，避免删除键光标跳动
                         var startSectionText by remember(startSection) { mutableStateOf(startSection?.toString() ?: "") }
                         var sectionCountText by remember(sectionCount) { mutableStateOf(sectionCount.toString()) }
                         OutlinedTextField(
@@ -237,7 +229,7 @@ fun AddExamDialog(
                                     if (section > 0) startSection = section
                                 }
                             },
-                            label = { Text("��ʼ�ڴ�") },
+                            label = { Text("开始节次") },
                             leadingIcon = { Icon(Icons.Default.AccessTime, null) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
@@ -288,12 +280,12 @@ fun AddExamDialog(
                 
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                // 座位�?
+                // 座位号
                 OutlinedTextField(
                     value = seat,
                     onValueChange = { seat = it },
                     label = { Text("座位号（可选）") },
-                    placeholder = { Text("���磺��A��5��") },
+                    placeholder = { Text("如：第3排15号") },
                     leadingIcon = { Icon(Icons.Default.EventSeat, null) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -346,7 +338,7 @@ fun AddExamDialog(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 
                                 Text(
-                                    text = "��ǰ $reminderDays ������",
+                                    text = "提前 $reminderDays 天提醒",
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 Slider(
@@ -366,7 +358,7 @@ fun AddExamDialog(
                         value = note,
                         onValueChange = { note = it },
                         label = { Text("备注") },
-                        placeholder = { Text("���磺�������ɴ���������") },
+                        placeholder = { Text("如：开卷、可带计算器等") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                         maxLines = 4
@@ -374,58 +366,50 @@ fun AddExamDialog(
                 }
             }
         },
-        actions = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onDismiss()
-                }) {
-                    Text("取消")
-                }
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Button(
-                    onClick = {
-                        val exam = if (existingExam != null) {
-                            existingExam.copy(
-                                examType = examType,
-                                weekNumber = weekNumber,
-                                dayOfWeek = if (isPreciseMode) dayOfWeek else null,
-                                startSection = if (isPreciseMode) startSection else null,
-                                sectionCount = sectionCount,
-                                examTime = examTime,
-                                location = location,
-                                seat = seat,
-                                reminderEnabled = reminderEnabled,
-                                reminderDays = reminderDays,
-                                note = note,
-                                updatedAt = System.currentTimeMillis()
-                            )
-                        } else {
-                            Exam(
-                                courseId = course.id,
-                                courseName = course.courseName,
-                                examType = examType,
-                                weekNumber = weekNumber,
-                                dayOfWeek = if (isPreciseMode) dayOfWeek else null,
-                                startSection = if (isPreciseMode) startSection else null,
-                                sectionCount = sectionCount,
-                                examTime = examTime,
-                                location = location,
-                                seat = seat,
-                                reminderEnabled = reminderEnabled,
-                                reminderDays = reminderDays,
-                                note = note
-                            )
-                        }
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onConfirm(exam)
+        confirmButton = {
+            Button(
+                onClick = {
+                    val exam = if (existingExam != null) {
+                        existingExam.copy(
+                            examType = examType,
+                            weekNumber = weekNumber,
+                            dayOfWeek = if (isPreciseMode) dayOfWeek else null,
+                            startSection = if (isPreciseMode) startSection else null,
+                            sectionCount = sectionCount,
+                            examTime = examTime,
+                            location = location,
+                            seat = seat,
+                            reminderEnabled = reminderEnabled,
+                            reminderDays = reminderDays,
+                            note = note,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    } else {
+                        Exam(
+                            courseId = course.id,
+                            courseName = course.courseName,
+                            examType = examType,
+                            weekNumber = weekNumber,
+                            dayOfWeek = if (isPreciseMode) dayOfWeek else null,
+                            startSection = if (isPreciseMode) startSection else null,
+                            sectionCount = sectionCount,
+                            examTime = examTime,
+                            location = location,
+                            seat = seat,
+                            reminderEnabled = reminderEnabled,
+                            reminderDays = reminderDays,
+                            note = note
+                        )
                     }
-                ) {
-                    Text(if (existingExam != null) "保存" else "添加")
+                    onConfirm(exam)
                 }
+            ) {
+                Text(if (existingExam != null) "保存" else "添加")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
             }
         }
     )

@@ -18,7 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -107,6 +110,13 @@ class ReminderSettingsViewModel @Inject constructor(
     // 提醒测试对话框状态
     private val _showReminderTestDialog = MutableStateFlow(false)
     val showReminderTestDialog: StateFlow<Boolean> = _showReminderTestDialog.asStateFlow()
+
+    private val _messageEvent = MutableSharedFlow<String>()
+    val messageEvent = _messageEvent.asSharedFlow()
+
+    private suspend fun showMessage(message: String) {
+        _messageEvent.emit(message)
+    }
 
     init {
         loadSettings()
@@ -279,15 +289,11 @@ class ReminderSettingsViewModel @Inject constructor(
                         val defaultMinutes = _defaultReminderMinutes.value
                         val updatedCount = courseRepository.enableAllCoursesReminder(it.id, defaultMinutes)
                         reminderScheduler.scheduleAllCourseReminders(it.id)
-                        android.widget.Toast.makeText(
-                            context, "已为 $updatedCount 门课程开启提醒", android.widget.Toast.LENGTH_SHORT
-                        ).show()
+                        showMessage("已为 $updatedCount 门课程开启提醒")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("ReminderSettingsVM", "开启课程提醒失败", e)
-                    android.widget.Toast.makeText(
-                        context, "开启课程提醒失败：${e.message}", android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    AppLogger.e("ReminderSettingsVM", "开启课程提醒失败", e)
+                    showMessage("开启课程提醒失败：${e.message}")
                 }
             } else {
                 // 关闭：批量取消所有课程的提醒
@@ -295,15 +301,11 @@ class ReminderSettingsViewModel @Inject constructor(
                     schedule?.let {
                         val updatedCount = courseRepository.disableAllCoursesReminder(it.id)
                         reminderScheduler.cancelAllCourseReminders(it.id)
-                        android.widget.Toast.makeText(
-                            context, "已关闭所有课程提醒", android.widget.Toast.LENGTH_SHORT
-                        ).show()
+                        showMessage("已关闭所有课程提醒")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("ReminderSettingsVM", "关闭课程提醒失败", e)
-                    android.widget.Toast.makeText(
-                        context, "关闭课程提醒失败：${e.message}", android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    AppLogger.e("ReminderSettingsVM", "关闭课程提醒失败", e)
+                    showMessage("关闭课程提醒失败：${e.message}")
                 }
             }
         }
@@ -327,15 +329,23 @@ class ReminderSettingsViewModel @Inject constructor(
      */
     fun updateHeadsUpNotificationEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.edit { preferences ->
-                preferences[HEADS_UP_NOTIFICATION_ENABLED_KEY] = enabled
+            try {
+                settingsDataStore.edit { preferences ->
+                    preferences[HEADS_UP_NOTIFICATION_ENABLED_KEY] = enabled
+                }
+                _headsUpNotificationEnabled.value = enabled
+                context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("heads_up_notification_enabled", enabled)
+                    .apply()
+            } catch (e: Exception) {
+                AppLogger.e("ReminderSettings", "更新悬浮通知设置失败", e)
+                _headsUpNotificationEnabled.value = enabled
+                context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("heads_up_notification_enabled", enabled)
+                    .apply()
             }
-            // 同步到 SharedPreferences 供 Worker 读取
-            context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean("heads_up_notification_enabled", enabled)
-                .apply()
-            _headsUpNotificationEnabled.value = enabled
         }
     }
 
@@ -371,12 +381,12 @@ class ReminderSettingsViewModel @Inject constructor(
             try {
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule == null) {
-                    android.widget.Toast.makeText(context, "未找到当前课表，请先导入课表", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("未找到当前课表，请先导入课表")
                     return@launch
                 }
                 val courses = courseRepository.getAllCoursesBySchedule(currentSchedule.id).first()
                 if (courses.isEmpty()) {
-                    android.widget.Toast.makeText(context, "当前课表没有课程", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("当前课表没有课程")
                     return@launch
                 }
                 // 取第一门课程，5秒后触发
@@ -391,12 +401,12 @@ class ReminderSettingsViewModel @Inject constructor(
                     isSameCourseClassroom = false
                 )
                 if (success) {
-                    android.widget.Toast.makeText(context, "立即提醒测试成功，5秒后收到通知", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("立即提醒测试成功，5秒后收到通知")
                 } else {
-                    android.widget.Toast.makeText(context, "立即提醒测试失败", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("立即提醒测试失败")
                 }
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "测试失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("测试失败: ${e.message}")
             }
         }
     }
@@ -409,12 +419,12 @@ class ReminderSettingsViewModel @Inject constructor(
             try {
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule == null) {
-                    android.widget.Toast.makeText(context, "未找到当前课表，请先导入课表", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("未找到当前课表，请先导入课表")
                     return@launch
                 }
                 val courses = courseRepository.getAllCoursesBySchedule(currentSchedule.id).first()
                 if (courses.size < 2) {
-                    android.widget.Toast.makeText(context, "至少需要2门课程才能测试下节课提醒", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("至少需要2门课程才能测试下节课提醒")
                     return@launch
                 }
                 val currentCourse = courses[0]
@@ -429,12 +439,12 @@ class ReminderSettingsViewModel @Inject constructor(
                     isSameCourseClassroom = false
                 )
                 if (success) {
-                    android.widget.Toast.makeText(context, "下节课提醒测试成功，5秒后收到通知", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("下节课提醒测试成功，5秒后收到通知")
                 } else {
-                    android.widget.Toast.makeText(context, "下节课提醒测试失败", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("下节课提醒测试失败")
                 }
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "测试失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("测试失败: ${e.message}")
             }
         }
     }
@@ -447,12 +457,12 @@ class ReminderSettingsViewModel @Inject constructor(
             try {
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule == null) {
-                    android.widget.Toast.makeText(context, "未找到当前课表，请先导入课表", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("未找到当前课表，请先导入课表")
                     return@launch
                 }
                 val courses = courseRepository.getAllCoursesBySchedule(currentSchedule.id).first()
                 if (courses.isEmpty()) {
-                    android.widget.Toast.makeText(context, "当前课表没有课程", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("当前课表没有课程")
                     return@launch
                 }
                 val testCourse = courses[0]
@@ -466,12 +476,12 @@ class ReminderSettingsViewModel @Inject constructor(
                     isSameCourseClassroom = false
                 )
                 if (success) {
-                    android.widget.Toast.makeText(context, "上课提醒测试成功，5秒后收到通知", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("上课提醒测试成功，5秒后收到通知")
                 } else {
-                    android.widget.Toast.makeText(context, "上课提醒测试失败", android.widget.Toast.LENGTH_SHORT).show()
+                    showMessage("上课提醒测试失败")
                 }
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "测试失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("测试失败: ${e.message}")
             }
         }
     }
@@ -481,7 +491,7 @@ class ReminderSettingsViewModel @Inject constructor(
      */
     fun testCourseEndReminder() {
         viewModelScope.launch {
-            android.widget.Toast.makeText(context, "下课提醒功能正在开发中", android.widget.Toast.LENGTH_SHORT).show()
+            showMessage("下课提醒功能正在开发中")
         }
     }
 
@@ -491,7 +501,7 @@ class ReminderSettingsViewModel @Inject constructor(
     fun testAllReminders() {
         viewModelScope.launch {
             try {
-                android.widget.Toast.makeText(context, "开始测试所有提醒功能...", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("开始测试所有提醒功能...")
                 kotlinx.coroutines.delay(1000)
                 testImmediateReminder()
                 kotlinx.coroutines.delay(2000)
@@ -499,9 +509,9 @@ class ReminderSettingsViewModel @Inject constructor(
                 kotlinx.coroutines.delay(2000)
                 testCourseStartReminder()
                 kotlinx.coroutines.delay(2000)
-                android.widget.Toast.makeText(context, "所有提醒测试完成", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("所有提醒测试完成")
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "批量测试失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("批量测试失败: ${e.message}")
             }
         }
     }
@@ -531,9 +541,9 @@ class ReminderSettingsViewModel @Inject constructor(
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 val clip = android.content.ClipData.newPlainText("提醒诊断报告", report.toString())
                 clipboard.setPrimaryClip(clip)
-                android.widget.Toast.makeText(context, "$summary\n详细报告已复制到剪贴板", android.widget.Toast.LENGTH_LONG).show()
+                showMessage("$summary\n详细报告已复制到剪贴板")
             } catch (e: Exception) {
-                android.widget.Toast.makeText(context, "诊断失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                showMessage("诊断失败: ${e.message}")
             }
         }
     }

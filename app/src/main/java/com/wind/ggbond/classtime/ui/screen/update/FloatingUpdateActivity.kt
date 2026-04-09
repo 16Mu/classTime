@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -36,6 +35,7 @@ import com.wind.ggbond.classtime.ui.theme.CourseScheduleTheme
 import com.wind.ggbond.classtime.util.SecureCookieManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -199,15 +199,15 @@ fun DebugWebViewDialog(
                 }
                 cookieManager.flush()
                 
-                Log.d("DebugWebView", "加载登录页面: ${school.loginUrl}")
-                Log.d("DebugWebView", "Cookie长度: ${cookies.length}字符")
+                AppLogger.d("DebugWebView", "加载登录页面: ${school.loginUrl}")
+                AppLogger.d("DebugWebView", "Cookie长度: ${cookies.length}字符")
                 
                 wv.loadUrl(school.loginUrl)
             }
             
         } catch (e: Exception) {
             statusText = "❌ 错误: ${e.message}"
-            Log.e("DebugWebView", "初始化失败", e)
+            AppLogger.e("DebugWebView", "初始化失败", e)
         }
     }
     
@@ -269,12 +269,14 @@ fun DebugWebViewDialog(
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
+                            allowFileAccess = false
+                            allowContentAccess = false
                             cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
                         }
                         
                         webChromeClient = object : android.webkit.WebChromeClient() {
                             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
-                                Log.d("WebViewConsole", "${consoleMessage.message()} -- Line ${consoleMessage.lineNumber()}")
+                                AppLogger.d("WebViewConsole", "${consoleMessage.message()} -- Line ${consoleMessage.lineNumber()}")
                                 return true
                             }
                         }
@@ -283,15 +285,15 @@ fun DebugWebViewDialog(
                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
                                 currentUrl = url ?: "unknown"
-                                Log.d("DebugWebView", "📄 开始加载: $url")
+                                AppLogger.d("DebugWebView", "📄 开始加载: $url")
                             }
                             
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
-                                Log.d("DebugWebView", "✅ 加载完成: $url")
+                                AppLogger.d("DebugWebView", "✅ 加载完成: $url")
                                 
                                 view?.postDelayed({
-                                    Log.d("DebugWebView", "🔘 尝试触发课表查询...")
+                                    AppLogger.d("DebugWebView", "🔘 尝试触发课表查询...")
                                     view.evaluateJavascript("""
                                         (function() {
                                             try {
@@ -311,7 +313,7 @@ fun DebugWebViewDialog(
                                             }
                                         })();
                                     """.trimIndent()) { clickResult ->
-                                        Log.d("DebugWebView", "🔘 查询按钮点击结果: $clickResult")
+                                        AppLogger.d("DebugWebView", "🔘 查询按钮点击结果: $clickResult")
                                     }
                                 }, 1000)
                                 
@@ -319,11 +321,11 @@ fun DebugWebViewDialog(
                                     val extractor = extractorFactory.getExtractor(schoolId)
                                     
                                     if (extractor != null) {
-                                        Log.d("DebugWebView", "✅ 使用专用提取器: ${extractor.schoolName}")
+                                        AppLogger.d("DebugWebView", "✅ 使用专用提取器: ${extractor.schoolName}")
                                         val extractScript = extractor.generateExtractionScript()
                                         
                                         view.evaluateJavascript(extractScript) { result ->
-                                            Log.d("DebugWebView", "📊 提取结果: ${result?.take(500)}")
+                                            AppLogger.d("DebugWebView", "📊 提取结果: ${result?.take(500)}")
                                             
                                             scope.launch {
                                                 try {
@@ -337,12 +339,12 @@ fun DebugWebViewDialog(
                                                         ${result?.take(500)}
                                         """.trimIndent()
                                                     
-                                                    Log.d("DebugWebView", "✅ 成功提取 ${courses.size} 门课程")
+                                                    AppLogger.d("DebugWebView", "✅ 成功提取 ${courses.size} 门课程")
                                                     courses.take(3).forEach { course ->
-                                                        Log.d("DebugWebView", "  - ${course.courseName} (${course.teacher})")
+                                                        AppLogger.d("DebugWebView", "  - ${course.courseName} (${course.teacher})")
                                                     }
                                                 } catch (e: Exception) {
-                                                    Log.e("DebugWebView", "解析失败", e)
+                                                    AppLogger.e("DebugWebView", "解析失败", e)
                                                     statusText = "❌ 解析失败: ${e.message}"
                                                 }
                                             }
@@ -360,7 +362,7 @@ fun DebugWebViewDialog(
                                 if (!request.isForMainFrame) return
 
                                 val description = error.description?.toString().orEmpty()
-                                Log.e("DebugWebView", "????????: $description")
+                                AppLogger.e("DebugWebView", "????????: $description")
                                 statusText = "????????: $description"
                             }
                         }
@@ -403,17 +405,17 @@ fun SilentUpdateDialog(
     
     LaunchedEffect(Unit) {
         try {
-            Log.d("SilentUpdate", "🚀 开始执行课表更新（静默模式）")
+            AppLogger.d("SilentUpdate", "🚀 开始执行课表更新（静默模式）")
             
             val autoLoginManager = com.wind.ggbond.classtime.util.AutoLoginManager(context)
             
             // 检查自动登录是否启用
             if (autoLoginManager.isAutoLoginEnabled()) {
-                Log.d("SilentUpdate", "自动登录已启用，检查账号...")
+                AppLogger.d("SilentUpdate", "自动登录已启用，检查账号...")
                 
                 if (!autoLoginManager.hasCredentials()) {
                     // 未配置账号
-                    Log.w("SilentUpdate", "未配置自动登录账号")
+                    AppLogger.w("SilentUpdate", "未配置自动登录账号")
                     autoLoginManager.saveLastUpdateResult(
                         com.wind.ggbond.classtime.util.AutoLoginResultCode.NO_CREDENTIAL,
                         com.wind.ggbond.classtime.util.AutoLoginResultMessages.getMessage(
@@ -425,26 +427,26 @@ fun SilentUpdateDialog(
                 }
                 
                 // 执行自动登录
-                Log.d("SilentUpdate", "开始自动登录...")
+                AppLogger.d("SilentUpdate", "开始自动登录...")
                 val loginStartTime = System.currentTimeMillis()
                 val loginResult = performAutoLogin(context, autoLoginManager)
                 val loginDuration = System.currentTimeMillis() - loginStartTime
                 
                 if (!loginResult.success) {
                     // 登录失败或需要验证码
-                    Log.w("SilentUpdate", "自动登录失败: ${loginResult.message}")
+                    AppLogger.w("SilentUpdate", "自动登录失败: ${loginResult.message}")
                     autoLoginManager.saveLastUpdateResult(loginResult.resultCode, loginResult.message)
                     onResult(false, loginResult.message)
                     return@LaunchedEffect
                 }
                 
-                Log.d("SilentUpdate", "自动登录成功，继续执行课表更新...")
+                AppLogger.d("SilentUpdate", "自动登录成功，继续执行课表更新...")
             }
             
             // ✅ 使用CookieAutoUpdateService执行完整更新流程
             val (success, message) = cookieAutoUpdateService.performUpdate()
             
-            Log.d("SilentUpdate", "更新结果: ${if (success) "成功" else "失败"} - $message")
+            AppLogger.d("SilentUpdate", "更新结果: ${if (success) "成功" else "失败"} - $message")
             
             // 保存更新结果
             if (autoLoginManager.isAutoLoginEnabled()) {
@@ -470,7 +472,7 @@ fun SilentUpdateDialog(
             onResult(success, message)
             
         } catch (e: Exception) {
-            Log.e("SilentUpdate", "更新失败", e)
+            AppLogger.e("SilentUpdate", "更新失败", e)
             
             logRepository.logUpdate(
                 triggerEvent = "自动更新",
@@ -517,7 +519,7 @@ private suspend fun performAutoLogin(
         val schoolId = prefs.getString("current_school_id", null)
         
         if (schoolId.isNullOrBlank()) {
-            Log.w("AutoLogin", "未找到当前学校ID")
+            AppLogger.w("AutoLogin", "未找到当前学校ID")
             return AutoLoginResult(
                 success = false,
                 resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
@@ -525,7 +527,7 @@ private suspend fun performAutoLogin(
             )
         }
         
-        Log.d("AutoLogin", "开始自动登录: $schoolId - $username")
+        AppLogger.d("AutoLogin", "开始自动登录: $schoolId - $username")
         
         // 使用 AutoLoginService 执行自动登录
         // 注意：这里需要通过 Hilt 注入 SchoolRepository
@@ -533,7 +535,7 @@ private suspend fun performAutoLogin(
         val schoolRepository = (context as? FloatingUpdateActivity)?.schoolRepository
         
         if (schoolRepository == null) {
-            Log.w("AutoLogin", "无法获取 SchoolRepository")
+            AppLogger.w("AutoLogin", "无法获取 SchoolRepository")
             return AutoLoginResult(
                 success = false,
                 resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
@@ -547,7 +549,7 @@ private suspend fun performAutoLogin(
         val loginScriptGenerator = activity?.loginScriptGenerator
         
         if (secureCookieManager == null || loginScriptGenerator == null) {
-            Log.w("AutoLogin", "无法获取 SecureCookieManager 或 LoginScriptGenerator")
+            AppLogger.w("AutoLogin", "无法获取 SecureCookieManager 或 LoginScriptGenerator")
             return AutoLoginResult(
                 success = false,
                 resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
@@ -564,11 +566,11 @@ private suspend fun performAutoLogin(
         
         val result = autoLoginService.performAutoLogin(schoolId, username, password)
         
-        Log.d("AutoLogin", "自动登录结果: ${result.resultCode} - ${result.message}")
+        AppLogger.d("AutoLogin", "自动登录结果: ${result.resultCode} - ${result.message}")
         
         result
     } catch (e: Exception) {
-        Log.e("AutoLogin", "自动登录异常", e)
+        AppLogger.e("AutoLogin", "自动登录异常", e)
         AutoLoginResult(
             success = false,
             resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
@@ -654,9 +656,9 @@ fun FloatingUpdateActivity.sendUpdateNotification(success: Boolean, message: Str
             }
         }
         
-        Log.d("SilentUpdate", "通知已发送: ${if (success) "成功" else "失败"} - $message")
+        AppLogger.d("SilentUpdate", "通知已发送: ${if (success) "成功" else "失败"} - $message")
     } catch (e: Exception) {
-        Log.e("SilentUpdate", "发送通知失败", e)
+        AppLogger.e("SilentUpdate", "发送通知失败", e)
     }
 }
 

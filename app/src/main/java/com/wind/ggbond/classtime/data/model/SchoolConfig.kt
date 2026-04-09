@@ -33,7 +33,8 @@ data class ParsedCourse(
     val sectionCount: Int = 1,
     val weekExpression: String = "",
     val weeks: List<Int> = emptyList(),
-    val credit: Float = 0f  // 学分，默认0（可在导入后手动编辑）
+    val credit: Float = 0f,
+    val courseCode: String = ""
 )
 
 /**

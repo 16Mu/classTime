@@ -3,11 +3,11 @@ package com.wind.ggbond.classtime.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
+import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,374 +16,136 @@ class SettingsRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SettingsRepository {
 
-    private val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
+    private val ds = DataStoreManager.getSettingsDataStore(context)
+    private val K = DataStoreManager.SettingsKeys
+
+    // ==================== 通用读写方法 ====================
+
+    private suspend fun <T> get(key: androidx.datastore.preferences.core.Preferences.Key<T>, default: T): T =
+        ds.data.first()[key] ?: default
+
+    private suspend fun <T> set(key: androidx.datastore.preferences.core.Preferences.Key<T>, value: T) {
+        ds.edit { it[key] = value }
+    }
+
+    private fun <T> observe(key: androidx.datastore.preferences.core.Preferences.Key<T>, default: T): Flow<T> =
+        ds.data.map { it[key] ?: default }
+
+    private suspend fun getBool(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, default: Boolean = false): Boolean = get(key, default)
+    private suspend fun setBool(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, value: Boolean) = set(key, value)
+    private fun observeBool(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, default: Boolean = false): Flow<Boolean> = observe(key, default)
+    private suspend fun getInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, default: Int): Int = get(key, default)
+    private suspend fun setInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, value: Int) = set(key, value)
+    private fun observeInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, default: Int): Flow<Int> = observe(key, default)
+    private suspend fun getStr(key: androidx.datastore.preferences.core.Preferences.Key<String>, default: String = ""): String? = get(key, default).takeIf { it.isNotEmpty() || default.isEmpty() }
+    private suspend fun setStr(key: androidx.datastore.preferences.core.Preferences.Key<String>, value: String?) {
+        ds.edit { if (value != null) it[key] = value else it.remove(key) }
+    }
+    private suspend fun getLong(key: androidx.datastore.preferences.core.Preferences.Key<Long>, default: Long = 0L): Long = get(key, default)
+    private suspend fun setLong(key: androidx.datastore.preferences.core.Preferences.Key<Long>, value: Long) = set(key, value)
 
     // ==================== 引导相关 ====================
 
-    override suspend fun isDisclaimerAccepted(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.DISCLAIMER_ACCEPTED_KEY] ?: false
-    }
+    override suspend fun isDisclaimerAccepted(): Boolean = getBool(K.DISCLAIMER_ACCEPTED_KEY)
+    override suspend fun setDisclaimerAccepted(accepted: Boolean) = setBool(K.DISCLAIMER_ACCEPTED_KEY, accepted)
+    override fun observeDisclaimerAccepted(): Flow<Boolean> = observeBool(K.DISCLAIMER_ACCEPTED_KEY)
 
-    override suspend fun setDisclaimerAccepted(accepted: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.DISCLAIMER_ACCEPTED_KEY] = accepted
-        }
-    }
-
-    override fun observeDisclaimerAccepted(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.DISCLAIMER_ACCEPTED_KEY] ?: false }
-    }
-
-    override suspend fun isOnboardingCompleted(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.ONBOARDING_COMPLETED_KEY] ?: false
-    }
-
-    override suspend fun setOnboardingCompleted(completed: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.ONBOARDING_COMPLETED_KEY] = completed
-        }
-    }
-
-    override fun observeOnboardingCompleted(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.ONBOARDING_COMPLETED_KEY] ?: false }
-    }
+    override suspend fun isOnboardingCompleted(): Boolean = getBool(K.ONBOARDING_COMPLETED_KEY)
+    override suspend fun setOnboardingCompleted(completed: Boolean) = setBool(K.ONBOARDING_COMPLETED_KEY, completed)
+    override fun observeOnboardingCompleted(): Flow<Boolean> = observeBool(K.ONBOARDING_COMPLETED_KEY)
 
     // ==================== 提醒相关 ====================
 
-    override suspend fun isReminderEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.REMINDER_ENABLED_KEY] ?: false
-    }
+    override suspend fun isReminderEnabled(): Boolean = getBool(K.REMINDER_ENABLED_KEY)
+    override suspend fun setReminderEnabled(enabled: Boolean) = setBool(K.REMINDER_ENABLED_KEY, enabled)
+    override fun observeReminderEnabled(): Flow<Boolean> = observeBool(K.REMINDER_ENABLED_KEY)
 
-    override suspend fun setReminderEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.REMINDER_ENABLED_KEY] = enabled
-        }
-    }
+    override suspend fun getDefaultReminderMinutes(): Int = getInt(K.DEFAULT_REMINDER_MINUTES_KEY, 10)
+    override suspend fun setDefaultReminderMinutes(minutes: Int) = setInt(K.DEFAULT_REMINDER_MINUTES_KEY, minutes)
+    override fun observeDefaultReminderMinutes(): Flow<Int> = observeInt(K.DEFAULT_REMINDER_MINUTES_KEY, 10)
 
-    override fun observeReminderEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.REMINDER_ENABLED_KEY] ?: false }
-    }
-
-    override suspend fun getDefaultReminderMinutes(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.DEFAULT_REMINDER_MINUTES_KEY] ?: 10
-    }
-
-    override suspend fun setDefaultReminderMinutes(minutes: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.DEFAULT_REMINDER_MINUTES_KEY] = minutes
-        }
-    }
-
-    override fun observeDefaultReminderMinutes(): Flow<Int> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.DEFAULT_REMINDER_MINUTES_KEY] ?: 10 }
-    }
-
-    override suspend fun isHeadsUpNotificationEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.HEADS_UP_NOTIFICATION_ENABLED_KEY] ?: true
-    }
-
-    override suspend fun setHeadsUpNotificationEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.HEADS_UP_NOTIFICATION_ENABLED_KEY] = enabled
-        }
-    }
-
-    override fun observeHeadsUpNotificationEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.HEADS_UP_NOTIFICATION_ENABLED_KEY] ?: true }
-    }
+    override suspend fun isHeadsUpNotificationEnabled(): Boolean = getBool(K.HEADS_UP_NOTIFICATION_ENABLED_KEY, true)
+    override suspend fun setHeadsUpNotificationEnabled(enabled: Boolean) = setBool(K.HEADS_UP_NOTIFICATION_ENABLED_KEY, enabled)
+    override fun observeHeadsUpNotificationEnabled(): Flow<Boolean> = observeBool(K.HEADS_UP_NOTIFICATION_ENABLED_KEY, true)
 
     // ==================== 显示模式 ====================
 
-    override suspend fun isCompactModeEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.COMPACT_MODE_ENABLED_KEY] ?: false
-    }
+    override suspend fun isCompactModeEnabled(): Boolean = getBool(K.COMPACT_MODE_ENABLED_KEY)
+    override suspend fun setCompactModeEnabled(enabled: Boolean) = setBool(K.COMPACT_MODE_ENABLED_KEY, enabled)
+    override fun observeCompactModeEnabled(): Flow<Boolean> = observeBool(K.COMPACT_MODE_ENABLED_KEY)
 
-    override suspend fun setCompactModeEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.COMPACT_MODE_ENABLED_KEY] = enabled
-        }
-    }
+    override suspend fun isShowWeekendEnabled(): Boolean = getBool(K.SHOW_WEEKEND_KEY, true)
+    override suspend fun setShowWeekendEnabled(enabled: Boolean) = setBool(K.SHOW_WEEKEND_KEY, enabled)
+    override fun observeShowWeekendEnabled(): Flow<Boolean> = observeBool(K.SHOW_WEEKEND_KEY, true)
 
-    override fun observeCompactModeEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.COMPACT_MODE_ENABLED_KEY] ?: false }
-    }
-
-    override suspend fun isShowWeekendEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.SHOW_WEEKEND_KEY] ?: true
-    }
-
-    override suspend fun setShowWeekendEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.SHOW_WEEKEND_KEY] = enabled
-        }
-    }
-
-    override fun observeShowWeekendEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map { it[DataStoreManager.SettingsKeys.SHOW_WEEKEND_KEY] ?: true }
-    }
-
-    override suspend fun isBottomBarBlurEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.BOTTOM_BAR_BLUR_ENABLED_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_BOTTOM_BAR_BLUR_ENABLED
-    }
-
-    override suspend fun setBottomBarBlurEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.BOTTOM_BAR_BLUR_ENABLED_KEY] = enabled
-        }
-    }
-
-    override fun observeBottomBarBlurEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.BOTTOM_BAR_BLUR_ENABLED_KEY]
-                ?: DataStoreManager.SettingsKeys.DEFAULT_BOTTOM_BAR_BLUR_ENABLED
-        }
-    }
+    override suspend fun isGlassEffectEnabled(): Boolean = getBool(K.GLASS_EFFECT_ENABLED_KEY, K.DEFAULT_GLASS_EFFECT_ENABLED)
+    override suspend fun setGlassEffectEnabled(enabled: Boolean) = setBool(K.GLASS_EFFECT_ENABLED_KEY, enabled)
+    override fun observeGlassEffectEnabled(): Flow<Boolean> = observeBool(K.GLASS_EFFECT_ENABLED_KEY, K.DEFAULT_GLASS_EFFECT_ENABLED)
 
     // ==================== 自动更新相关 ====================
 
-    override suspend fun isAutoUpdateEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.AUTO_UPDATE_ENABLED_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_ENABLED
-    }
+    override suspend fun isAutoUpdateEnabled(): Boolean = getBool(K.AUTO_UPDATE_ENABLED_KEY, K.DEFAULT_AUTO_UPDATE_ENABLED)
+    override suspend fun setAutoUpdateEnabled(enabled: Boolean) = setBool(K.AUTO_UPDATE_ENABLED_KEY, enabled)
 
-    override suspend fun setAutoUpdateEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.AUTO_UPDATE_ENABLED_KEY] = enabled
-        }
-    }
+    override suspend fun isIntervalUpdateEnabled(): Boolean = getBool(K.INTERVAL_UPDATE_ENABLED_KEY, K.DEFAULT_INTERVAL_UPDATE_ENABLED)
+    override suspend fun setIntervalUpdateEnabled(enabled: Boolean) = setBool(K.INTERVAL_UPDATE_ENABLED_KEY, enabled)
 
-    override suspend fun isIntervalUpdateEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.INTERVAL_UPDATE_ENABLED_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_INTERVAL_UPDATE_ENABLED
-    }
+    override suspend fun getAutoUpdateIntervalHours(): Int = getInt(K.AUTO_UPDATE_INTERVAL_HOURS_KEY, K.DEFAULT_AUTO_UPDATE_INTERVAL_HOURS)
+    override suspend fun setAutoUpdateIntervalHours(hours: Int) = setInt(K.AUTO_UPDATE_INTERVAL_HOURS_KEY, hours)
 
-    override suspend fun setIntervalUpdateEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.INTERVAL_UPDATE_ENABLED_KEY] = enabled
-        }
-    }
+    override suspend fun isScheduledUpdateEnabled(): Boolean = getBool(K.SCHEDULED_UPDATE_ENABLED_KEY, K.DEFAULT_SCHEDULED_UPDATE_ENABLED)
+    override suspend fun setScheduledUpdateEnabled(enabled: Boolean) = setBool(K.SCHEDULED_UPDATE_ENABLED_KEY, enabled)
 
-    override suspend fun getAutoUpdateIntervalHours(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.AUTO_UPDATE_INTERVAL_HOURS_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_INTERVAL_HOURS
-    }
+    override suspend fun getScheduledUpdateTime(): String = getStr(K.SCHEDULED_UPDATE_TIME_KEY) ?: K.DEFAULT_SCHEDULED_UPDATE_TIME
+    override suspend fun setScheduledUpdateTime(time: String) = setStr(K.SCHEDULED_UPDATE_TIME_KEY, time)
 
-    override suspend fun setAutoUpdateIntervalHours(hours: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.AUTO_UPDATE_INTERVAL_HOURS_KEY] = hours
-        }
-    }
-
-    override suspend fun isScheduledUpdateEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_ENABLED_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_ENABLED
-    }
-
-    override suspend fun setScheduledUpdateEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_ENABLED_KEY] = enabled
-        }
-    }
-
-    override suspend fun getScheduledUpdateTime(): String {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_TIME_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_TIME
-    }
-
-    override suspend fun setScheduledUpdateTime(time: String) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_TIME_KEY] = time
-        }
-    }
-
-    override suspend fun getLastAutoUpdateTime(): Long {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] ?: 0L
-    }
-
-    override suspend fun setLastAutoUpdateTime(time: Long) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] = time
-        }
-    }
+    override suspend fun getLastAutoUpdateTime(): Long = getLong(K.LAST_AUTO_UPDATE_TIME_KEY)
+    override suspend fun setLastAutoUpdateTime(time: Long) = setLong(K.LAST_AUTO_UPDATE_TIME_KEY, time)
 
     // ==================== 背景主题相关 ====================
 
-    override fun observeSeedColor(): Flow<Int> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.SEED_COLOR_KEY] ?: BackgroundThemeManager.Companion.DEFAULT_SEED_COLOR
-        }
-    }
+    override fun observeSeedColor(): Flow<Int> = observeInt(K.SEED_COLOR_KEY, BackgroundThemeManager.Companion.DEFAULT_SEED_COLOR)
+    override suspend fun getSeedColor(): Int = getInt(K.SEED_COLOR_KEY, BackgroundThemeManager.Companion.DEFAULT_SEED_COLOR)
+    override suspend fun setSeedColor(color: Int) = setInt(K.SEED_COLOR_KEY, color)
 
-    override suspend fun getSeedColor(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.SEED_COLOR_KEY]
-            ?: BackgroundThemeManager.Companion.DEFAULT_SEED_COLOR
-    }
+    override fun observeUseDynamicTheme(): Flow<Boolean> = observeBool(K.USE_DYNAMIC_THEME_KEY, BackgroundThemeManager.Companion.DEFAULT_USE_DYNAMIC_THEME)
+    override suspend fun isUseDynamicTheme(): Boolean = getBool(K.USE_DYNAMIC_THEME_KEY, BackgroundThemeManager.Companion.DEFAULT_USE_DYNAMIC_THEME)
+    override suspend fun setUseDynamicTheme(enabled: Boolean) = setBool(K.USE_DYNAMIC_THEME_KEY, enabled)
 
-    override suspend fun setSeedColor(color: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.SEED_COLOR_KEY] = color
-        }
-    }
+    override fun observeActiveBackgroundIndex(): Flow<Int> = observeInt(K.ACTIVE_BACKGROUND_INDEX_KEY, K.DEFAULT_ACTIVE_BACKGROUND_INDEX)
+    override suspend fun getActiveBackgroundIndex(): Int = getInt(K.ACTIVE_BACKGROUND_INDEX_KEY, K.DEFAULT_ACTIVE_BACKGROUND_INDEX)
+    override suspend fun setActiveBackgroundIndex(index: Int) = setInt(K.ACTIVE_BACKGROUND_INDEX_KEY, index)
 
-    override fun observeUseDynamicTheme(): Flow<Boolean> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY]
-                ?: BackgroundThemeManager.Companion.DEFAULT_USE_DYNAMIC_THEME
-        }
-    }
+    override suspend fun getBackgroundsJson(): String? = getStr(K.BACKGROUNDS_JSON_KEY)
+    override suspend fun setBackgroundsJson(json: String?) = setStr(K.BACKGROUNDS_JSON_KEY, json)
 
-    override suspend fun isUseDynamicTheme(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY]
-            ?: BackgroundThemeManager.Companion.DEFAULT_USE_DYNAMIC_THEME
-    }
+    override suspend fun getBlurRadius(): Int = getInt(K.BLUR_RADIUS_KEY, K.DEFAULT_BLUR_RADIUS)
+    override suspend fun setBlurRadius(radius: Int) = setInt(K.BLUR_RADIUS_KEY, radius)
 
-    override suspend fun setUseDynamicTheme(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY] = enabled
-        }
-    }
+    override suspend fun getDimAmount(): Int = getInt(K.DIM_AMOUNT_KEY, K.DEFAULT_DIM_AMOUNT)
+    override suspend fun setDimAmount(amount: Int) = setInt(K.DIM_AMOUNT_KEY, amount)
 
-    override fun observeActiveBackgroundIndex(): Flow<Int> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY]
-                ?: DataStoreManager.SettingsKeys.DEFAULT_ACTIVE_BACKGROUND_INDEX
-        }
-    }
+    override suspend fun getBackgroundType(): String = getStr(K.BACKGROUND_TYPE_KEY) ?: K.DEFAULT_BACKGROUND_TYPE
+    override suspend fun setBackgroundType(type: String) = setStr(K.BACKGROUND_TYPE_KEY, type)
 
-    override suspend fun getActiveBackgroundIndex(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_ACTIVE_BACKGROUND_INDEX
-    }
+    override suspend fun getCustomBackgroundUri(): String? = getStr(K.CUSTOM_BACKGROUND_URI_KEY)
+    override suspend fun setCustomBackgroundUri(uri: String?) = setStr(K.CUSTOM_BACKGROUND_URI_KEY, uri)
 
-    override suspend fun setActiveBackgroundIndex(index: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] = index
-        }
-    }
-
-    override suspend fun getBackgroundsJson(): String? {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY]
-    }
-
-    override suspend fun setBackgroundsJson(json: String?) {
-        settingsDataStore.edit { prefs ->
-            if (json != null) {
-                prefs[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY] = json
-            } else {
-                prefs.remove(DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY)
-            }
-        }
-    }
-
-    override suspend fun getBlurRadius(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.BLUR_RADIUS_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_BLUR_RADIUS
-    }
-
-    override suspend fun setBlurRadius(radius: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.BLUR_RADIUS_KEY] = radius
-        }
-    }
-
-    override suspend fun getDimAmount(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.DIM_AMOUNT_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_DIM_AMOUNT
-    }
-
-    override suspend fun setDimAmount(amount: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.DIM_AMOUNT_KEY] = amount
-        }
-    }
-
-    override suspend fun getBackgroundType(): String {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.BACKGROUND_TYPE_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_BACKGROUND_TYPE
-    }
-
-    override suspend fun setBackgroundType(type: String) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.BACKGROUND_TYPE_KEY] = type
-        }
-    }
-
-    override suspend fun getCustomBackgroundUri(): String? {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.CUSTOM_BACKGROUND_URI_KEY]
-    }
-
-    override suspend fun setCustomBackgroundUri(uri: String?) {
-        settingsDataStore.edit { prefs ->
-            if (uri != null) {
-                prefs[DataStoreManager.SettingsKeys.CUSTOM_BACKGROUND_URI_KEY] = uri
-            } else {
-                prefs.remove(DataStoreManager.SettingsKeys.CUSTOM_BACKGROUND_URI_KEY)
-            }
-        }
-    }
-
-    override suspend fun getLastUpdateCheckTime(): Long {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.LAST_UPDATE_CHECK_TIME_KEY] ?: 0L
-    }
-
-    override suspend fun setLastUpdateCheckTime(time: Long) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.LAST_UPDATE_CHECK_TIME_KEY] = time
-        }
-    }
+    override suspend fun getLastUpdateCheckTime(): Long = getLong(K.LAST_UPDATE_CHECK_TIME_KEY)
+    override suspend fun setLastUpdateCheckTime(time: Long) = setLong(K.LAST_UPDATE_CHECK_TIME_KEY, time)
 
     // ==================== 其他设置 ====================
 
-    override suspend fun getRecentSchools(): String? {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.RECENT_SCHOOLS_KEY]
-    }
-
-    override suspend fun setRecentSchools(schools: String?) {
-        settingsDataStore.edit { prefs ->
-            if (schools != null) {
-                prefs[DataStoreManager.SettingsKeys.RECENT_SCHOOLS_KEY] = schools
-            } else {
-                prefs.remove(DataStoreManager.SettingsKeys.RECENT_SCHOOLS_KEY)
-            }
-        }
-    }
+    override suspend fun getRecentSchools(): String? = getStr(K.RECENT_SCHOOLS_KEY)
+    override suspend fun setRecentSchools(schools: String?) = setStr(K.RECENT_SCHOOLS_KEY, schools)
 
     // ==================== 莫奈课程颜色 ====================
 
-    override suspend fun isMonetCourseColorsEnabled(): Boolean {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.MONET_COURSE_COLORS_ENABLED_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_MONET_COURSE_COLORS_ENABLED
-    }
+    override suspend fun isMonetCourseColorsEnabled(): Boolean = getBool(K.MONET_COURSE_COLORS_ENABLED_KEY, K.DEFAULT_MONET_COURSE_COLORS_ENABLED)
+    override suspend fun setMonetCourseColorsEnabled(enabled: Boolean) = setBool(K.MONET_COURSE_COLORS_ENABLED_KEY, enabled)
+    override fun observeMonetCourseColorsEnabled(): Flow<Boolean> = observeBool(K.MONET_COURSE_COLORS_ENABLED_KEY, K.DEFAULT_MONET_COURSE_COLORS_ENABLED)
 
-    override suspend fun setMonetCourseColorsEnabled(enabled: Boolean) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.MONET_COURSE_COLORS_ENABLED_KEY] = enabled
-        }
-    }
-
-    override fun observeMonetCourseColorsEnabled(): Flow<Boolean> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.MONET_COURSE_COLORS_ENABLED_KEY]
-                ?: DataStoreManager.SettingsKeys.DEFAULT_MONET_COURSE_COLORS_ENABLED
-        }
-    }
-
-    override suspend fun getCourseColorSaturation(): Int {
-        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.COURSE_COLOR_SATURATION_KEY]
-            ?: DataStoreManager.SettingsKeys.DEFAULT_COURSE_COLOR_SATURATION
-    }
-
-    override suspend fun setCourseColorSaturation(saturation: Int) {
-        settingsDataStore.edit { prefs ->
-            prefs[DataStoreManager.SettingsKeys.COURSE_COLOR_SATURATION_KEY] = saturation
-        }
-    }
-
-    override fun observeCourseColorSaturation(): Flow<Int> {
-        return settingsDataStore.data.map {
-            it[DataStoreManager.SettingsKeys.COURSE_COLOR_SATURATION_KEY]
-                ?: DataStoreManager.SettingsKeys.DEFAULT_COURSE_COLOR_SATURATION
-        }
-    }
+    override suspend fun getCourseColorSaturation(): Int = getInt(K.COURSE_COLOR_SATURATION_KEY, K.DEFAULT_COURSE_COLOR_SATURATION)
+    override suspend fun setCourseColorSaturation(saturation: Int) = setInt(K.COURSE_COLOR_SATURATION_KEY, saturation)
+    override fun observeCourseColorSaturation(): Flow<Int> = observeInt(K.COURSE_COLOR_SATURATION_KEY, K.DEFAULT_COURSE_COLOR_SATURATION)
 }

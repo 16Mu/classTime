@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.ui.screen.profile
+﻿package com.wind.ggbond.classtime.ui.screen.profile
 
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.ui.navigation.Screen
@@ -34,7 +34,7 @@ class ProfileScreenNavigationTest {
     private val testDispatcher = StandardTestDispatcher()
     
     // StateFlows for testing
-    private val bottomBarBlurEnabledFlow = MutableStateFlow(true)
+    private val glassEffectEnabledFlow = MutableStateFlow(true)
     private val compactModeEnabledFlow = MutableStateFlow(false)
     private val showWeekendEnabledFlow = MutableStateFlow(true)
     private val reminderEnabledFlow = MutableStateFlow(false)
@@ -52,7 +52,7 @@ class ProfileScreenNavigationTest {
         navController = mockk(relaxed = true)
         
         // Setup StateFlow mocks
-        every { settingsViewModel.bottomBarBlurEnabled } returns bottomBarBlurEnabledFlow
+        every { settingsViewModel.glassEffectEnabled } returns glassEffectEnabledFlow
         every { settingsViewModel.compactModeEnabled } returns compactModeEnabledFlow
         every { settingsViewModel.showWeekendEnabled } returns showWeekendEnabledFlow
         every { settingsViewModel.reminderEnabled } returns reminderEnabledFlow
@@ -289,7 +289,7 @@ class ProfileScreenNavigationTest {
     @Test
     fun `navigation to BackgroundSettings should preserve ViewModel state`() = runTest {
         // Given: User has set some preferences
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         compactModeEnabledFlow.value = true
         
         // When: User navigates to BackgroundSettings
@@ -301,7 +301,7 @@ class ProfileScreenNavigationTest {
         advanceUntilIdle()
         
         // Then: ViewModel state should be preserved
-        assertEquals(false, bottomBarBlurEnabledFlow.value)
+        assertEquals(false, glassEffectEnabledFlow.value)
         assertEquals(true, compactModeEnabledFlow.value)
     }
     

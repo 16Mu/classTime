@@ -5,6 +5,7 @@ import com.wind.ggbond.classtime.util.common.Constants
 import com.wind.ggbond.classtime.util.parser.WeekParser
 import org.jsoup.Jsoup
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -387,7 +388,7 @@ class HtmlScheduleParser @Inject constructor() {
                 
                 // 这里需要解析JSON数组
                 // 由于结构可能复杂，我们先打印出来查看
-                android.util.Log.d("HTMLParser", "kbList内容: $jsonArray")
+                AppLogger.d("HTMLParser", "kbList内容: $jsonArray")
             } else {
                 println("未找到kbList变量")
             }
@@ -403,7 +404,7 @@ class HtmlScheduleParser @Inject constructor() {
                 val m = pattern.find(html)
                 if (m != null) {
                     println("找到课表数据变量")
-                    android.util.Log.d("HTMLParser", "课表数据: ${m.groupValues[1].take(500)}")
+                    AppLogger.d("HTMLParser", "课表数据: ${m.groupValues[1].take(500)}")
                 }
             }
         } catch (e: Exception) {

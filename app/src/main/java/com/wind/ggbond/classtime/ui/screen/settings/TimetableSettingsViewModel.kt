@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -85,12 +86,12 @@ class TimetableSettingsViewModel @Inject constructor(
      */
     fun updateShowWeekend(enabled: Boolean) {
         viewModelScope.launch {
-            android.util.Log.d("TimetableSettingsVM", "updateShowWeekend called with: $enabled")
+            AppLogger.d("TimetableSettingsVM", "updateShowWeekend called with: $enabled")
             settingsDataStore.edit { preferences ->
                 preferences[DataStoreManager.SettingsKeys.SHOW_WEEKEND_KEY] = enabled
             }
             _showWeekend.value = enabled
-            android.util.Log.d("TimetableSettingsVM", "显示周末已更新为: ${_showWeekend.value}")
+            AppLogger.d("TimetableSettingsVM", "显示周末已更新为: ${_showWeekend.value}")
         }
     }
     

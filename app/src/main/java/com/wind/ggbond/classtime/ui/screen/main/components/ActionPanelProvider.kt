@@ -5,6 +5,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -29,7 +31,7 @@ import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
-import com.wind.ggbond.classtime.ui.components.glassModifier
+import androidx.compose.ui.draw.blur
 
 /**
  * 操作面板组件
@@ -50,13 +52,17 @@ fun ActionPanelProvider(
     navController: NavController,
     onScheduleQuickEditRequest: () -> Unit,
     onWeekPickerRequest: () -> Unit,
+    onViewModeToggle: () -> Unit = {},
     modifier: Modifier = Modifier,
+    isWallpaperEnabled: Boolean = false,
     content: @Composable (PaddingValues) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    
+    val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
+
     Scaffold(
         modifier = modifier,
+        containerColor = if (isWallpaperEnabled) Color.Transparent else MaterialTheme.colorScheme.background,
         floatingActionButton = {
             val fabInteractionSource = remember { MutableInteractionSource() }
             val fabPressed by fabInteractionSource.collectIsPressedAsState()
@@ -82,12 +88,20 @@ fun ActionPanelProvider(
                         scaleX = fabScale
                         scaleY = fabScale
                     }
-                    .glassModifier(
-                        alpha = 0.58f,
-                        tintColor = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(16.dp),
-                        borderWidth = 0.6.dp,
-                        borderColor = Color.White.copy(alpha = 0.25f)
+                    .background(
+                        color = if (glassEffectEnabled) MaterialTheme.colorScheme.surface.copy(alpha = 0.92f) else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .then(
+                        if (glassEffectEnabled) {
+                            Modifier.border(
+                                width = 0.8.dp,
+                                color = Color.White.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        } else {
+                            Modifier
+                        }
                     ),
                 color = Color.Transparent
             ) {
@@ -206,6 +220,7 @@ fun ActionPanelProvider(
                         FilledTonalIconButton(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onViewModeToggle()
                             },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant

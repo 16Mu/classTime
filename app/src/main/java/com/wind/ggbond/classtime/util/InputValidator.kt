@@ -1,10 +1,10 @@
 package com.wind.ggbond.classtime.util
 
-import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import com.wind.ggbond.classtime.util.Constants.Course.MAX_COURSE_NAME_LENGTH
 import com.wind.ggbond.classtime.util.Constants.Course.MAX_TEACHER_NAME_LENGTH
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.Constants.Course.MAX_CLASSROOM_NAME_LENGTH
 
 /**
@@ -50,11 +50,25 @@ object InputValidator {
         // 检测并记录可疑模式
         for (pattern in XSS_PATTERNS) {
             if (input.contains(pattern, ignoreCase = true)) {
-                Log.w(TAG, "XSS pattern detected: $pattern in input: ${input.take(50)}")
+                AppLogger.w(TAG, "XSS pattern detected: $pattern in input: ${input.take(50)}")
             }
         }
         
         return result
+    }
+    
+    private fun validateField(value: String, maxLength: Int, fieldName: String): Boolean {
+        if (value.length > maxLength) return false
+        if (containsXSSPattern(value)) {
+            AppLogger.w(TAG, "$fieldName contains suspicious XSS pattern: ${value.take(50)}")
+            return false
+        }
+        return true
+    }
+
+    private fun containsXSSPattern(input: String): Boolean {
+        val lower = input.lowercase()
+        return XSS_PATTERNS.any { pattern -> lower.contains(pattern.lowercase()) }
     }
     
     /**
@@ -65,16 +79,7 @@ object InputValidator {
      */
     fun validateCourseName(name: String): Boolean {
         if (name.isBlank()) return false
-        if (name.length > MAX_COURSE_NAME_LENGTH) return false
-        
-        // 检查是否包含可疑字符
-        val sanitized = sanitizeXSS(name)
-        if (sanitized != name) {
-            Log.w(TAG, "Course name contains suspicious characters: $name")
-            return false
-        }
-        
-        return true
+        return validateField(name, MAX_COURSE_NAME_LENGTH, "Course name")
     }
     
     /**
@@ -84,15 +89,7 @@ object InputValidator {
      * @return 是否有效
      */
     fun validateTeacher(teacher: String): Boolean {
-        if (teacher.length > MAX_TEACHER_NAME_LENGTH) return false
-        
-        val sanitized = sanitizeXSS(teacher)
-        if (sanitized != teacher) {
-            Log.w(TAG, "Teacher name contains suspicious characters: $teacher")
-            return false
-        }
-        
-        return true
+        return validateField(teacher, MAX_TEACHER_NAME_LENGTH, "Teacher name")
     }
     
     /**
@@ -102,15 +99,7 @@ object InputValidator {
      * @return 是否有效
      */
     fun validateClassroom(classroom: String): Boolean {
-        if (classroom.length > MAX_CLASSROOM_NAME_LENGTH) return false
-        
-        val sanitized = sanitizeXSS(classroom)
-        if (sanitized != classroom) {
-            Log.w(TAG, "Classroom name contains suspicious characters: $classroom")
-            return false
-        }
-        
-        return true
+        return validateField(classroom, MAX_CLASSROOM_NAME_LENGTH, "Classroom name")
     }
     
     /**
@@ -195,7 +184,7 @@ object InputValidator {
                 
                 // 记录修正信息（但不阻止验证）
                 if (validDayOfWeek != dayOfWeek) {
-                    Log.w(TAG, "星期值已修正: $dayOfWeek -> $validDayOfWeek")
+                    AppLogger.w(TAG, "星期值已修正: $dayOfWeek -> $validDayOfWeek")
                 }
                 
                 // 验证节次（如果有startSection，验证它；如果有sectionRow，转换为startSection后验证）
@@ -251,11 +240,11 @@ object InputValidator {
                 }
             }
             
-            Log.i(TAG, "JSON validation passed: ${jsonArray.length()} courses")
+            AppLogger.i(TAG, "JSON validation passed: ${jsonArray.length()} courses")
             return ValidationResult(true, "验证成功")
             
         } catch (e: Exception) {
-            Log.e(TAG, "JSON validation failed", e)
+            AppLogger.e(TAG, "JSON validation failed", e)
             return ValidationResult(false, "JSON解析失败: ${e.message}")
         }
     }
@@ -269,7 +258,7 @@ object InputValidator {
     fun detectSqlInjection(input: String): Boolean {
         for (pattern in SQL_INJECTION_PATTERNS) {
             if (input.contains(pattern, ignoreCase = true)) {
-                Log.w(TAG, "SQL injection pattern detected: $pattern")
+                AppLogger.w(TAG, "SQL injection pattern detected: $pattern")
                 return true
             }
         }
@@ -287,7 +276,7 @@ object InputValidator {
         
         // 只允许http和https协议
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            Log.w(TAG, "Invalid URL protocol: $url")
+            AppLogger.w(TAG, "Invalid URL protocol: $url")
             return false
         }
         
@@ -295,7 +284,7 @@ object InputValidator {
         if (url.contains("javascript:", ignoreCase = true) ||
             url.contains("data:", ignoreCase = true) ||
             url.contains("file:", ignoreCase = true)) {
-            Log.w(TAG, "Suspicious URL detected: $url")
+            AppLogger.w(TAG, "Suspicious URL detected: $url")
             return false
         }
         

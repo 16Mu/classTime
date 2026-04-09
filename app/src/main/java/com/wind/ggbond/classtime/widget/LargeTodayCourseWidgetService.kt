@@ -8,6 +8,7 @@ import android.widget.RemoteViewsService
 import com.wind.ggbond.classtime.R
 import com.wind.ggbond.classtime.widget.data.WidgetCourseItem
 import kotlinx.coroutines.Dispatchers
+import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.runBlocking
 
 class LargeTodayCourseWidgetService : RemoteViewsService() {
@@ -35,13 +36,13 @@ class LargeTodayCourseRemoteViewsFactory(
                     val displayData = WidgetDataProvider.getTodayCourses(context)
                     displayData.courseItems
                 } catch (e: Exception) {
-                    android.util.Log.e("LargeWidgetFactory", "数据加载失败", e)
+                    AppLogger.e("LargeWidgetFactory", "数据加载失败", e)
                     loadError = "数据加载失败"
                     emptyList()
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("LargeWidgetFactory", "onDataSetChanged 异常", e)
+            AppLogger.e("LargeWidgetFactory", "onDataSetChanged 异常", e)
             loadError = "加载异常"
         }
     }
@@ -61,7 +62,7 @@ class LargeTodayCourseRemoteViewsFactory(
         return try {
             createCourseItemView(course)
         } catch (e: Exception) {
-            android.util.Log.e("LargeWidgetFactory", "getViewAt 异常 pos=$position", e)
+            AppLogger.e("LargeWidgetFactory", "getViewAt 异常 pos=$position", e)
             createErrorView()
         }
     }

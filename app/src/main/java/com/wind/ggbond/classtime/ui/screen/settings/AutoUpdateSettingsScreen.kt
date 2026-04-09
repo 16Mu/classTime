@@ -70,10 +70,9 @@ fun AutoUpdateSettingsScreen(
     var lastUpdateTime by remember { mutableStateOf(autoLoginManager.getLastUpdateTime()) }
     var hasCredentials by remember { mutableStateOf(autoLoginManager.hasCredentials()) }
     
-    // 定期刷新自动登录状态（3秒间隔，减少性能开销）
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(3000) // 3秒刷新一次（足够及时）
+            kotlinx.coroutines.delay(5000)
             lastUpdateResultCode = autoLoginManager.getLastUpdateResultCode() ?: ""
             lastUpdateResultMessage = autoLoginManager.getLastUpdateResultMessage() ?: ""
             lastUpdateTime = autoLoginManager.getLastUpdateTime()
@@ -486,8 +485,8 @@ fun AutoUpdateSettingsScreen(
                                 },
                                 contentDescription = null,
                                 tint = when (lastUpdateResultCode) {
-                                    AutoLoginResultCode.OK -> Color(0xFF4CAF50)
-                                    else -> Color(0xFFF44336)
+                                    AutoLoginResultCode.OK -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.error
                                 },
                                 modifier = Modifier.size(24.dp)
                             )
@@ -564,9 +563,9 @@ fun AutoUpdateSettingsScreen(
                             horizontalArrangement = Arrangement.SpaceAround
                         ) {
                             StatItem("总次数", config.totalAttempts, Color.Gray)
-                            StatItem("成功", config.successCount, Color(0xFF4CAF50))
-                            StatItem("失败", config.failureCount, Color(0xFFF44336))
-                            StatItem("跳过", config.skipCount, Color(0xFFFF9800))
+                            StatItem("成功", config.successCount, MaterialTheme.colorScheme.primary)
+                            StatItem("失败", config.failureCount, MaterialTheme.colorScheme.error)
+                            StatItem("跳过", config.skipCount, MaterialTheme.colorScheme.tertiary)
                         }
                         
                         Spacer(Modifier.height(16.dp))
@@ -821,9 +820,9 @@ fun UpdateLogItem(log: UpdateLogEntry) {
                 },
                 contentDescription = null,
                 tint = when (log.status) {
-                    UpdateStatus.SUCCESS -> Color(0xFF4CAF50)
-                    UpdateStatus.FAILURE -> Color(0xFFF44336)
-                    UpdateStatus.SKIPPED -> Color(0xFFFF9800)
+                    UpdateStatus.SUCCESS -> MaterialTheme.colorScheme.primary
+                    UpdateStatus.FAILURE -> MaterialTheme.colorScheme.error
+                    UpdateStatus.SKIPPED -> MaterialTheme.colorScheme.tertiary
                 },
                 modifier = Modifier.padding(top = 2.dp)
             )

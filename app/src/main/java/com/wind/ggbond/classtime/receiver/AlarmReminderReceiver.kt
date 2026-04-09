@@ -10,7 +10,6 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.wind.ggbond.classtime.MainActivity
@@ -24,6 +23,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.launch
 
 /**
@@ -47,40 +47,50 @@ class AlarmReminderReceiver : BroadcastReceiver() {
         const val EXTRA_COURSE_ID = "courseId"
         const val EXTRA_WEEK_NUMBER = "weekNumber"
         const val EXTRA_IS_NEXT_COURSE = "isNextCourse"
-        const val EXTRA_CURRENT_COURSE_NAME = "currentCourseName"
-        const val EXTRA_IS_SAME_COURSE_CLASSROOM = "isSameCourseClassroom"
+    const val EXTRA_CURRENT_COURSE_NAME = "currentCourseName"
+    const val EXTRA_IS_SAME_COURSE_CLASSROOM = "isSameCourseClassroom"
+    const val EXTRA_IS_CLASS_END = "isClassEnd"
         private const val TAG = "AlarmReminderReceiver"
         
         /**
          * 生成唯一的通知ID
          */
-        fun generateNotificationId(courseId: Long, weekNumber: Int, isNextCourse: Boolean = false): Int {
+        fun generateNotificationId(courseId: Long, weekNumber: Int, isNextCourse: Boolean = false, isClassEnd: Boolean = false): Int {
             val baseId = "${courseId}_${weekNumber}".hashCode().and(0x7FFFFFFF)
-            return if (isNextCourse) baseId + 1000000 else baseId
+            return when {
+                isClassEnd -> baseId + 3000000
+                isNextCourse -> baseId + 1000000
+                else -> baseId
+            }
         }
         
         /**
          * 生成唯一的 AlarmManager requestCode
          */
-        fun generateRequestCode(courseId: Long, weekNumber: Int, isNextCourse: Boolean = false): Int {
+        fun generateRequestCode(courseId: Long, weekNumber: Int, isNextCourse: Boolean = false, isClassEnd: Boolean = false): Int {
             val baseCode = "${courseId}_${weekNumber}".hashCode().and(0x7FFFFFFF)
-            return if (isNextCourse) baseCode + 2000000 else baseCode
+            return when {
+                isClassEnd -> baseCode + 4000000
+                isNextCourse -> baseCode + 2000000
+                else -> baseCode
+            }
         }
     }
     
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_COURSE_REMINDER) return
         
-        Log.d(TAG, "收到课程提醒 AlarmManager 触发")
+        AppLogger.d(TAG, "收到课程提醒 AlarmManager 触发")
         
         val courseId = intent.getLongExtra(EXTRA_COURSE_ID, 0L)
         val weekNumber = intent.getIntExtra(EXTRA_WEEK_NUMBER, 0)
         val isNextCourse = intent.getBooleanExtra(EXTRA_IS_NEXT_COURSE, false)
         val currentCourseName = intent.getStringExtra(EXTRA_CURRENT_COURSE_NAME) ?: ""
         val isSameCourseClassroom = intent.getBooleanExtra(EXTRA_IS_SAME_COURSE_CLASSROOM, false)
+        val isClassEnd = intent.getBooleanExtra(EXTRA_IS_CLASS_END, false)
         
         if (courseId == 0L) {
-            Log.e(TAG, "courseId 为 0，无法处理提醒")
+            AppLogger.e(TAG, "courseId 为 0，无法处理提醒")
             return
         }
         
@@ -92,13 +102,13 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                 // 手动获取 CourseRepository
                 val courseRepository = getCourseRepository(context)
                 if (courseRepository == null) {
-                    Log.e(TAG, "无法获取 CourseRepository")
+                    AppLogger.e(TAG, "无法获取 CourseRepository")
                     return@launch
                 }
                 
                 val course = courseRepository.getCourseById(courseId)
                 if (course == null) {
-                    Log.e(TAG, "未找到课程 ID: $courseId")
+                    AppLogger.e(TAG, "未找到课程 ID: $courseId")
                     return@launch
                 }
                 
@@ -109,11 +119,12 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                     weekNumber = weekNumber,
                     isNextCourse = isNextCourse,
                     currentCourseName = currentCourseName,
-                    isSameCourseClassroom = isSameCourseClassroom
+                    isSameCourseClassroom = isSameCourseClassroom,
+                    isClassEnd = isClassEnd
                 )
                 
             } catch (e: Exception) {
-                Log.e(TAG, "处理课程提醒失败", e)
+                AppLogger.e(TAG, "处理课程提醒失败", e)
             } finally {
                 // 通知系统 BroadcastReceiver 处理完毕，可以安全回收
                 pendingResult.finish()
@@ -132,7 +143,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
             )
             entryPoint.courseRepository()
         } catch (e: Exception) {
-            Log.e(TAG, "获取 CourseRepository 失败", e)
+            AppLogger.e(TAG, "获取 CourseRepository 失败", e)
             null
         }
     }
@@ -143,13 +154,14 @@ class AlarmReminderReceiver : BroadcastReceiver() {
         weekNumber: Int,
         isNextCourse: Boolean,
         currentCourseName: String,
-        isSameCourseClassroom: Boolean
+        isSameCourseClassroom: Boolean,
+        isClassEnd: Boolean = false
     ) {
         try {
             // 检查通知权限
             val notificationManager = NotificationManagerCompat.from(context)
             if (!notificationManager.areNotificationsEnabled()) {
-                Log.w(TAG, "通知权限未授予，无法显示通知")
+                AppLogger.w(TAG, "通知权限未授予，无法显示通知")
                 return
             }
             
@@ -161,7 +173,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                 val systemNotificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 val channel = systemNotificationManager.getNotificationChannel(CHANNEL_ID)
                 if (channel?.importance == NotificationManager.IMPORTANCE_NONE) {
-                    Log.w(TAG, "通知渠道已被用户禁用")
+                    AppLogger.w(TAG, "通知渠道已被用户禁用")
                     return
                 }
             }
@@ -177,11 +189,11 @@ class AlarmReminderReceiver : BroadcastReceiver() {
             }
             
             // 根据是否是下节课提醒，构建不同的通知内容
-            val (title, shortText, longText) = if (isNextCourse) {
-                buildNextCourseNotification(
-                    course, classroomText, teacherText, dayOfWeekName, 
-                    sectionText, currentCourseName, isSameCourseClassroom
-                )
+            val (title, shortText, longText) = if (isClassEnd) {
+                buildClassEndNotification(course, classroomText, teacherText, dayOfWeekName, sectionText)
+            } else if (isNextCourse) {
+                buildNextCourseNotification(course, classroomText, teacherText, dayOfWeekName, 
+                    sectionText, currentCourseName, isSameCourseClassroom)
             } else {
                 buildNormalNotification(course, classroomText, teacherText, dayOfWeekName, sectionText)
             }
@@ -205,7 +217,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                 val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
                 prefs.getBoolean("heads_up_notification_enabled", true)
             } catch (e: Exception) {
-                Log.w(TAG, "读取弹窗设置失败，使用默认值: ${e.message}")
+                AppLogger.w(TAG, "读取弹窗设置失败，使用默认值: ${e.message}")
                 true
             }
             
@@ -240,22 +252,22 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                     .setFullScreenIntent(fullScreenIntent, true)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-                Log.d(TAG, "弹窗通知已启用，将显示悬浮弹窗")
+                AppLogger.d(TAG, "弹窗通知已启用，将显示悬浮弹窗")
             } else {
                 notificationBuilder.setCategory(NotificationCompat.CATEGORY_REMINDER)
-                Log.d(TAG, "弹窗通知已禁用，仅显示通知栏通知")
+                AppLogger.d(TAG, "弹窗通知已禁用，仅显示通知栏通知")
             }
             
             // 发送通知
-            val notificationId = generateNotificationId(course.id, weekNumber, isNextCourse)
+            val notificationId = generateNotificationId(course.id, weekNumber, isNextCourse, isClassEnd)
             val finalNotificationId = (notificationId.toString() + currentTime).hashCode().and(0x7FFFFFFF)
             
             notificationManager.notify(finalNotificationId, notificationBuilder.build())
             
-            Log.d(TAG, "通知已发送: ${course.courseName}, ID: $finalNotificationId, 下节课: $isNextCourse")
+            AppLogger.d(TAG, "通知已发送: ${course.courseName}, ID: $finalNotificationId, 下节课: $isNextCourse")
             
         } catch (e: Exception) {
-            Log.e(TAG, "发送通知失败", e)
+            AppLogger.e(TAG, "发送通知失败", e)
         }
     }
     
@@ -281,6 +293,30 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                 append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
             }
         }
+        return Triple(title, shortText, longText)
+    }
+    
+    private fun buildClassEndNotification(
+        course: Course,
+        classroomText: String,
+        teacherText: String,
+        dayOfWeekName: String,
+        sectionText: String
+    ): Triple<String, String, String> {
+        val title = "时课 ${course.courseName} 即将下课"
+        val shortText = "课程即将结束，请整理物品"
+        
+        val longText = buildString {
+            append("下课提醒\n\n")
+            append("课程：${course.courseName}\n")
+            append("上课地点：${classroomText}\n")
+            if (course.teacher.isNotEmpty()) {
+                append("任课教师：${teacherText}\n")
+            }
+            append("上课时间：${dayOfWeekName} ${sectionText}\n")
+            append("\n提示：课程即将结束，请整理好随身物品")
+        }
+        
         return Triple(title, shortText, longText)
     }
     
@@ -374,7 +410,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
                     lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
                 }
                 notificationManager.createNotificationChannel(channel)
-                Log.d(TAG, "通知渠道已创建")
+                AppLogger.d(TAG, "通知渠道已创建")
             }
         }
     }

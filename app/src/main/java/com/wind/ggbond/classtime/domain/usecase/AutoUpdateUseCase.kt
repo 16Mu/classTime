@@ -1,7 +1,6 @@
 package com.wind.ggbond.classtime.domain.usecase
 
 import android.content.Context
-import android.util.Log
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.local.entity.UpdateResult
 import com.wind.ggbond.classtime.data.repository.AutoUpdateLogRepository
@@ -10,6 +9,7 @@ import com.wind.ggbond.classtime.service.CookieAutoUpdateService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 @Singleton
@@ -27,11 +27,11 @@ class AutoUpdateUseCase @Inject constructor(
     suspend fun checkAndPerformAutoUpdate(): Pair<Boolean, String> {
         val startTime = System.currentTimeMillis()
         try {
-            Log.d(TAG, "🔍 检查是否需要自动更新")
+            AppLogger.d(TAG, "🔍 检查是否需要自动更新")
             
             val skipReason = getSkipReason()
             if (skipReason != null) {
-                Log.d(TAG, "无需更新: $skipReason")
+                AppLogger.d(TAG, "无需更新: $skipReason")
                 
                 val durationMs = System.currentTimeMillis() - startTime
                 autoUpdateLogRepository.logUpdate(
@@ -46,13 +46,13 @@ class AutoUpdateUseCase @Inject constructor(
                 return Pair(false, skipReason)
             }
             
-            Log.d(TAG, "🚀 开始自动更新（Cookie模式）")
+            AppLogger.d(TAG, "🚀 开始自动更新（Cookie模式）")
             
             val result = cookieAutoUpdateService.performUpdate()
             
             val durationMs = System.currentTimeMillis() - startTime
             if (result.first) {
-                Log.d(TAG, "✅ 更新成功: ${result.second}")
+                AppLogger.d(TAG, "✅ 更新成功: ${result.second}")
                 autoUpdateLogRepository.logUpdate(
                     triggerEvent = "进入软件",
                     result = UpdateResult.SUCCESS,
@@ -62,7 +62,7 @@ class AutoUpdateUseCase @Inject constructor(
                     durationMs = durationMs
                 )
             } else {
-                Log.d(TAG, "❌ 更新失败: ${result.second}")
+                AppLogger.d(TAG, "❌ 更新失败: ${result.second}")
                 autoUpdateLogRepository.logUpdate(
                     triggerEvent = "进入软件",
                     result = UpdateResult.FAILED,
@@ -75,7 +75,7 @@ class AutoUpdateUseCase @Inject constructor(
             
             return result
         } catch (e: Exception) {
-            Log.e(TAG, "自动更新异常", e)
+            AppLogger.e(TAG, "自动更新异常", e)
             
             val durationMs = System.currentTimeMillis() - startTime
             autoUpdateLogRepository.logUpdate(

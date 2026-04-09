@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -12,6 +11,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.model.SchoolConfig
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.HtmlScheduleParser
 import com.wind.ggbond.classtime.util.MutableContextWrapper
 import com.wind.ggbond.classtime.util.SecureCookieManager
@@ -33,300 +33,131 @@ class UnifiedScheduleFetchService @Inject constructor(
 ) : IScheduleFetcher {
     companion object {
         private const val TAG = "UnifiedScheduleFetch"
-        private const val TIMEOUT_MS = 30000L // 30秒超时
-        private const val PAGE_LOAD_WAIT_MS = 1000L // 页面加载后等待1秒
+        private const val TIMEOUT_MS = 30000L
+        private const val PAGE_LOAD_WAIT_MS = 1000L
     }
-    
-    /**
-     * 🌟 核心方法：获取课表数据
-     * 
-     * 工作流程：
-     * 1. 使用保存的Cookie获取课表
-     * 2. 如果Cookie失效或不存在，提示用户重新登录
-     * 
-     * @param schoolConfig 学校配置
-     * @param showWebView 是否显示WebView（手动导入时为true，自动更新时为false）
-     * @return 课程列表和Cookie
-     */
-    suspend override fun fetchSchedule(
-        schoolConfig: SchoolConfig,
-        showWebView: Boolean
-    ): Result<Pair<List<ParsedCourse>, String>> {
-        
+
+    suspend override fun fetchSchedule(schoolConfig: SchoolConfig, showWebView: Boolean): Result<Pair<List<ParsedCourse>, String>> {
         val domain = extractDomain(schoolConfig.loginUrl)
-        
-        // 1. ✅ 使用Cookie获取课表
         val savedCookies = secureCookieManager.getCookies(domain)
         if (savedCookies.isNullOrEmpty()) {
-            Log.w(TAG, "❌ 未找到保存的Cookie")
-            return Result.failure(
-                Exception("登录凭证不存在，请重新登录教务系统导入课表")
-            )
+            AppLogger.w(TAG, "未找到保存的Cookie")
+            return Result.failure(Exception("登录凭证不存在，请重新登录教务系统导入课表"))
         }
-        
-        Log.d(TAG, "✅ 找到保存的Cookie，使用Cookie获取课表")
-        
-        val cookieResult = try {
+
+        return try {
             fetchWithCookie(schoolConfig, savedCookies)
         } catch (e: Exception) {
-            Log.w(TAG, "使用Cookie获取课表失败: ${e.message}")
-            return Result.failure(
-                Exception("登录已过期，请重新登录教务系统导入课表")
-            )
-        }
-        
-        if (cookieResult.isSuccess) {
-            Log.d(TAG, "✅ Cookie有效，成功获取课表")
-            return cookieResult
-        } else {
-            Log.d(TAG, "⚠️ Cookie已失效")
-            return Result.failure(
-                Exception("登录已过期，请重新登录教务系统导入课表")
-            )
+            AppLogger.w(TAG, "使用Cookie获取课表失败: ${e.message}")
+            Result.failure(Exception("登录已过期，请重新登录教务系统导入课表"))
         }
     }
-    
-    /**
-     * 从URL中提取域名
-     */
-    private fun extractDomain(url: String): String {
-        return try {
-            val urlObj = java.net.URL(url)
-            urlObj.host
-        } catch (e: Exception) {
-            url
-        }
-    }
-    
-    /**
-     * 使用Cookie直接获取课表（不需要登录）
-     */
-    private suspend fun fetchWithCookie(
-        config: SchoolConfig,
-        cookies: String
-    ): Result<Pair<List<ParsedCourse>, String>> = suspendCancellableCoroutine { continuation ->
-        
-        val mainHandler = Handler(Looper.getMainLooper())
-        var webView: WebView? = null
-        var timeoutHandler: Handler? = null
-        val hasResumed = AtomicBoolean(false)
-        
-        // 安全的resume函数
-        fun safeResume(block: () -> Unit) {
-            if (hasResumed.compareAndSet(false, true)) {
-                try {
-                    // 清理WebView
+
+    private fun extractDomain(url: String): String = try { java.net.URL(url).host } catch (_: Exception) { url }
+
+    private suspend fun fetchWithCookie(config: SchoolConfig, cookies: String): Result<Pair<List<ParsedCourse>, String>> =
+        suspendCancellableCoroutine { continuation ->
+            val mainHandler = Handler(Looper.getMainLooper())
+            var webView: WebView? = null; var timeoutHandler: Handler? = null
+            val hasResumed = AtomicBoolean(false)
+
+            fun safeResume(block: () -> Unit) {
+                if (hasResumed.compareAndSet(false, true)) try {
                     mainHandler.post {
-                        webView?.apply {
-                            stopLoading()
-                            webViewClient = WebViewClient()
-                            webChromeClient = null
-                            removeAllViews()
-                            destroy()
-                        }
+                        webView?.apply { stopLoading(); webViewClient = WebViewClient(); webChromeClient = null; removeAllViews(); destroy() }
                         webView = null
                     }
-                    
-                    // 取消超时
-                    timeoutHandler?.removeCallbacksAndMessages(null)
-                    timeoutHandler = null
-                    
+                    timeoutHandler?.removeCallbacksAndMessages(null); timeoutHandler = null
                     block()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Resume失败", e)
-                }
+                } catch (e: Exception) { AppLogger.e(TAG, "Resume失败", e) }
             }
-        }
-        
-        mainHandler.post {
-            try {
-                Log.d(TAG, "🍪 使用Cookie直接访问课表页面: ${config.name}")
-                
-                // 创建WebView
-                val webViewContext = MutableContextWrapper(context.applicationContext)
-                webView = WebView(webViewContext).apply {
-                    layout(0, 0, 1, 1)
-                    
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        databaseEnabled = true
-                        cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                        blockNetworkImage = true // 不加载图片，提升速度
-                    }
-                    
-                    // ✅ 设置Cookie
-                    CookieManager.getInstance().apply {
-                        setAcceptCookie(true)
-                        removeAllCookies(null)
-                        flush()
-                        
-                        // 为登录域名设置Cookie
-                        val domain = extractDomain(config.loginUrl)
-                        val cookieParts = cookies.split(";")
-                        cookieParts.forEach { cookie ->
-                            val trimmedCookie = cookie.trim()
-                            if (trimmedCookie.isNotEmpty()) {
-                                setCookie(domain, trimmedCookie)
-                            }
-                        }
-                        flush()
-                        
-                        Log.d(TAG, "✓ Cookie已设置到WebView: $domain")
-                    }
-                    
-                    webViewClient = object : WebViewClient() {
-                        private var pageLoadCount = 0
-                        
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            
-                            if (hasResumed.get()) return
-                            
-                            pageLoadCount++
-                            Log.d(TAG, "📄 页面加载完成 ($pageLoadCount): $url")
-                            
-                            // 判断当前页面类型
-                            val isLoginPage = url?.contains("login", ignoreCase = true) == true ||
-                                             url?.contains("cas", ignoreCase = true) == true
-                            
-                            if (isLoginPage && pageLoadCount > 1) {
-                                // 如果加载了多次还是登录页，说明Cookie已失效
-                                Log.w(TAG, "⚠️ Cookie已失效，无法自动跳转")
-                                safeResume {
-                                    continuation.resumeWithException(
-                                        Exception("Cookie已失效")
-                                    )
-                                }
-                                return
-                            }
-                            
-                            if (!isLoginPage) {
-                                // 已经自动跳转到课表页面了
-                                Log.d(TAG, "✅ 服务器识别Cookie，自动跳转到课表页面")
-                                
-                                mainHandler.postDelayed({
-                                    if (hasResumed.get()) return@postDelayed
-                                    
-                                    // 提取课表数据
-                                    Log.d(TAG, "📚 开始提取课表数据")
-                                    extractScheduleData(view, config, safeResume = { safeResume(it) }, continuation)
-                                }, PAGE_LOAD_WAIT_MS)
-                            } else {
-                                // 第一次加载登录页，等待服务器自动跳转
-                                Log.d(TAG, "等待服务器识别Cookie并自动跳转...")
-                            }
-                        }
-                        
-                        override fun onReceivedError(
-                            view: WebView,
-                            request: WebResourceRequest,
-                            error: WebResourceError
-                        ) {
-                            super.onReceivedError(view, request, error)
-                            if (!request.isForMainFrame || hasResumed.get()) return
 
-                            val description = error.description?.toString().orEmpty()
-                            Log.e(TAG, "WebView??????: $description")
-                            safeResume {
-                                continuation.resumeWithException(
-                                    Exception("??????: $description")
-                                )
+            mainHandler.post {
+                try {
+                    AppLogger.d(TAG, "使用Cookie访问课表页面: ${config.name}")
+                    val webViewContext = MutableContextWrapper(context.applicationContext)
+                    webView = WebView(webViewContext).apply {
+                        layout(0, 0, 1, 1)
+                        settings.apply {
+                            javaScriptEnabled = true; domStorageEnabled = true; databaseEnabled = true
+                            allowFileAccess = false; allowContentAccess = false
+                            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT; blockNetworkImage = true
+                        }
+                        CookieManager.getInstance().apply {
+                            setAcceptCookie(true); removeAllCookies(null); flush()
+                            val domain = extractDomain(config.loginUrl)
+                            cookies.split(";").map { it.trim() }.filter { it.isNotEmpty() }.forEach { setCookie(domain, it) }
+                            flush()
+                        }
+
+                        webViewClient = object : WebViewClient() {
+                            private var pageLoadCount = 0; private var sslRetryCount = 0
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                if (hasResumed.get()) return
+                                pageLoadCount++
+                                val isLoginPage = url?.contains("login", ignoreCase = true) == true || url?.contains("cas", ignoreCase = true) == true
+                                if (isLoginPage && pageLoadCount > 1) {
+                                    AppLogger.w(TAG, "Cookie已失效")
+                                    safeResume { continuation.resumeWithException(Exception("Cookie已失效")) }; return
+                                }
+                                if (!isLoginPage) {
+                                    mainHandler.postDelayed({
+                                        if (hasResumed.get()) return@postDelayed
+                                        extractScheduleData(view, config, safeResume = { safeResume(it) }, continuation)
+                                    }, PAGE_LOAD_WAIT_MS)
+                                }
+                            }
+
+                            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                                super.onReceivedError(view, request, error)
+                                if (!request.isForMainFrame || hasResumed.get()) return
+                                val desc = error.description?.toString().orEmpty()
+                                val failingUrl = request.url?.toString()
+                                val isSslError = desc.contains("ERR_SSL_PROTOCOL_ERROR", ignoreCase = true) || desc.contains("ERR_SSL_VERSION_OR_CIPHER_MISMATCH", ignoreCase = true)
+
+                                if (isSslError && sslRetryCount < 3 && failingUrl != null) {
+                                    sslRetryCount++; view.clearCache(true); view.postDelayed({ view.loadUrl(failingUrl) }, 1500L * sslRetryCount); return
+                                }
+                                safeResume { continuation.resumeWithException(Exception("网络错误: $desc")) }
                             }
                         }
+                        loadUrl(config.loginUrl)
                     }
-                    
-                    // ✅ 访问登录页面（带上Cookie，让服务器自动识别并跳转）
-                    loadUrl(config.loginUrl)
-                }
-                
-                // 设置超时
-                timeoutHandler = Handler(Looper.getMainLooper())
-                timeoutHandler?.postDelayed({
-                    safeResume {
-                        continuation.resumeWithException(
-                            Exception("获取课表超时（${TIMEOUT_MS / 1000}秒）")
-                        )
-                    }
-                }, TIMEOUT_MS)
-                
-                // 支持取消
-                continuation.invokeOnCancellation {
-                    Log.w(TAG, "⚠️ 操作被取消")
-                    safeResume {
-                        // 已取消，不需要额外操作
-                    }
-                }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 使用Cookie获取课表失败", e)
-                safeResume {
-                    continuation.resumeWithException(e)
+
+                    timeoutHandler = Handler(Looper.getMainLooper())
+                    timeoutHandler?.postDelayed({
+                        safeResume { continuation.resumeWithException(Exception("获取课表超时（${TIMEOUT_MS / 1000}秒）")) }
+                    }, TIMEOUT_MS)
+                    continuation.invokeOnCancellation { AppLogger.w(TAG, "操作被取消"); safeResume {} }
+                } catch (e: Exception) {
+                    AppLogger.e(TAG, "获取课表失败", e); safeResume { continuation.resumeWithException(e) }
                 }
             }
         }
-    }
-    
-    /**
-     * 提取课表数据
-     */
-    private fun extractScheduleData(
-        webView: WebView?,
-        config: SchoolConfig,
-        safeResume: (() -> Unit) -> Unit,
-        continuation: kotlinx.coroutines.CancellableContinuation<Result<Pair<List<ParsedCourse>, String>>>
-    ) {
-        if (webView == null) {
-            safeResume {
-                continuation.resume(Result.failure(Exception("WebView已销毁")))
-            }
-            return
-        }
-        
-        // 获取Cookie
+
+    private fun extractScheduleData(webView: WebView?, config: SchoolConfig, safeResume: (() -> Unit) -> Unit, continuation: kotlinx.coroutines.CancellableContinuation<Result<Pair<List<ParsedCourse>, String>>>) {
+        if (webView == null) { safeResume { continuation.resume(Result.failure(Exception("WebView已销毁"))) }; return }
+
         val cookies = CookieManager.getInstance().getCookie(config.scheduleUrl) ?: ""
-        
-        // 获取提取脚本
         val extractor = extractorFactory.getExtractor(config.id)
         if (extractor == null) {
-            Log.e(TAG, "❌ 未找到学校 ${config.name} 的提取器")
-            safeResume {
-                continuation.resume(Result.failure(Exception("该学校暂未适配自动提取功能")))
-            }
-            return
+            AppLogger.e(TAG, "未找到学校 ${config.name} 的提取器")
+            safeResume { continuation.resume(Result.failure(Exception("该学校暂未适配自动提取功能"))) }; return
         }
-        
-        val extractScript = extractor.generateExtractionScript()
-        Log.d(TAG, "🔧 使用提取器: ${extractor.javaClass.simpleName}")
-        
-        // 执行提取脚本
-        webView.evaluateJavascript("($extractScript)") { result ->
+
+        webView.evaluateJavascript("(${extractor.generateExtractionScript()})") { result ->
             try {
-                Log.d(TAG, "📊 提取器返回数据: ${result?.take(200)}...")
-                
-                // 使用提取器解析数据
                 val courses = extractor.parseCourses(result ?: "")
-                
                 if (courses.isEmpty()) {
-                    Log.w(TAG, "⚠️ 未提取到课程数据")
-                    safeResume {
-                        continuation.resume(
-                            Result.failure(Exception("未提取到课程数据，可能登录失败或页面结构变化"))
-                        )
-                    }
+                    safeResume { continuation.resume(Result.failure(Exception("未提取到课程数据"))) }
                 } else {
-                    Log.d(TAG, "✅ 成功提取 ${courses.size} 门课程")
-                    safeResume {
-                        continuation.resume(Result.success(Pair(courses, cookies)))
-                    }
+                    safeResume { continuation.resume(Result.success(Pair(courses, cookies))) }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ 解析课程数据失败", e)
-                safeResume {
-                    continuation.resume(Result.failure(e))
-                }
+                AppLogger.e(TAG, "解析课程数据失败", e); safeResume { continuation.resume(Result.failure(e)) }
             }
         }
     }
 }
-

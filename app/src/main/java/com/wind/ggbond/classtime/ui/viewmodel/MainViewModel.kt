@@ -1,7 +1,6 @@
 package com.wind.ggbond.classtime.ui.viewmodel
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.repository.InitializationRepository
@@ -60,19 +59,19 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
     
-    // 底部栏模糊设置（供 Composable 读取）
-    private val _bottomBarBlurEnabled = MutableStateFlow(true)
-    val bottomBarBlurEnabled: StateFlow<Boolean> = _bottomBarBlurEnabled.asStateFlow()
+    // 全局毛玻璃效果设置（供 Composable 读取）
+    private val _glassEffectEnabled = MutableStateFlow(true)
+    val glassEffectEnabled: StateFlow<Boolean> = _glassEffectEnabled.asStateFlow()
 
     init {
         AppLogger.d(TAG, "MainViewModel 初始化")
-        
-        // 观察 DataStore 中的底部栏模糊设置
+
+        // 观察 DataStore 中的全局毛玻璃效果设置
         viewModelScope.launch {
-            settingsRepository.observeBottomBarBlurEnabled()
+            settingsRepository.observeGlassEffectEnabled()
                 .distinctUntilChanged()
                 .collect { value ->
-                    _bottomBarBlurEnabled.value = value
+                    _glassEffectEnabled.value = value
                 }
         }
         
@@ -167,8 +166,7 @@ class MainViewModel @Inject constructor(
 
         } catch (e: Exception) {
             AppLogger.e(TAG, "检查引导状态失败", e)
-            // 出错时默认显示主界面
-            _uiState.value = UiState.Success
+            _uiState.value = UiState.Error("检查引导状态失败，请重启应用")
         }
     }
     
@@ -209,10 +207,20 @@ class MainViewModel @Inject constructor(
     /**
      * 重试初始化（用于错误恢复）
      */
+    private var isInitializing = false
+
     fun retry() {
+        if (isInitializing) return
         AppLogger.d(TAG, "用户请求重试初始化")
+        isInitializing = true
         _uiState.value = UiState.Loading
-        initializeApp()
+        viewModelScope.launch {
+            try {
+                initializeApp()
+            } finally {
+                isInitializing = false
+            }
+        }
     }
     
     /**

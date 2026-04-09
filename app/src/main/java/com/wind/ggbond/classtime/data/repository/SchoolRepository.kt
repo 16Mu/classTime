@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import java.io.StringReader
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -30,7 +31,7 @@ class SchoolRepository @Inject constructor(
      */
     suspend fun initializeSchoolsFromAssets() {
         try {
-            android.util.Log.d("SchoolRepository", "开始从 assets 加载学校数据...")
+            AppLogger.d("SchoolRepository", "开始从 assets 加载学校数据...")
             
             val jsonString = context.assets.open("schools.json")
                 .bufferedReader()
@@ -38,8 +39,8 @@ class SchoolRepository @Inject constructor(
                 .trim()  // 去除首尾空白字符
                 .replace("\uFEFF", "")  // 移除 UTF-8 BOM
             
-            android.util.Log.d("SchoolRepository", "成功读取 schools.json，内容长度：${jsonString.length}")
-            android.util.Log.d("SchoolRepository", "文件前100字符：${jsonString.take(100)}")
+            AppLogger.d("SchoolRepository", "成功读取 schools.json，内容长度：${jsonString.length}")
+            AppLogger.d("SchoolRepository", "文件前100字符：${jsonString.take(100)}")
             
             // 使用 JsonReader 进行宽松解析
             val reader = JsonReader(StringReader(jsonString))
@@ -48,34 +49,31 @@ class SchoolRepository @Inject constructor(
             val type = object : TypeToken<List<SchoolData>>() {}.type
             val schoolDataList: List<SchoolData> = gson.fromJson(reader, type)
             
-            android.util.Log.d("SchoolRepository", "JSON 解析成功，原始学校数量：${schoolDataList.size}")
+            AppLogger.d("SchoolRepository", "JSON 解析成功，原始学校数量：${schoolDataList.size}")
             
             val schools = schoolDataList.map { it.toEntity() }
-            android.util.Log.d("SchoolRepository", "转换为 Entity 后学校数量：${schools.size}")
+            AppLogger.d("SchoolRepository", "转换为 Entity 后学校数量：${schools.size}")
             
             // 先删除所有旧数据，确保已移除的学校被清理
             val deletedCount = schoolDao.getSchoolCount()
-            schoolDao.deleteAllSchools()
-            android.util.Log.d("SchoolRepository", "已删除 $deletedCount 条旧学校记录")
             
-            // 再插入新的学校列表
-            schoolDao.insertSchools(schools)
-            android.util.Log.d("SchoolRepository", "已插入 ${schools.size} 条新学校记录")
+            schoolDao.replaceAllSchools(schools)
+            AppLogger.d("SchoolRepository", "已替换学校数据：删除 $deletedCount 条，插入 ${schools.size} 条")
             
             // 验证数据是否插入成功
             val insertedCount = schoolDao.getSchoolCount()
-            android.util.Log.d("SchoolRepository", "插入后数据库中的学校数量：$insertedCount")
+            AppLogger.d("SchoolRepository", "插入后数据库中的学校数量：$insertedCount")
             
             // 验证isEnabled字段
             val enabledSchools = schoolDao.getAllSchools().first()
-            android.util.Log.d("SchoolRepository", "已启用的学校数量：${enabledSchools.size}")
+            AppLogger.d("SchoolRepository", "已启用的学校数量：${enabledSchools.size}")
             
             if (enabledSchools.isNotEmpty()) {
-                android.util.Log.d("SchoolRepository", "第一个启用的学校：${enabledSchools.first().name}, isEnabled: ${enabledSchools.first().isEnabled}")
+                AppLogger.d("SchoolRepository", "第一个启用的学校：${enabledSchools.first().name}, isEnabled: ${enabledSchools.first().isEnabled}")
             }
             
         } catch (e: Exception) {
-            android.util.Log.e("SchoolRepository", "加载学校数据失败", e)
+            AppLogger.e("SchoolRepository", "加载学校数据失败", e)
             throw e  // 重新抛出异常，让上层知道加载失败
         }
     }
@@ -92,7 +90,7 @@ class SchoolRepository @Inject constructor(
             // 先检查数据是否存在，如果不存在则自动加载
             val count = schoolDao.getSchoolCount()
             if (count == 0) {
-                android.util.Log.w("SchoolRepository", "⚠️ 学校数据为空，自动加载...")
+                AppLogger.w("SchoolRepository", "⚠️ 学校数据为空，自动加载...")
                 initializeSchoolsFromAssets()
             }
             // 发出数据
@@ -117,7 +115,7 @@ class SchoolRepository @Inject constructor(
             // 先检查数据是否存在，如果不存在则自动加载
             val count = schoolDao.getSchoolCount()
             if (count == 0) {
-                android.util.Log.w("SchoolRepository", "⚠️ 学校数据为空，自动加载...")
+                AppLogger.w("SchoolRepository", "⚠️ 学校数据为空，自动加载...")
                 initializeSchoolsFromAssets()
             }
             // 发出数据

@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.util.Log
+import com.wind.ggbond.classtime.util.AppLogger
 import androidx.core.content.ContextCompat
 
 /**
@@ -254,7 +254,7 @@ object ReminderPermissionHelper {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "打开权限设置失败: ${permission.name}", e)
+            AppLogger.e(TAG, "打开权限设置失败: ${permission.name}", e)
             // 降级方案：打开应用详情页
             try {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -262,7 +262,7 @@ object ReminderPermissionHelper {
                 }
                 context.startActivity(intent)
             } catch (e2: Exception) {
-                Log.e(TAG, "打开应用详情页也失败", e2)
+                AppLogger.e(TAG, "打开应用详情页也失败", e2)
             }
         }
     }
@@ -339,7 +339,7 @@ object ReminderPermissionHelper {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "打开厂商特定设置页面失败: $manufacturer", e)
+            AppLogger.e(TAG, "打开厂商特定设置页面失败: $manufacturer", e)
             // 降级：打开应用详情页
             try {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -347,7 +347,7 @@ object ReminderPermissionHelper {
                 }
                 context.startActivity(intent)
             } catch (e2: Exception) {
-                Log.e(TAG, "打开应用详情页失败", e2)
+                AppLogger.e(TAG, "打开应用详情页失败", e2)
             }
         }
     }

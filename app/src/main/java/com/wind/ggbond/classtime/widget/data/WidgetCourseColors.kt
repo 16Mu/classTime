@@ -6,7 +6,7 @@ object WidgetCourseColors {
 
     fun getCourseColor(index: Int, isDarkTheme: Boolean = false): Color {
         val colors = if (isDarkTheme) DARK_COLORS else LIGHT_COLORS
-        return colors[index % colors.size]
+        return colors[Math.floorMod(index, colors.size)]
     }
 
     fun getCourseColorHex(index: Int, isDarkTheme: Boolean = false): String {

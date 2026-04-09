@@ -21,7 +21,7 @@ class ClassTimeRepository @Inject constructor(
     override fun getAllFlow(): Flow<List<ClassTime>> = dao.getClassTimesByConfig()
 
     override suspend fun getById(id: Long): ClassTime? =
-        dao.getClassTimesByConfigSync().find { it.id == id }
+        dao.getClassTimeById(id)
 
     override fun getByIdFlow(id: Long): Flow<ClassTime?> =
         kotlinx.coroutines.flow.flow { emit(getById(id)) }
@@ -29,7 +29,7 @@ class ClassTimeRepository @Inject constructor(
     override suspend fun insert(entity: ClassTime): Long = dao.insertClassTime(entity)
 
     override suspend fun insertAll(entities: List<ClassTime>): List<Long> =
-        entities.map { dao.insertClassTime(it) }
+        dao.insertClassTimes(entities)
 
     override suspend fun update(entity: ClassTime) = dao.updateClassTime(entity)
 

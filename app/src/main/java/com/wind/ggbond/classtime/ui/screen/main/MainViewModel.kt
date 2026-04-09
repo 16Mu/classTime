@@ -20,6 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 @Immutable
@@ -66,7 +67,7 @@ class MainViewModel @Inject constructor(
             examUseCase.getExamsByWeekRangeFlow(week, week + 1)
         }
         .catch { e ->
-            android.util.Log.e(TAG, "Error in upcomingExams flow", e)
+            AppLogger.e(TAG, "Error in upcomingExams flow", e)
             emit(emptyList())
         }
         .stateIn(
@@ -81,13 +82,13 @@ class MainViewModel @Inject constructor(
                 try {
                     emit(examUseCase.getExamsWithSectionByWeek(week))
                 } catch (e: Exception) {
-                    android.util.Log.e(TAG, "Error loading exams for week $week", e)
+                    AppLogger.e(TAG, "Error loading exams for week $week", e)
                     emit(emptyList())
                 }
             }
         }
         .catch { e ->
-            android.util.Log.e(TAG, "Error in examsForCurrentWeek flow", e)
+            AppLogger.e(TAG, "Error in examsForCurrentWeek flow", e)
             emit(emptyList())
         }
         .stateIn(
@@ -147,39 +148,39 @@ class MainViewModel @Inject constructor(
             _courses.first { it.isNotEmpty() }
             
             val currentWeek = _currentWeekNumber.value
-            android.util.Log.d(TAG, "ViewModel初始化：开始预加载周次 $currentWeek 及相邻周")
+            AppLogger.d(TAG, "ViewModel初始化：开始预加载周次 $currentWeek 及相邻周")
             
             courseUseCase.preloadAdjacentWeeks(_courses.value, currentWeek, _currentSchedule.value?.totalWeeks ?: 20)
             
-            android.util.Log.d(TAG, "ViewModel初始化：预加载完成")
+            AppLogger.d(TAG, "ViewModel初始化：预加载完成")
         }
     }
     
     private fun loadCurrentSchedule() {
         viewModelScope.launch {
             scheduleRepository.getCurrentScheduleFlow().collect { schedule ->
-                android.util.Log.d(TAG, "当前课表变化: ${schedule?.name} (ID=${schedule?.id})")
+                AppLogger.d(TAG, "当前课表变化: ${schedule?.name} (ID=${schedule?.id})")
                 _currentSchedule.value = schedule
                 schedule?.let {
-                    android.util.Log.d(TAG, "=== 课表信息加载 ===")
-                    android.util.Log.d(TAG, "课表名称: ${it.name}")
-                    android.util.Log.d(TAG, "开始日期: ${it.startDate}")
-                    android.util.Log.d(TAG, "结束日期: ${it.endDate}")
-                    android.util.Log.d(TAG, "总周数: ${it.totalWeeks}")
+                    AppLogger.d(TAG, "=== 课表信息加载 ===")
+                    AppLogger.d(TAG, "课表名称: ${it.name}")
+                    AppLogger.d(TAG, "开始日期: ${it.startDate}")
+                    AppLogger.d(TAG, "结束日期: ${it.endDate}")
+                    AppLogger.d(TAG, "总周数: ${it.totalWeeks}")
                     
                     val calculatedWeek = DateUtils.calculateWeekNumber(it.startDate)
-                    android.util.Log.d(TAG, "计算的周次: $calculatedWeek")
+                    AppLogger.d(TAG, "计算的周次: $calculatedWeek")
                     
                     val safeWeekNumber = if (calculatedWeek < 1 || calculatedWeek > 30) {
-                        android.util.Log.w(TAG, "计算的周次异常: $calculatedWeek，使用默认值1")
+                        AppLogger.w(TAG, "计算的周次异常: $calculatedWeek，使用默认值1")
                         1
                     } else {
                         calculatedWeek
                     }
                     _currentWeekNumber.value = safeWeekNumber
                     _actualWeekNumber.value = safeWeekNumber
-                    android.util.Log.d(TAG, "最终使用周次: $safeWeekNumber")
-                    android.util.Log.d(TAG, "==================")
+                    AppLogger.d(TAG, "最终使用周次: $safeWeekNumber")
+                    AppLogger.d(TAG, "==================")
                     
                     loadCourses(it.id)
                 }
@@ -196,16 +197,16 @@ class MainViewModel @Inject constructor(
         courseUseCase.clearCache()
         
         courseLoadJob = viewModelScope.launch {
-            android.util.Log.d(TAG, "开始加载课表 ID=$scheduleId 的课程")
+            AppLogger.d(TAG, "开始加载课表 ID=$scheduleId 的课程")
             courseUseCase.getCoursesBySchedule(scheduleId).collect { courseList ->
-                android.util.Log.d(TAG, "✓ 加载到 ${courseList.size} 门课程")
+                AppLogger.d(TAG, "✓ 加载到 ${courseList.size} 门课程")
                 courseList.forEachIndexed { index, course ->
-                    android.util.Log.d(TAG, "课程$index: ${course.courseName} (星期${course.dayOfWeek}, 第${course.startSection}节, 周次${course.weeks}, 周次类型=${course.weeks::class.simpleName})")
+                    AppLogger.d(TAG, "课程$index: ${course.courseName} (星期${course.dayOfWeek}, 第${course.startSection}节, 周次${course.weeks}, 周次类型=${course.weeks::class.simpleName})")
                     if (course.weeks.isNotEmpty()) {
                         val firstWeek = course.weeks.first()
-                        android.util.Log.d(TAG, "  └─ 第一周: $firstWeek (类型: ${firstWeek::class.simpleName})")
+                        AppLogger.d(TAG, "  └─ 第一周: $firstWeek (类型: ${firstWeek::class.simpleName})")
                         if (firstWeek is String) {
-                            android.util.Log.w(TAG, "  ⚠️ 周次数据类型错误：期望Int，实际String")
+                            AppLogger.w(TAG, "  ⚠️ 周次数据类型错误：期望Int，实际String")
                         }
                     }
                 }
@@ -216,15 +217,15 @@ class MainViewModel @Inject constructor(
         
         adjustmentLoadJob = viewModelScope.launch {
             adjustmentUseCase.getAdjustmentsBySchedule(scheduleId).collect { adjustmentList ->
-                android.util.Log.d(TAG, "========== 调课记录更新 ==========")
-                android.util.Log.d(TAG, "✓ 加载到 ${adjustmentList.size} 条调课记录")
+                AppLogger.d(TAG, "========== 调课记录更新 ==========")
+                AppLogger.d(TAG, "✓ 加载到 ${adjustmentList.size} 条调课记录")
                 
                 adjustmentList.forEachIndexed { index, adj ->
-                    android.util.Log.d(TAG, "调课记录 ${index + 1}:")
-                    android.util.Log.d(TAG, "  ID=${adj.id}, 课程ID=${adj.originalCourseId}")
-                    android.util.Log.d(TAG, "  原始: 第${adj.originalWeekNumber}周 ${DateUtils.getDayOfWeekName(adj.originalDayOfWeek)} 第${adj.originalStartSection}节")
-                    android.util.Log.d(TAG, "  调整: 第${adj.newWeekNumber}周 ${DateUtils.getDayOfWeekName(adj.newDayOfWeek)} 第${adj.newStartSection}节")
-                    android.util.Log.d(TAG, "  原因: ${adj.reason}")
+                    AppLogger.d(TAG, "调课记录 ${index + 1}:")
+                    AppLogger.d(TAG, "  ID=${adj.id}, 课程ID=${adj.originalCourseId}")
+                    AppLogger.d(TAG, "  原始: 第${adj.originalWeekNumber}周 ${DateUtils.getDayOfWeekName(adj.originalDayOfWeek)} 第${adj.originalStartSection}节")
+                    AppLogger.d(TAG, "  调整: 第${adj.newWeekNumber}周 ${DateUtils.getDayOfWeekName(adj.newDayOfWeek)} 第${adj.newStartSection}节")
+                    AppLogger.d(TAG, "  原因: ${adj.reason}")
                 }
                 
                 _adjustments.value = adjustmentList
@@ -232,9 +233,9 @@ class MainViewModel @Inject constructor(
                 val map = adjustmentUseCase.buildAdjustmentMap(adjustmentList)
                 _adjustmentMap.value = map
                 
-                android.util.Log.d(TAG, "调课数据更新，清除所有缓存")
+                AppLogger.d(TAG, "调课数据更新，清除所有缓存")
                 courseUseCase.clearCache()
-                android.util.Log.d(TAG, "====================================")
+                AppLogger.d(TAG, "====================================")
             }
         }
     }
@@ -268,7 +269,7 @@ class MainViewModel @Inject constructor(
         val adjustmentsList = _adjustments.value
         
         if (adjustmentsList.isNotEmpty()) {
-            android.util.Log.d(TAG, "getCoursesForWeek: 检测到${adjustmentsList.size}条调课记录，使用合并逻辑")
+            AppLogger.d(TAG, "getCoursesForWeek: 检测到${adjustmentsList.size}条调课记录，使用合并逻辑")
             return adjustmentUseCase.mergeCoursesWithAdjustments(_courses.value, adjustmentsList, weekNumber)
         }
         
@@ -291,12 +292,12 @@ class MainViewModel @Inject constructor(
             try {
                 val result = autoUpdateUseCase.checkAndPerformAutoUpdate()
                 if (result.first) {
-                    android.util.Log.d(TAG, "✅ 更新成功: ${result.second}")
+                    AppLogger.d(TAG, "✅ 更新成功: ${result.second}")
                 } else {
-                    android.util.Log.d(TAG, "❌ 更新失败: ${result.second}")
+                    AppLogger.d(TAG, "❌ 更新失败: ${result.second}")
                 }
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "自动更新异常", e)
+                AppLogger.e(TAG, "自动更新异常", e)
             }
         }
     }
@@ -337,7 +338,7 @@ class MainViewModel @Inject constructor(
                 }
                 forceRefreshCourses()
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "删除课程失败", e)
+                AppLogger.e(TAG, "删除课程失败", e)
                 _lastDeletedSnapshot = null
             }
         }
@@ -366,7 +367,7 @@ class MainViewModel @Inject constructor(
                 }
                 forceRefreshCourses()
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "撤销删除失败", e)
+                AppLogger.e(TAG, "撤销删除失败", e)
             }
         }
     }
@@ -436,9 +437,9 @@ class MainViewModel @Inject constructor(
                 
                 courseUseCase.clearCache()
                 
-                android.util.Log.d(TAG, "✅ 课表更新成功: $name, 起始日期=$startDate, 总周数=$totalWeeks")
+                AppLogger.d(TAG, "✅ 课表更新成功: $name, 起始日期=$startDate, 总周数=$totalWeeks")
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "更新课表失败", e)
+                AppLogger.e(TAG, "更新课表失败", e)
             }
         }
     }

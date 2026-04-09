@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -117,7 +118,7 @@ class SemesterManagementViewModel @Inject constructor(
     fun setCurrentSchedule(schedule: Schedule) {
         viewModelScope.launch {
             scheduleRepository.setCurrentSchedule(schedule.id)
-            android.util.Log.d("ScheduleVM", "已切换到课表: ${schedule.name}")
+            AppLogger.d("ScheduleVM", "已切换到课表: ${schedule.name}")
         }
     }
 }

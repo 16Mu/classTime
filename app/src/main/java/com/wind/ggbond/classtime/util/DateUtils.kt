@@ -1,7 +1,7 @@
 package com.wind.ggbond.classtime.util
 
-import android.util.Log
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import java.time.temporal.ChronoUnit
 
 /**
@@ -33,7 +33,7 @@ object DateUtils {
     ): Int {
         // ✅ 验证：currentDate不能早于semesterStartDate
         if (currentDate.isBefore(semesterStartDate)) {
-            Log.w(TAG, "currentDate ($currentDate) is before semesterStartDate ($semesterStartDate), returning week 1")
+            AppLogger.w(TAG, "currentDate ($currentDate) is before semesterStartDate ($semesterStartDate), returning week 1")
             return 1  // 返回第1周而不是负数
         }
         
@@ -41,7 +41,7 @@ object DateUtils {
         
         // ✅ 边界检查：防止计算结果异常
         if (days < 0) {
-            Log.e(TAG, "Unexpected negative days: $days, returning week 1")
+            AppLogger.e(TAG, "Unexpected negative days: $days, returning week 1")
             return 1
         }
         
@@ -49,7 +49,7 @@ object DateUtils {
         
         // ✅ 合理性检查：周次不应超过30周
         if (weekNumber > MAX_WEEK_NUMBER) {
-            Log.w(TAG, "Week number $weekNumber exceeds maximum $MAX_WEEK_NUMBER, check semester configuration")
+            AppLogger.w(TAG, "Week number $weekNumber exceeds maximum $MAX_WEEK_NUMBER, check semester configuration")
         }
         
         return weekNumber.coerceIn(MIN_WEEK_NUMBER, MAX_WEEK_NUMBER)
@@ -72,7 +72,7 @@ object DateUtils {
         }
         
         if (weekNumber > MAX_WEEK_NUMBER) {
-            Log.w(TAG, "Week number $weekNumber is unusually large")
+            AppLogger.w(TAG, "Week number $weekNumber is unusually large")
         }
         
         // 计算学期第一周的周一
@@ -92,7 +92,7 @@ object DateUtils {
     fun getDayOfWeekName(dayOfWeek: Int): String {
         // ✅ 使用Constants验证范围
         if (dayOfWeek !in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) {
-            Log.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
+            AppLogger.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
             return ""
         }
         
@@ -119,7 +119,7 @@ object DateUtils {
     fun getDayOfWeekShortName(dayOfWeek: Int): String {
         // ✅ 使用Constants验证范围
         if (dayOfWeek !in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) {
-            Log.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
+            AppLogger.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
             return ""
         }
         

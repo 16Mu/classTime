@@ -177,11 +177,13 @@ object MonetColorPalette {
         courseName: String,
         seedColor: Int,
         saturationLevel: SaturationLevel,
-        existingColors: List<String> = emptyList()
+        existingColors: List<String> = emptyList(),
+        isDarkMode: Boolean = false
     ): String {
-        courseColorMap[courseName]?.let { return it }
+        val cacheKey = "$courseName:$seedColor:$saturationLevel:$isDarkMode"
+        courseColorMap[cacheKey]?.let { return it }
 
-        val palette = generatePalette(seedColor, saturationLevel)
+        val palette = generatePalette(seedColor, saturationLevel, isDarkMode)
         val availableColors = palette.filter { it !in existingColors }
 
         val selectedColor = if (availableColors.isNotEmpty()) {
@@ -191,35 +193,24 @@ object MonetColorPalette {
             palette.minByOrNull { colorUsageCount[it] ?: 0 } ?: palette.first()
         }
 
-        courseColorMap[courseName] = selectedColor
+        courseColorMap[cacheKey] = selectedColor
         return selectedColor
     }
 
-    /**
-     * 批量为课程列表分配互不重复的颜色
-     *
-     * 对课程列表去重后保持原始顺序，逐一调用 [getColorForCourse] 分配颜色，
-     * 每次将已分配的颜色累积传入 [existingColors]，确保同批次内不重复。
-     *
-     * @param courseNames 课程名称列表
-     * @param seedColor 种子颜色
-     * @param saturationLevel 饱和度等级
-     * @return 课程名称到颜色字符串的映射
-     */
     fun assignColorsForCourses(
         courseNames: List<String>,
         seedColor: Int,
-        saturationLevel: SaturationLevel
+        saturationLevel: SaturationLevel,
+        isDarkMode: Boolean = false
     ): Map<String, String> {
         val uniqueCourseNames = courseNames.distinct()
         val result = mutableMapOf<String, String>()
         val usedColors = mutableListOf<String>()
 
         uniqueCourseNames.forEach { courseName ->
-            val color = if (courseColorMap.containsKey(courseName)) {
-                courseColorMap.getValue(courseName)
-            } else {
-                getColorForCourse(courseName, seedColor, saturationLevel, usedColors)
+            val cacheKey = "$courseName:$seedColor:$saturationLevel:$isDarkMode"
+            val color = courseColorMap.getOrPut(cacheKey) {
+                getColorForCourse(courseName, seedColor, saturationLevel, usedColors, isDarkMode)
             }
             result[courseName] = color
             usedColors.add(color)

@@ -38,12 +38,11 @@ fun ScheduleQuickEditDialog(
     val haptic = LocalHapticFeedback.current
     
     // 状态 - 使用当前课表的值作为初始值
-    var scheduleName by remember { mutableStateOf(schedule.name) }
-    var startDate by remember { mutableStateOf(schedule.startDate) }
-    var totalWeeks by remember { mutableStateOf(schedule.totalWeeks) }
+    var scheduleName by remember(schedule.id) { mutableStateOf(schedule.name) }
+    var startDate by remember(schedule.id) { mutableStateOf(schedule.startDate) }
+    var totalWeeks by remember(schedule.id) { mutableStateOf(schedule.totalWeeks) }
     var showDatePicker by remember { mutableStateOf(false) }
     
-    // 日期格式化
     val dateFormatter = DateTimeFormatter.ofPattern("yyyy年MM月dd日")
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = startDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

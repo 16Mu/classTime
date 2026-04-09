@@ -50,6 +50,7 @@ import com.wind.ggbond.classtime.ui.components.ScheduleExpiredDialog
 import com.wind.ggbond.classtime.ui.components.CreateScheduleDialog
 import com.wind.ggbond.classtime.util.DateUtils
 import com.wind.ggbond.classtime.util.WeekParser
+import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 
 enum class BatchPhase {
     BASIC_INFO,
@@ -227,7 +228,8 @@ fun BatchCourseCreateScreen(
                     onComplete = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         currentPhase = BatchPhase.COLOR_SELECTION
-                    }
+                    },
+                    onCourseClick = { index -> currentCourseIndex = index }
                 )
 
                 BatchPhase.COLOR_SELECTION -> ColorSelectionPhase(
@@ -461,9 +463,19 @@ private fun BasicInfoCardExpanded(
     onUpdateClassroom: (String) -> Unit,
     onDelete: () -> Unit
 ) {
-    var name by remember(courseItem.courseName) { mutableStateOf(courseItem.courseName) }
-    var teacher by remember(courseItem.teacher) { mutableStateOf(courseItem.teacher) }
-    var classroom by remember(courseItem.defaultClassroom) { mutableStateOf(courseItem.defaultClassroom) }
+    var name by remember(courseItem.id, courseItem.courseName) { mutableStateOf(courseItem.courseName) }
+    var teacher by remember(courseItem.id, courseItem.teacher) { mutableStateOf(courseItem.teacher) }
+    var classroom by remember(courseItem.id, courseItem.defaultClassroom) { mutableStateOf(courseItem.defaultClassroom) }
+
+    LaunchedEffect(courseItem.id, courseItem.courseName) {
+        if (name != courseItem.courseName) name = courseItem.courseName
+    }
+    LaunchedEffect(courseItem.id, courseItem.teacher) {
+        if (teacher != courseItem.teacher) teacher = courseItem.teacher
+    }
+    LaunchedEffect(courseItem.id, courseItem.defaultClassroom) {
+        if (classroom != courseItem.defaultClassroom) classroom = courseItem.defaultClassroom
+    }
 
     Card(modifier = Modifier.fillMaxWidth().animateContentSize(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -573,7 +585,8 @@ private fun DetailedConfigPhase(
     onPreviousCourse: () -> Unit,
     onNextCourse: () -> Unit,
     onStepChange: (Int) -> Unit,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    onCourseClick: (Int) -> Unit = {}
 ) {
     if (courseItems.isEmpty()) return
 
@@ -611,7 +624,7 @@ private fun DetailedConfigPhase(
         CourseProgressIndicator(
             courses = courseItems,
             currentIndex = currentIndex,
-            onCourseClick = { index -> if (index != currentIndex) {} }
+            onCourseClick = { index -> if (index != currentIndex) onCourseClick(index) }
         )
 
         Surface(
@@ -636,7 +649,7 @@ private fun DetailedConfigPhase(
                                 text = currentCourse.courseName.takeIf { it.isNotBlank() }?.first()?.toString() ?: "?",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
@@ -810,7 +823,7 @@ private fun CourseProgressIndicator(
         itemsIndexed(items = courses) { index, course ->
             val isSelected = index == currentIndex
             Surface(
-                shape = RoundedCornerShape(20.dp),
+                shape = MaterialTheme.shapes.large,
                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 onClick = { onCourseClick(index) }
             ) {
@@ -830,7 +843,7 @@ private fun CourseProgressIndicator(
                                 text = "${index + 1}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -867,7 +880,7 @@ private fun ConfigStepIndicator(currentStep: Int, onStepClick: (Int) -> Unit) {
                     isActive -> MaterialTheme.colorScheme.primary
                     else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
                 },
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp),
                 onClick = { if (isCompleted || isActive) onStepClick(stepNum) }
             ) {
@@ -1095,7 +1108,7 @@ private fun ColorSelectionCard(
                             text = "$index",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = contentColorForBackground(displayColor)
                         )
                     }
                 }
@@ -1143,7 +1156,7 @@ private fun ColorSelectionCard(
                                     Icon(
                                         Icons.Default.Check,
                                         null,
-                                        tint = Color.White,
+                                        tint = contentColorForBackground(color),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -1306,9 +1319,25 @@ private fun WeekSelectionStep(course: BatchCourseItem, courseId: Long, viewModel
 
 @Composable
 private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourseCreateViewModel) {
-    var reminderEnabled by remember { mutableStateOf(course.reminderEnabled) }
-    var reminderMinutes by remember { mutableIntStateOf(course.reminderMinutes) }
-    var notes by remember { mutableStateOf(course.note) }
+    var reminderEnabled by remember(course.id) { mutableStateOf(course.reminderEnabled) }
+    var reminderMinutes by remember(course.id) { mutableIntStateOf(course.reminderMinutes) }
+    var notes by remember(course.id) { mutableStateOf(course.note) }
+
+    LaunchedEffect(course.id, course.reminderEnabled) {
+        if (reminderEnabled != course.reminderEnabled) {
+            reminderEnabled = course.reminderEnabled
+        }
+    }
+    LaunchedEffect(course.id, course.reminderMinutes) {
+        if (reminderMinutes != course.reminderMinutes) {
+            reminderMinutes = course.reminderMinutes
+        }
+    }
+    LaunchedEffect(course.id, course.note) {
+        if (notes != course.note) {
+            notes = course.note
+        }
+    }
     val haptic = LocalHapticFeedback.current
 
     LazyColumn(
@@ -1381,7 +1410,7 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                             options.forEach { (minutes, label) ->
                                 val isSelected = reminderMinutes == minutes && !showCustomInput
                                 Surface(
-                                    shape = RoundedCornerShape(20.dp),
+                                    shape = MaterialTheme.shapes.large,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.surfaceVariant,
                                     onClick = {
@@ -1389,13 +1418,14 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                                         reminderMinutes = minutes
                                         viewModel.updateReminderMinutes(course.id, minutes)
                                         showCustomInput = false
+                                        customMinutes = ""
                                     }
                                 ) {
                                     Text(
                                         text = label,
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                     )
                                 }
@@ -1403,7 +1433,7 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                             
                             // 自定义选项
                             Surface(
-                                shape = RoundedCornerShape(20.dp),
+                                shape = MaterialTheme.shapes.large,
                                 color = if (showCustomInput) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceVariant,
                                 onClick = {
@@ -1420,7 +1450,7 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                                     text = "自定义",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = if (showCustomInput) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (showCustomInput) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (showCustomInput) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                 )
                             }
@@ -1479,7 +1509,7 @@ private fun ReminderAndNotesStep(course: BatchCourseItem, viewModel: BatchCourse
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)) {
-                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.NotificationsActive, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+                                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp)) }
                                     }
                                     Text(text = "课程提醒", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                 }
@@ -1628,7 +1658,7 @@ private fun PreviewPhase(
                         Icon(
                             Icons.Default.CheckCircle,
                             null,
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onTertiary,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -1880,7 +1910,7 @@ private fun TimeSlotEditRowExpanded(
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp)) {
-                    Box(contentAlignment = Alignment.Center) { Text(text = "${slotIndex}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White) }
+                    Box(contentAlignment = Alignment.Center) { Text(text = "${slotIndex}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) }
                 }
                 Text(text = "时间段 $slotIndex", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                 if (canDelete) IconButton(onClick = onDelete, modifier = Modifier.size(26.dp)) { Icon(Icons.Default.Close, "删除", tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f), modifier = Modifier.size(16.dp)) }
@@ -1976,9 +2006,9 @@ private fun QuickEditDialog(
     onDismiss: () -> Unit,
     onConfirm: (BatchCourseItem) -> Unit
 ) {
-    var name by remember { mutableStateOf(courseItem.courseName) }
-    var teacher by remember { mutableStateOf(courseItem.teacher) }
-    var classroom by remember { mutableStateOf(courseItem.defaultClassroom) }
+    var name by remember(courseItem.id) { mutableStateOf(courseItem.courseName) }
+    var teacher by remember(courseItem.id) { mutableStateOf(courseItem.teacher) }
+    var classroom by remember(courseItem.id) { mutableStateOf(courseItem.defaultClassroom) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
