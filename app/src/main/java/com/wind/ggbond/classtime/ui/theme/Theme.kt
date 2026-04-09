@@ -11,11 +11,24 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+
+/**
+ * 全局壁纸状态 CompositionLocal
+ * 当用户启用壁纸时，所有使用 WallpaperAwareSurface 的组件会自动变为半透明
+ */
+val LocalWallpaperEnabled = staticCompositionLocalOf { false }
+
+/**
+ * 全局壁纸透明度 CompositionLocal (0.0f - 1.0f)
+ * 默认 1.0f（不透明），启用壁纸时建议 0.85f
+ */
+val LocalWallpaperAlpha = staticCompositionLocalOf { 1.0f }
 
 /**
  * Light Color Scheme - 温暖米白主题

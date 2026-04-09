@@ -1,0 +1,18 @@
+                if (showCustom) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        customMin,
+                        { customMin = it; it.toIntOrNull()?.let { m -> if (m in 1..120) { reminderMinutes = m; viewModel.updateReminderMinutes(course.id, m) } } },
+                        label = { Text("自定义分钟数") },
+                        placeholder = { Text("输入1-120之间的数字") },
+                        Modifier.fillMaxSize(),
+                        true,
+                        SmallCardRounded,
+                        isError = customMin.toIntOrNull()?.let { it !in 1..120 } ?: (customMin.isNotBlank()),
+                        supportingText = {
+                            if (customMin.isNotBlank()) customMin.toIntOrNull()?.let { v ->
+                                Text(if (v == null) "请输入有效数字" else if (v !in 1..120) "范围应为1-120分钟", color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    )
+                }

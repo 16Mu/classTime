@@ -1,5 +1,6 @@
 package com.wind.ggbond.classtime.widget.data
 
+import com.wind.ggbond.classtime.widget.data.CourseBrief
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.LocalDate
@@ -76,7 +77,7 @@ class WidgetModelsTest {
 
         assertFalse(noClass.hasNextClass)
         assertEquals("", noClass.courseName)
-        assertNotNull("消息可为null", noClass.message)
+        assertNull(noClass.message)
     }
 
     @Test
@@ -106,10 +107,10 @@ class WidgetModelsTest {
 
     @Test
     fun `DayCourseInfo - should store course summary correctly`() {
-        val dayInfo = DayCourseInfo(dayOfWeek = 1, courseCount = 4, courseNames = listOf("数学", "英语", "物理"))
+        val dayInfo = DayCourseInfo(dayOfWeek = 1, courseCount = 4, courses = listOf(CourseBrief("数学", 1, 2), CourseBrief("英语", 3, 4), CourseBrief("物理", 5, 6)))
 
         assertEquals(1, dayInfo.dayOfWeek)
         assertEquals(4, dayInfo.courseCount)
-        assertEquals(3, dayInfo.courseNames.size)
+        assertEquals(3, dayInfo.courses.size)
     }
 }

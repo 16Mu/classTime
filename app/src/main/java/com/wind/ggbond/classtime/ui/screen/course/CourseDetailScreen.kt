@@ -29,16 +29,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavController
-import android.widget.Toast
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import com.wind.ggbond.classtime.ui.navigation.Screen
+import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.util.DateUtils
 import com.wind.ggbond.classtime.util.WeekParser
 import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.topGradientOverlayAlpha
+import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
 import com.wind.ggbond.classtime.BuildConfig
 import com.wind.ggbond.classtime.util.CourseColorProvider
 
@@ -63,6 +64,8 @@ fun CourseDetailScreen(
     val currentSchedule by viewModel.currentSchedule.collectAsState()
     val currentWeekNumber by viewModel.currentWeekNumber.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     
     var dynamicCourseColor by remember { mutableStateOf<String?>(null) }
     
@@ -81,6 +84,7 @@ fun CourseDetailScreen(
     val adjustmentSaveState by adjustmentViewModel.saveState.collectAsState()
     
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
@@ -98,7 +102,9 @@ fun CourseDetailScreen(
                             onClick = {
                                 course?.let { c ->
                                     viewModel.sendTestNotification(c)
-                                    Toast.makeText(context, "已发送测试通知", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("已发送测试通知")
+                                    }
                                 }
                             }
                         ) {
@@ -114,7 +120,9 @@ fun CourseDetailScreen(
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                                             val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
                                             if (!notificationManager.canUseFullScreenIntent()) {
-                                                Toast.makeText(context, "需要开启全屏通知权限才能在后台弹出，即将跳转到设置页面", Toast.LENGTH_LONG).show()
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("需要开启全屏通知权限才能在后台弹出，即将跳转到设置页面")
+                                                }
                                                 try {
                                                     val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
                                                         data = Uri.parse("package:${context.packageName}")
@@ -131,7 +139,9 @@ fun CourseDetailScreen(
                                         }
                                         
                                         viewModel.sendBackgroundTestNotification(c, 10)
-                                        Toast.makeText(context, "10秒后将发送通知，请切换到后台\n\n提示：如果通知不弹出，点击设置图标检查通知权限", Toast.LENGTH_LONG).show()
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("10秒后将发送通知，请切换到后台观察")
+                                        }
                                     }
                                 }
                             ) {
@@ -154,9 +164,13 @@ fun CourseDetailScreen(
                                         }
                                     }
                                     context.startActivity(intent)
-                                    Toast.makeText(context, "请检查通知权限是否开启，重要性级别是否足够高", Toast.LENGTH_LONG).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("请检查通知权限是否开启")
+                                    }
                                 } catch (e: Exception) {
-                                    Toast.makeText(context, "无法打开设置页面", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("无法打开设置页面")
+                                    }
                                 }
                             }
                         ) {
@@ -185,22 +199,19 @@ fun CourseDetailScreen(
                     .padding(16.dp)
             ) {
                 // 课程颜色卡片 - 现代化设计
-                Card(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(
-                        defaultElevation = 2.dp
-                    ),
-                    colors = CardDefaults.cardColors(
-                        containerColor = try {
-                            val colorStr = dynamicCourseColor ?: c.color
-                            Color(android.graphics.Color.parseColor(colorStr))
-                        } catch (e: Exception) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        }
-                    )
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .wallpaperAwareBackground(
+                            try {
+                                val colorStr = dynamicCourseColor ?: c.color
+                                Color(android.graphics.Color.parseColor(colorStr))
+                            } catch (e: Exception) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            }
+                        )
                 ) {
                     val bg = try { 
                         val colorStr = dynamicCourseColor ?: c.color
@@ -416,10 +427,8 @@ fun CourseDetailScreen(
                                 checked = c.reminderEnabled,
                                 onCheckedChange = { enabled ->
                                     viewModel.toggleReminderEnabled(enabled)
-                                    if (enabled) {
-                                        Toast.makeText(context, "已开启上课提醒", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "已关闭上课提醒", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(if (enabled) "已开启上课提醒" else "已关闭上课提醒")
                                     }
                                 }
                             )
@@ -455,7 +464,9 @@ fun CourseDetailScreen(
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                                         val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
                                         if (!notificationManager.canUseFullScreenIntent()) {
-                                            Toast.makeText(context, "需要开启全屏通知权限才能在后台弹出，即将跳转到设置页面", Toast.LENGTH_LONG).show()
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("需要开启全屏通知权限才能在后台弹出，即将跳转设置")
+                                            }
                                             try {
                                                 val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
                                                     data = Uri.parse("package:${context.packageName}")
@@ -471,7 +482,9 @@ fun CourseDetailScreen(
                                         }
                                     }
                                     viewModel.sendBackgroundTestNotification(c, 10)
-                                    Toast.makeText(context, "10秒后将发送通知，请切换到后台并观察是否收到通知。", Toast.LENGTH_LONG).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("10秒后将发送通知，请切换到后台观察")
+                                    }
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -538,12 +551,16 @@ fun CourseDetailScreen(
         LaunchedEffect(adjustmentSaveState) {
             when (val state = adjustmentSaveState) {
                 is CourseAdjustmentViewModel.SaveState.Success -> {
-                    android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_SHORT).show()
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(state.message)
+                    }
                     viewModel.hideAdjustmentDialog()
                     adjustmentViewModel.resetSaveState()
                 }
                 is CourseAdjustmentViewModel.SaveState.Error -> {
-                    android.widget.Toast.makeText(context, state.message, android.widget.Toast.LENGTH_SHORT).show()
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar(state.message)
+                    }
                     adjustmentViewModel.resetSaveState()
                 }
                 else -> {}
@@ -589,11 +606,9 @@ fun CourseDetailScreen(
             onDismiss = { viewModel.hideAddExamDialog() },
             onConfirm = { exam ->
                 viewModel.saveExam(exam)
-                Toast.makeText(
-                    context,
-                    "考试已添加",
-                    Toast.LENGTH_SHORT
-                ).show()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("考试已添加")
+                }
                 viewModel.hideAddExamDialog()
             }
         )

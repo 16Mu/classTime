@@ -1,6 +1,5 @@
 package com.wind.ggbond.classtime.ui.screen.course
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
@@ -15,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -40,6 +40,7 @@ class CourseEditViewModel @Inject constructor(
     private var currentCourseId: Long? = null
     private var existingCoursesColors: List<String> = emptyList()
     private var hasAppliedDefaults: Boolean = false
+    private var isUserSelectedColor: Boolean = false
     
     // 课程基本信息
     private val _courseName = MutableStateFlow("")
@@ -85,6 +86,9 @@ class CourseEditViewModel @Inject constructor(
     private val _note = MutableStateFlow("")
     val note: StateFlow<String> = _note.asStateFlow()
     
+    private val _courseCode = MutableStateFlow("")
+    val courseCode: StateFlow<String> = _courseCode.asStateFlow()
+    
     // UI 状态
     private val _showWeekSelector = MutableStateFlow(false)
     val showWeekSelector: StateFlow<Boolean> = _showWeekSelector.asStateFlow()
@@ -108,7 +112,7 @@ class CourseEditViewModel @Inject constructor(
                     _totalWeeks.value = schedule.totalWeeks
                 }
             } catch (e: Exception) {
-                Log.w("CourseEdit", "加载课表信息失败", e)
+                AppLogger.e("CourseEdit", "加载课表信息失败", e)
             }
         }
         
@@ -145,6 +149,7 @@ class CourseEditViewModel @Inject constructor(
                 _reminderMinutes.value = course.reminderMinutes
                 _note.value = course.note
                 _credit.value = course.credit
+                _courseCode.value = course.courseCode
             }
             _isLoading.value = false
         }
@@ -193,7 +198,7 @@ class CourseEditViewModel @Inject constructor(
     
     fun updateCourseName(name: String) {
         _courseName.value = name
-        if (currentCourseId == null && name.isNotBlank()) {
+        if (currentCourseId == null && name.isNotBlank() && !isUserSelectedColor) {
             viewModelScope.launch {
                 _selectedColor.value = CourseColorProvider.getColorForCourse(name, existingCoursesColors)
             }
@@ -226,12 +231,13 @@ class CourseEditViewModel @Inject constructor(
     
     fun updateColor(color: String) {
         _selectedColor.value = color
+        isUserSelectedColor = true
     }
     
     fun updateReminderEnabled(enabled: Boolean) {
-        Log.d("CourseEdit", "✅ updateReminderEnabled called: $enabled")
+        AppLogger.d("CourseEdit", "✅ updateReminderEnabled called: $enabled")
         _reminderEnabled.value = enabled
-        Log.d("CourseEdit", "✅ reminderEnabled state updated to: ${_reminderEnabled.value}")
+        AppLogger.d("CourseEdit", "✅ reminderEnabled state updated to: ${_reminderEnabled.value}")
     }
     
     fun updateReminderMinutes(minutes: Int) {
@@ -240,6 +246,10 @@ class CourseEditViewModel @Inject constructor(
     
     fun updateNote(note: String) {
         _note.value = note
+    }
+    
+    fun updateCourseCode(code: String) {
+        _courseCode.value = code
     }
     
     fun updateCredit(credit: Float) {
@@ -271,13 +281,13 @@ class CourseEditViewModel @Inject constructor(
         // 验证必填字段
         if (_courseName.value.isBlank()) {
             _saveState.value = SaveState.Error("请输入课程名称")
-            Log.w("CourseEdit", "保存失败：课程名称为空")
+            AppLogger.e("CourseEdit", "保存失败：课程名称为空")
             return
         }
         
         if (_selectedWeeks.value.isEmpty()) {
             _saveState.value = SaveState.Error("请选择上课周次")
-            Log.w("CourseEdit", "保存失败：未选择周次")
+            AppLogger.e("CourseEdit", "保存失败：未选择周次")
             return
         }
         
@@ -286,12 +296,12 @@ class CourseEditViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                Log.d("CourseEdit", "开始保存课程：${_courseName.value}")
+                AppLogger.d("CourseEdit", "开始保存课程：${_courseName.value}")
                 
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule == null) {
                     _saveState.value = SaveState.Error("未找到当前课表，请先创建课表")
-                    Log.e("CourseEdit", "保存失败：getCurrentSchedule返回null")
+                    AppLogger.e("CourseEdit", "保存失败：getCurrentSchedule返回null")
                     return@launch
                 }
                 
@@ -310,12 +320,12 @@ class CourseEditViewModel @Inject constructor(
                 if (conflicts.isNotEmpty()) {
                     val conflictNames = conflicts.joinToString(", ") { it.courseName }
                     _saveState.value = SaveState.Error("课程时间冲突：与「$conflictNames」冲突")
-                    Log.w("CourseEdit", "保存失败：检测到冲突")
+                    AppLogger.e("CourseEdit", "保存失败：检测到冲突")
                     return@launch
                 }
                 
-                Log.d("CourseEdit", "使用课表ID: $scheduleId")
-                Log.d("CourseEdit", "✅ 准备保存课程，reminderEnabled = ${_reminderEnabled.value}, reminderMinutes = ${_reminderMinutes.value}")
+                AppLogger.d("CourseEdit", "使用课表ID: $scheduleId")
+                AppLogger.d("CourseEdit", "✅ 准备保存课程，reminderEnabled = ${_reminderEnabled.value}, reminderMinutes = ${_reminderMinutes.value}")
                 
                 val course = Course(
                     id = currentCourseId ?: 0,
@@ -332,23 +342,24 @@ class CourseEditViewModel @Inject constructor(
                     reminderEnabled = _reminderEnabled.value,
                     reminderMinutes = _reminderMinutes.value,
                     note = _note.value,
-                    credit = _credit.value
+                    credit = _credit.value,
+                    courseCode = _courseCode.value
                 )
                 
-                Log.d("CourseEdit", "✅ Course对象已创建，reminderEnabled = ${course.reminderEnabled}")
+                AppLogger.d("CourseEdit", "✅ Course对象已创建，reminderEnabled = ${course.reminderEnabled}")
                 
                 val savedCourse: Course
                 val courseId = currentCourseId
                 if (courseId != null) {
-                    Log.d("CourseEdit", "更新课程 ID: $courseId")
+                    AppLogger.d("CourseEdit", "更新课程 ID: $courseId")
                     courseRepository.updateCourse(course)
                     savedCourse = course.copy(id = courseId)
                     // ✅ 设置成功状态
                     _saveState.value = SaveState.Success("课程更新成功")
                 } else {
-                    Log.d("CourseEdit", "插入新课程")
+                    AppLogger.d("CourseEdit", "插入新课程")
                     val newId = courseRepository.insertCourse(course)
-                    Log.d("CourseEdit", "课程插入成功，新ID: $newId")
+                    AppLogger.d("CourseEdit", "课程插入成功，新ID: $newId")
                     savedCourse = course.copy(id = newId)
                     // ✅ 设置成功状态
                     _saveState.value = SaveState.Success("课程添加成功")
@@ -357,22 +368,22 @@ class CourseEditViewModel @Inject constructor(
                 // ✅ 添加：保存成功后创建/更新提醒
                 try {
                     if (savedCourse.reminderEnabled) {
-                        Log.d("CourseEdit", "创建课程提醒：${savedCourse.courseName}")
+                        AppLogger.d("CourseEdit", "创建课程提醒：${savedCourse.courseName}")
                         reminderScheduler.scheduleCourseReminders(savedCourse)
                     } else {
-                        Log.d("CourseEdit", "取消课程提醒：${savedCourse.courseName}")
+                        AppLogger.d("CourseEdit", "取消课程提醒：${savedCourse.courseName}")
                         reminderScheduler.cancelCourseReminders(savedCourse.id)
                     }
                 } catch (e: Exception) {
-                    Log.e("CourseEdit", "创建提醒失败：${e.message}", e)
+                    AppLogger.e("CourseEdit", "创建提醒失败：${e.message}", e)
                     // 提醒创建失败不影响课程保存成功
                 }
                 
-                Log.d("CourseEdit", "课程保存成功")
+                AppLogger.d("CourseEdit", "课程保存成功")
             } catch (e: Exception) {
                 // ✅ 设置错误状态
                 _saveState.value = SaveState.Error("保存失败：${e.message ?: "未知错误"}")
-                Log.e("CourseEdit", "保存课程时出错", e)
+                AppLogger.e("CourseEdit", "保存课程时出错", e)
             }
         }
     }

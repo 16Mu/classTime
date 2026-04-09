@@ -10,7 +10,6 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -39,7 +39,8 @@ class CourseDetailViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val reminderRepository: ReminderRepository,
     private val scheduleRepository: com.wind.ggbond.classtime.data.repository.ScheduleRepository,
-    private val examRepository: com.wind.ggbond.classtime.data.repository.ExamRepository
+    private val examRepository: com.wind.ggbond.classtime.data.repository.ExamRepository,
+    private val alarmScheduler: com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 ) : ViewModel() {
     
     companion object {
@@ -76,7 +77,7 @@ class CourseDetailViewModel @Inject constructor(
             courseRepository.getCourseByIdFlow(courseId).collect {
                 _course.value = it
                 it?.let { course ->
-                    Log.d(TAG, "✅ 课程已加载：${course.courseName}, reminderEnabled = ${course.reminderEnabled}, reminderMinutes = ${course.reminderMinutes}")
+                    AppLogger.d(TAG, "✅ 课程已加载：${course.courseName}, reminderEnabled = ${course.reminderEnabled}, reminderMinutes = ${course.reminderMinutes}")
                 }
             }
         }
@@ -96,14 +97,14 @@ class CourseDetailViewModel @Inject constructor(
             try {
                 examRepository.getExamsByCourse(courseId)
                     .catch { e ->
-                        android.util.Log.e("CourseDetailViewModel", "Error loading exams for course $courseId", e)
+                        AppLogger.e("CourseDetailViewModel", "Error loading exams for course $courseId", e)
                         emit(emptyList())
                     }
                     .collect { examList ->
                         _exams.value = examList
                     }
             } catch (e: Exception) {
-                android.util.Log.e("CourseDetailViewModel", "Error in exam collection", e)
+                AppLogger.e("CourseDetailViewModel", "Error in exam collection", e)
                 _exams.value = emptyList()
             }
         }
@@ -167,14 +168,16 @@ class CourseDetailViewModel @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
                 courseRepository.updateCourse(updatedCourse)
-                Log.d(TAG, "课程通知状态已更新：${course.courseName}, reminderEnabled = $enabled")
+                if (enabled) {
+                    alarmScheduler.scheduleCourseReminders(updatedCourse)
+                } else {
+                    alarmScheduler.cancelCourseReminders(updatedCourse.id)
+                }
+                AppLogger.d(TAG, "课程通知状态已更新：${course.courseName}, reminderEnabled = $enabled")
             }
         }
     }
     
-    /**
-     * 更新提醒提前时间
-     */
     fun updateReminderMinutes(minutes: Int) {
         viewModelScope.launch {
             _course.value?.let { course ->
@@ -183,7 +186,10 @@ class CourseDetailViewModel @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
                 courseRepository.updateCourse(updatedCourse)
-                Log.d(TAG, "课程提醒时间已更新：${course.courseName}, reminderMinutes = $minutes")
+                if (updatedCourse.reminderEnabled) {
+                    alarmScheduler.scheduleCourseReminders(updatedCourse)
+                }
+                AppLogger.d(TAG, "课程提醒时间已更新：${course.courseName}, reminderMinutes = $minutes")
             }
         }
     }
@@ -211,28 +217,28 @@ class CourseDetailViewModel @Inject constructor(
         
         // 验证必填字段
         if (courseName.isBlank()) {
-            Log.w(TAG, "⚠️ 课程名称不能为空")
+            AppLogger.w(TAG, "⚠️ 课程名称不能为空")
             return false
         }
         // 验证时间范围
         if (dayOfWeek !in 1..7) {
-            Log.w(TAG, "⚠️ 星期必须在1-7之间")
+            AppLogger.w(TAG, "⚠️ 星期必须在1-7之间")
             return false
         }
         if (startSection < 1) {
-            Log.w(TAG, "⚠️ 开始节次必须大于等于1")
+            AppLogger.w(TAG, "⚠️ 开始节次必须大于等于1")
             return false
         }
         if (sectionCount < 1) {
-            Log.w(TAG, "⚠️ 持续节数必须大于等于1")
+            AppLogger.w(TAG, "⚠️ 持续节数必须大于等于1")
             return false
         }
         if (startSection > 14 || (startSection + sectionCount - 1) > 14) {
-            Log.w(TAG, "⚠️ 节次范围超出限制（最大14节）")
+            AppLogger.w(TAG, "⚠️ 节次范围超出限制（最大14节）")
             return false
         }
         if (weeks.isEmpty()) {
-            Log.w(TAG, "⚠️ 周次不能为空")
+            AppLogger.w(TAG, "⚠️ 周次不能为空")
             return false
         }
         
@@ -246,7 +252,7 @@ class CourseDetailViewModel @Inject constructor(
                 weeks = weeks
             )
             if (hasConflict) {
-                Log.w(TAG, "⚠️ 检测到时间冲突，但仍允许保存")
+                AppLogger.w(TAG, "⚠️ 检测到时间冲突，但仍允许保存")
             }
         }
         
@@ -272,9 +278,9 @@ class CourseDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 courseRepository.updateCourse(updatedCourse)
-                Log.d(TAG, "✅ 课程全字段更新成功：${updatedCourse.courseName}")
+                AppLogger.d(TAG, "✅ 课程全字段更新成功：${updatedCourse.courseName}")
             } catch (e: Exception) {
-                Log.e(TAG, "❌ 课程更新失败", e)
+                AppLogger.e(TAG, "❌ 课程更新失败", e)
             }
         }
         
@@ -307,17 +313,17 @@ class CourseDetailViewModel @Inject constructor(
             )
             
             if (conflicts.isNotEmpty()) {
-                Log.w(TAG, "⚠️ 检测到时间冲突，与以下课程冲突：")
+                AppLogger.w(TAG, "⚠️ 检测到时间冲突，与以下课程冲突：")
                 conflicts.forEach { conflictCourse ->
-                    Log.w(TAG, "  - ${conflictCourse.courseName} (星期${dayOfWeek}, 第${conflictCourse.startSection}-${conflictCourse.startSection + conflictCourse.sectionCount - 1}节)")
+                    AppLogger.w(TAG, "  - ${conflictCourse.courseName} (星期${dayOfWeek}, 第${conflictCourse.startSection}-${conflictCourse.startSection + conflictCourse.sectionCount - 1}节)")
                 }
                 true
             } else {
-                Log.d(TAG, "✅ 未检测到时间冲突")
+                AppLogger.d(TAG, "✅ 未检测到时间冲突")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 冲突检测失败", e)
+            AppLogger.e(TAG, "❌ 冲突检测失败", e)
             false
         }
     }
@@ -368,10 +374,10 @@ class CourseDetailViewModel @Inject constructor(
                 )
             }
             
-            Log.d(TAG, "已使用 AlarmManager 设置后台测试通知，将在 ${delaySeconds} 秒后触发")
+            AppLogger.d(TAG, "已使用 AlarmManager 设置后台测试通知，将在 ${delaySeconds} 秒后触发")
             
         } catch (e: Exception) {
-            Log.e(TAG, "设置后台测试通知失败", e)
+            AppLogger.e(TAG, "设置后台测试通知失败", e)
         }
     }
     
@@ -481,7 +487,7 @@ class CourseDetailViewModel @Inject constructor(
                     .setPriority(NotificationCompat.PRIORITY_HIGH)  // 使用 HIGH 优先级
                     .setCategory(NotificationCompat.CATEGORY_MESSAGE)  // 使用 MESSAGE 分类
                     .setTimeoutAfter(5000)  // 5秒后自动收回到通知栏
-                Log.d(TAG, "后台测试通知：使用 Heads-Up 样式，5秒后自动收回")
+                AppLogger.d(TAG, "后台测试通知：使用 Heads-Up 样式，5秒后自动收回")
             } else {
                 // 普通测试通知
                 notificationBuilder
@@ -495,10 +501,10 @@ class CourseDetailViewModel @Inject constructor(
             val notificationId = (course.id.toString() + System.currentTimeMillis()).hashCode().and(0x7FFFFFFF)
             notificationManager.notify(notificationId, notification)
             
-            Log.d(TAG, "测试通知已发送: ${course.courseName}, 后台测试: $isBackgroundTest")
+            AppLogger.d(TAG, "测试通知已发送: ${course.courseName}, 后台测试: $isBackgroundTest")
             
         } catch (e: Exception) {
-            Log.e(TAG, "发送测试通知失败", e)
+            AppLogger.e(TAG, "发送测试通知失败", e)
         }
     }
     
@@ -541,7 +547,7 @@ class CourseDetailViewModel @Inject constructor(
             try {
                 notificationManager.deleteNotificationChannel(BACKGROUND_TEST_CHANNEL_ID)
             } catch (e: Exception) {
-                Log.w(TAG, "删除旧的测试渠道失败: ${e.message}")
+                AppLogger.w(TAG, "删除旧的测试渠道失败: ${e.message}")
             }
             
             val channel = NotificationChannel(
@@ -566,7 +572,7 @@ class CourseDetailViewModel @Inject constructor(
                 setBypassDnd(false)  // 不绕过勿扰模式
             }
             notificationManager.createNotificationChannel(channel)
-            Log.d(TAG, "后台测试通知渠道已创建，重要性级别：${channel.importance}")
+            AppLogger.d(TAG, "后台测试通知渠道已创建，重要性级别：${channel.importance}")
         }
     }
 }
@@ -577,7 +583,7 @@ class CourseDetailViewModel @Inject constructor(
  */
 class BackgroundTestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d("BackgroundTestReceiver", "收到后台测试通知触发，开始发送通知")
+        AppLogger.d("BackgroundTestReceiver", "收到后台测试通知触发，开始发送通知")
         
         try {
             val courseId = intent.getLongExtra("courseId", 0L)
@@ -663,10 +669,10 @@ class BackgroundTestReceiver : BroadcastReceiver() {
             val notificationId = (courseId.toString() + System.currentTimeMillis()).hashCode().and(0x7FFFFFFF)
             notificationManager.notify(notificationId, notification)
             
-            Log.d("BackgroundTestReceiver", "后台测试通知已成功发送")
+            AppLogger.d("BackgroundTestReceiver", "后台测试通知已成功发送")
             
         } catch (e: Exception) {
-            Log.e("BackgroundTestReceiver", "发送后台测试通知失败", e)
+            AppLogger.e("BackgroundTestReceiver", "发送后台测试通知失败", e)
         }
     }
     
@@ -676,7 +682,7 @@ class BackgroundTestReceiver : BroadcastReceiver() {
             try {
                 notificationManager.deleteNotificationChannel("background_test_notification")
             } catch (e: Exception) {
-                Log.w("BackgroundTestReceiver", "删除旧渠道失败: ${e.message}")
+                AppLogger.w("BackgroundTestReceiver", "删除旧渠道失败: ${e.message}")
             }
             
             val channel = NotificationChannel(

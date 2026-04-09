@@ -411,6 +411,7 @@ fun ProvinceIndexBar(
 ) {
     var selectedProvince by remember { mutableStateOf<String?>(null) }
     val hapticFeedback = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -449,7 +450,7 @@ fun ProvinceIndexBar(
                             }
                         },
                         onDragEnd = {
-                            kotlinx.coroutines.GlobalScope.launch {
+                            coroutineScope.launch {
                                 kotlinx.coroutines.delay(200)
                                 selectedProvince = null
                             }

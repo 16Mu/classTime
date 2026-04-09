@@ -46,7 +46,6 @@ sealed class Screen(val route: String) {
         }
     }
     object CourseInfoList : Screen("course_info_list")
-    object Settings : Screen("settings")
     object SemesterManagement : Screen("semester_management?fromImport={fromImport}&fallSemesterStartDate={fallSemesterStartDate}&springSemesterStartDate={springSemesterStartDate}") {
         fun createRoute(
             fromImport: Boolean = false,

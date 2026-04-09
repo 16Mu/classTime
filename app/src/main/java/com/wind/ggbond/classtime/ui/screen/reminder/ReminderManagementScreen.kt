@@ -211,7 +211,7 @@ private fun ReminderStatsSummary(stats: ReminderStats) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF10B981))
+                    .background(MaterialTheme.colorScheme.primary)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
@@ -226,7 +226,7 @@ private fun ReminderStatsSummary(stats: ReminderStats) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFF59E0B))
+                    .background(MaterialTheme.colorScheme.tertiary)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(

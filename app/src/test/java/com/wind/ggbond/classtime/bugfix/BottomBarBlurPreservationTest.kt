@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.bugfix
+﻿package com.wind.ggbond.classtime.bugfix
 
 import android.app.Application
 import com.wind.ggbond.classtime.data.repository.InitializationRepository
@@ -40,7 +40,7 @@ import org.junit.Test
  * - Other settings (compact mode, show weekend, reminder settings) continue to persist and synchronize
  * - Bottom bar rendering with blur disabled continues to render opaque background
  * - SettingsViewModel persistence to DataStore continues to work for all settings
- * - MainContent reading of blur setting from MainViewModel.bottomBarBlurEnabled continues to work
+ * - MainContent reading of blur setting from MainViewModel.glassEffectEnabled continues to work
  * 
  * **Expected Outcome on UNFIXED code**: Tests PASS (confirms baseline behavior)
  * **Expected Outcome on FIXED code**: Tests PASS (confirms no regressions)
@@ -92,7 +92,7 @@ class BottomBarBlurPreservationTest {
         // Setup settings repository defaults
         coEvery { settingsRepository.isDisclaimerAccepted() } returns true
         coEvery { settingsRepository.isOnboardingCompleted() } returns true
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns true
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns true
         
         // Mock all settings update methods (needed for preservation tests)
         coJustRun { settingsRepository.setCompactModeEnabled(any()) }
@@ -342,7 +342,7 @@ class BottomBarBlurPreservationTest {
         
         // Given: Blur is disabled in DataStore
         val blurEnabled = false
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns blurEnabled
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns blurEnabled
         
         // Setup other required flows
         every { settingsRepository.observeCompactModeEnabled() } returns MutableStateFlow(false)
@@ -368,7 +368,7 @@ class BottomBarBlurPreservationTest {
         assertEquals(
             "Blur disabled setting should be loaded from DataStore",
             blurEnabled,
-            viewModel.bottomBarBlurEnabled.value
+            viewModel.glassEffectEnabled.value
         )
         
         // Document expected behavior:
@@ -383,7 +383,7 @@ class BottomBarBlurPreservationTest {
         val preservationNote = """
             Preservation Requirement Documented:
             
-            When bottomBarBlurEnabled = false:
+            When glassEffectEnabled = false:
             - glassModifier SHALL render opaque background (current behavior)
             - glassModifier SHALL NOT apply Gaussian blur
             - This behavior MUST remain unchanged after the fix
@@ -470,7 +470,7 @@ class BottomBarBlurPreservationTest {
      * 
      * **Validates: Requirement 3.4**
      * 
-     * For any MainContent render, the reading of blur setting from MainViewModel.bottomBarBlurEnabled
+     * For any MainContent render, the reading of blur setting from MainViewModel.glassEffectEnabled
      * StateFlow SHALL continue to work exactly as it does in the unfixed code.
      * 
      * This test verifies that MainContent can still read the blur setting from MainViewModel
@@ -484,7 +484,7 @@ class BottomBarBlurPreservationTest {
     fun `Property 4 - MainContent reading of blur setting SHALL continue to work`() = runTest {
         checkAll(Arb.boolean()) { blurEnabled ->
             // Given: DataStore contains blur setting
-            coEvery { settingsRepository.isBottomBarBlurEnabled() } returns blurEnabled
+            coEvery { settingsRepository.isGlassEffectEnabled() } returns blurEnabled
             
             // When: MainViewModel is initialized (simulating MainContent reading the value)
             val viewModel = com.wind.ggbond.classtime.ui.viewmodel.MainViewModel(
@@ -500,7 +500,7 @@ class BottomBarBlurPreservationTest {
             advanceUntilIdle()
             
             // Then: MainContent should be able to read the blur setting from MainViewModel
-            val blurSettingValue = viewModel.bottomBarBlurEnabled.value
+            val blurSettingValue = viewModel.glassEffectEnabled.value
             
             // The value might not match DataStore in unfixed code (that's the bug),
             // but MainContent CAN read the StateFlow - this capability must be preserved
@@ -508,7 +508,7 @@ class BottomBarBlurPreservationTest {
                 """
                 Preservation Requirement Documented:
                 
-                MainContent reads blur setting from: MainViewModel.bottomBarBlurEnabled
+                MainContent reads blur setting from: MainViewModel.glassEffectEnabled
                 
                 Current behavior (UNFIXED):
                 - MainContent can read the StateFlow (this works)

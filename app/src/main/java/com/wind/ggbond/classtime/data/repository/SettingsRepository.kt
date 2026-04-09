@@ -38,9 +38,9 @@ interface SettingsRepository {
     suspend fun setShowWeekendEnabled(enabled: Boolean)
     fun observeShowWeekendEnabled(): Flow<Boolean>
 
-    suspend fun isBottomBarBlurEnabled(): Boolean
-    suspend fun setBottomBarBlurEnabled(enabled: Boolean)
-    fun observeBottomBarBlurEnabled(): Flow<Boolean>
+    suspend fun isGlassEffectEnabled(): Boolean
+    suspend fun setGlassEffectEnabled(enabled: Boolean)
+    fun observeGlassEffectEnabled(): Flow<Boolean>
 
     // ==================== 自动更新相关 ====================
 

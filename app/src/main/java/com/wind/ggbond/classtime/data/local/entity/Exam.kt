@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
 /**
@@ -10,7 +11,18 @@ import androidx.room.PrimaryKey
  * 1. 周次模式：仅指定周次，在横幅显示
  * 2. 精确模式：指定周次+星期+节次，在横幅和课表格子中显示
  */
-@Entity(tableName = "exams")
+@Entity(
+    tableName = "exams",
+    foreignKeys = [
+        ForeignKey(
+            entity = Course::class,
+            parentColumns = ["id"],
+            childColumns = ["courseId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [androidx.room.Index("courseId")]
+)
 data class Exam(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

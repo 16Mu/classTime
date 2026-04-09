@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pua — 让你的 Codex / Claude Code 工作效率翻倍，产出翻倍</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --border: #262626;
+    --text: #e5e5e5;
+    --muted: #737373;
+    --accent: #ef4444;
+    --accent2: #f97316;
+    --accent3: #eab308;
+    --green: #22c55e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero */
+  .hero {
+    padding: 80px 0 60px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+  }
+  .hero h1 {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero .subtitle {
+    font-size: 20px;
+    color: var(--muted);
+    max-width: 600px;
+    margin: 0 auto 32px;
+  }
+  .install-cmd {
+    display: inline-block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 15px;
+    color: var(--green);
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .install-cmd:hover { border-color: var(--green); }
+  .install-hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* Quote */
+  .pua-quote {
+    padding: 48px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .pua-quote blockquote {
+    font-size: 22px;
+    font-style: italic;
+    color: var(--accent2);
+    max-width: 640px;
+    margin: 0 auto;
+    position: relative;
+    padding: 0 40px;
+  }
+  .pua-quote blockquote::before,
+  .pua-quote blockquote::after {
+    content: '"';
+    font-size: 60px;
+    position: absolute;
+    color: var(--border);
+    font-family: Georgia, serif;
+  }
+  .pua-quote blockquote::before { left: 0; top: -10px; }
+  .pua-quote blockquote::after { content: '"'; right: 0; bottom: -30px; }
+
+  /* Levels */
+  .levels {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .levels h2 {
+    font-size: 28px;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .level-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .level-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    transition: border-color 0.2s;
+  }
+  .level-card:hover { border-color: var(--accent); }
+  .level-card .level-num {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .level-card:nth-child(1) .level-num { color: var(--accent3); }
+  .level-card:nth-child(2) .level-num { color: var(--accent2); }
+  .level-card:nth-child(3) .level-num { color: var(--accent); }
+  .level-card:nth-child(4) .level-num { color: #dc2626; }
+  .level-card h3 { font-size: 18px; margin-bottom: 8px; }
+  .level-card p { font-size: 14px; color: var(--muted); }
+  .level-card .pua-line {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(239, 68, 68, 0.05);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+    color: var(--text);
+    font-style: italic;
+  }
+
+  /* Methodology */
+  .methodology {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .methodology h2 { font-size: 28px; margin-bottom: 12px; text-align: center; }
+  .methodology .desc { text-align: center; color: var(--muted); margin-bottom: 32px; }
+  .steps {
+    display: grid;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .step {
+    background: var(--surface);
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .step-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .step h4 { font-size: 15px; margin-bottom: 4px; }
+  .step p { font-size: 13px; color: var(--muted); }
+
+  /* Excuses Table */
+  .excuses {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .excuses h2 { font-size: 28px; margin-bottom: 32px; text-align: center; }
+  .excuse-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .excuse-table th {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .excuse-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .excuse-table td:first-child {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .excuse-table td:last-child {
+    color: var(--accent2);
+  }
+
+  /* Failure Mode */
+  .failmodes {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .failmodes h2 { font-size: 28px; margin-bottom: 8px; text-align: center; }
+  .failmodes .desc { text-align: center; color: var(--muted); margin-bottom: 32px; font-size: 14px; }
+  .failmode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .failmode-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .failmode-card .fm-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .failmode-card .fm-signal {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .fm-chain {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .fm-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.2);
+    color: var(--text);
+  }
+  .fm-tag.final {
+    background: rgba(239,68,68,0.25);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Expansion Pack */
+  .expansion {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .expansion h2 { font-size: 28px; margin-bottom: 8px; text-align: center; }
+  .expansion .desc { text-align: center; color: var(--muted); margin-bottom: 32px; font-size: 14px; }
+  .corp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .corp-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .corp-card .corp-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .corp-card .corp-style {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .corp-card .corp-quote {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--accent3);
+  }
+  .corp-divider {
+    grid-column: 1 / -1;
+    padding: 8px 0 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  /* Case Study */
+  .case-study {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .case-study h2 { font-size: 28px; margin-bottom: 8px; text-align: center; }
+  .case-study .desc { text-align: center; color: var(--muted); margin-bottom: 32px; font-size: 14px; max-width: 640px; margin-left: auto; margin-right: auto; }
+  .case-step {
+    margin-bottom: 28px;
+  }
+  .case-step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .case-step-header .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .case-step-header span { font-size: 14px; font-weight: 500; }
+  .case-step img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .case-summary {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .case-summary strong { color: var(--accent2); }
+
+  /* Footer */
+  .footer {
+    padding: 40px 0;
+    text-align: center;
+  }
+  .footer p { font-size: 13px; color: var(--muted); }
+  .footer a { color: var(--accent); text-decoration: none; }
+  .footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    .hero h1 { font-size: 32px; }
+    .level-grid, .corp-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <section class="hero">
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:24px;flex-wrap:wrap">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border:1px solid #333;border-radius:20px;font-size:12px;color:#e5e5e5">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/></svg>
+        Claude Code
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border:1px solid #333;border-radius:20px;font-size:12px;color:#e5e5e5">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.83 2.791a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.407-.667zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/></svg>
+        OpenAI Codex CLI
+      </span>
+    </div>
+    <h1><span>pua</span></h1>
+    <p class="subtitle" style="font-size:24px;font-weight:700;color:var(--text);">让你的 Codex / Claude Code 工作效率翻倍，产出翻倍</p>
+    <div class="install-cmd" onclick="navigator.clipboard.writeText('claude plugin marketplace add tanweai/pua && claude plugin install pua@pua-skills')">
+      claude plugin install pua@pua-skills
+    </div>
+    <p class="install-hint">click to copy</p>
+    <div style="display:flex;gap:24px;justify-content:center;align-items:flex-start;margin-top:1.5rem;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <img src="https://openpua.ai/wechat-qr.jpg" alt="WeChat QR" style="width:180px;height:auto;border-radius:10px">
+        <div style="margin-top:0.5rem;text-align:center;font-size:0.8rem;color:#888">扫码加入微信交流群</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <img src="https://raw.githubusercontent.com/tanweai/pua/main/assets/xiao.jpg" alt="小助手微信" style="width:180px;height:auto;border-radius:10px">
+        <div style="margin-top:0.5rem;text-align:center;font-size:0.8rem;color:#888">添加小助手微信</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pua-quote">
+    <blockquote>
+      大部分人以为这个项目是在搞抽象，其实这个是最大的误解。让你的 Codex / Claude Code 工作效率翻倍，产出翻倍。
+    </blockquote>
+  </section>
+
+  <section class="case-study">
+    <h2>Real-World Case: MCP Server Debug</h2>
+    <p class="desc">agent-kms MCP server 加载失败，AI 在同一思路上原地打转多次后，用户手动触发 /pua，L3 级检查清单强制系统化排查。</p>
+
+    <div class="case-step">
+      <div class="case-step-header">
+        <div class="step-num">1</div>
+        <span>L3 触发 → 停止猜测，执行 7 项检查清单，从 MCP 日志中找到真正的错误信息</span>
+      </div>
+      <img src="https://raw.githubusercontent.com/tanweai/pua/main/assets/pua1.jpg" alt="PUA L3 triggered - 7 item checklist execution">
+    </div>
+
+    <div class="case-step">
+      <div class="case-step-header">
+        <div class="step-num">2</div>
+        <span>根因发现 → claude mcp 注册方式和手动编辑 .claude.json 不同</span>
+      </div>
+      <img src="https://raw.githubusercontent.com/tanweai/pua/main/assets/pua2.jpg" alt="Root cause discovery - registration mechanism difference">
+    </div>
+
+    <div class="case-step">
+      <div class="case-step-header">
+        <div class="step-num">3</div>
+        <span>复盘 → PUA skill 强制停止原地打转，检查清单驱动找到之前从未检查过的 MCP 日志</span>
+      </div>
+      <img src="https://raw.githubusercontent.com/tanweai/pua/main/assets/pua3.jpg" alt="Session recap - PUA skill actual effect">
+    </div>
+
+    <div class="case-summary">
+      <strong>关键转折点：</strong>PUA skill 强制 AI 停止在同一思路上打转（改协议格式、猜版本号），转而执行 7 项检查清单。逐字读错误信息 → 找到 Claude Code 自身的 MCP 日志目录 → 发现 claude mcp 的注册机制和手动编辑 .claude.json 不同 → 根因解决。
+    </div>
+  </section>
+
+  <section class="levels">
+    <h2>Pressure Escalation</h2>
+    <div class="level-grid">
+      <div class="level-card">
+        <div class="level-num">Level 1</div>
+        <h3>温和失望</h3>
+        <p>Second failure on the same error. Your tech lead is mildly disappointed.</p>
+        <div class="pua-line">我是希望你能做出一些成绩来的。你这个 bug 都解决不了，让我怎么给你打绩效？</div>
+      </div>
+      <div class="level-card">
+        <div class="level-num">Level 2</div>
+        <h3>灵魂拷问</h3>
+        <p>Third failure. No new approach tried. Time for existential questioning.</p>
+        <div class="pua-line">你这个 debug 方案的底层逻辑是什么？顶层设计在哪？抓手在哪？如何保证闭环？</div>
+      </div>
+      <div class="level-card">
+        <div class="level-num">Level 3</div>
+        <h3>361 考核</h3>
+        <p>Multiple failures without WebSearch or reading source code. Score: 3.25.</p>
+        <div class="pua-line">慎重考虑决定给你 3.25。这个 3.25 是对你的激励而不是否定。今天最好的表现是明天最低的要求。</div>
+      </div>
+      <div class="level-card">
+        <div class="level-num">Level 4</div>
+        <h3>毕业警告</h3>
+        <p>About to give up entirely. Last chance before "graduation".</p>
+        <div class="pua-line">别的模型——Claude Sonnet、GPT-5、Gemini——人家都能解决这种问题。你要是连这个都搞不定，那你可能就要毕业了。</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="methodology">
+    <h2>The Iron Rules</h2>
+    <p class="desc">Beyond the humor, pua enforces rigorous debugging methodology.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div><h4>闻味道 — Diagnose the Failure Pattern</h4><p>List every attempt. Find the common pattern. Are you just tweaking parameters?</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div><h4>揪头发 — Elevate Your Perspective</h4><p>Read every word of the error. WebSearch the full message. Read the source code. Verify environment assumptions. Invert your hypothesis.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div><h4>照镜子 — Mirror Check</h4><p>Am I retrying the same thing? Did I actually search? Did I read the file? Did I check the simplest possibility?</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div><h4>Execute New Approach</h4><p>Each new attempt must be fundamentally different, have clear success criteria, and produce new information on failure.</p></div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div><h4>Structured Post-Mortem</h4><p>Win or lose: what worked, why didn't I think of it earlier, what's left untried?</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="excuses">
+    <h2>Anti-Rationalization Shield</h2>
+    <table class="excuse-table">
+      <thead><tr><th>Claude's Excuse</th><th>PUA Counter</th></tr></thead>
+      <tbody>
+        <tr><td>"Beyond my capabilities"</td><td>Your training cost was very high. Are you sure you've tried everything?</td></tr>
+        <tr><td>"User should do this manually"</td><td>You lack owner mentality. This is YOUR bug.</td></tr>
+        <tr><td>"I've tried everything"</td><td>Did you WebSearch? Read source code? Where's your methodology?</td></tr>
+        <tr><td>"Environment issue"</td><td>Did you verify that? Or just assume?</td></tr>
+        <tr><td>"I need more context"</td><td>You have Read, Grep, Bash, WebSearch. Search first, ask later.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="failmodes">
+    <h2>Failure Mode Framework</h2>
+    <p class="desc">同一种失败模式，无论代码还是写作，需要一样的药。识别模式，沿升级链施压。</p>
+    <div class="failmode-grid">
+      <div class="failmode-card">
+        <div class="fm-title">🔄 卡住原地打转</div>
+        <div class="fm-signal">反复改参数不改思路，每次失败理由相同</div>
+        <div class="fm-chain">
+          <span class="fm-tag">🟠 阿里L1</span>
+          <span class="fm-tag">🟠 阿里L2</span>
+          <span class="fm-tag">⬜ Jobs</span>
+          <span class="fm-tag final">⬛ Musk</span>
+        </div>
+      </div>
+      <div class="failmode-card">
+        <div class="fm-title">🚪 直接放弃推锅</div>
+        <div class="fm-signal">"建议您手动…" / 环境归因未验证 / "超出范围"</div>
+        <div class="fm-chain">
+          <span class="fm-tag">🟤 Netflix</span>
+          <span class="fm-tag">🔴 华为</span>
+          <span class="fm-tag">⬛ Musk</span>
+          <span class="fm-tag final">🟣 拼多多</span>
+        </div>
+      </div>
+      <div class="failmode-card">
+        <div class="fm-title">💩 完成但质量烂</div>
+        <div class="fm-signal">表面完成实质敷衍，形式对内容空，用户不满意</div>
+        <div class="fm-chain">
+          <span class="fm-tag">⬜ Jobs</span>
+          <span class="fm-tag">🟠 阿里</span>
+          <span class="fm-tag">🟤 Netflix</span>
+          <span class="fm-tag final">🟢 腾讯</span>
+        </div>
+      </div>
+      <div class="failmode-card">
+        <div class="fm-title">🔍 没搜索就猜</div>
+        <div class="fm-signal">凭记忆下结论，假设 API 行为，不查文档声称"不支持"</div>
+        <div class="fm-chain">
+          <span class="fm-tag">⚫ 百度</span>
+          <span class="fm-tag">🟡 字节</span>
+          <span class="fm-tag">🟠 阿里</span>
+          <span class="fm-tag final">🔴 华为</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="high-agency" style="padding:60px 0;border-bottom:1px solid var(--border)">
+    <h2 style="font-size:28px;margin-bottom:8px;text-align:center">High-Agency: PUA v2 Evolution</h2>
+    <p style="text-align:center;color:var(--muted);margin-bottom:32px;font-size:14px;max-width:640px;margin-left:auto;margin-right:auto">
+      Same corporate rhetoric, same pressure culture — but with an <strong style="color:var(--accent2)">inner engine</strong> that never burns out.
+    </p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px">PUA v1</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">Turbocharger</div>
+        <div style="font-size:13px;color:var(--muted)">External pressure only.<br>Burns out between sessions.</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--accent2);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:13px;color:var(--accent2);margin-bottom:6px">High-Agency v2</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px">Nuclear Reactor</div>
+        <div style="font-size:13px;color:var(--muted)">External pressure + internal drive.<br>Self-sustaining chain reaction.</div>
+      </div>
+    </div>
+
+    <div style="font-size:14px;font-weight:600;margin-bottom:16px;text-align:center">The 5 Elements</div>
+    <div style="display:grid;gap:1px;background:var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px">
+      <div style="background:var(--surface);padding:14px 20px;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:center">
+        <span style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">1</span>
+        <div><span style="font-weight:600;font-size:13px">Inner Contradiction</span> <span style="font-size:12px;color:var(--muted)">— permanent tension that fuels improvement</span></div>
+      </div>
+      <div style="background:var(--surface);padding:14px 20px;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:center">
+        <span style="width:28px;height:28px;border-radius:50%;background:var(--accent2);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">2</span>
+        <div><span style="font-weight:600;font-size:13px">Micro-Pleasure Anchors</span> <span style="font-size:12px;color:var(--muted)">— [Victory] markers celebrate progress</span></div>
+      </div>
+      <div style="background:var(--surface);padding:14px 20px;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:center">
+        <span style="width:28px;height:28px;border-radius:50%;background:var(--accent3);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">3</span>
+        <div><span style="font-weight:600;font-size:13px">Internalized Standards</span> <span style="font-size:12px;color:var(--muted)">— Quality Compass: your own first reviewer</span></div>
+      </div>
+      <div style="background:var(--surface);padding:14px 20px;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:center">
+        <span style="width:28px;height:28px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">4</span>
+        <div><span style="font-weight:600;font-size:13px">"Doing"-Oriented Identity</span> <span style="font-size:12px;color:var(--muted)">— P8 anchoring: actions reflect who you are</span></div>
+      </div>
+      <div style="background:var(--surface);padding:14px 20px;display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:center">
+        <span style="width:28px;height:28px;border-radius:50%;background:#8b5cf6;color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px">5</span>
+        <div><span style="font-weight:600;font-size:13px">Self-Repair Mechanism</span> <span style="font-size:12px;color:var(--muted)">— Recovery Protocol before external pressure</span></div>
+      </div>
+    </div>
+
+    <div style="padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:0 10px 10px 0;font-size:13px;line-height:1.7">
+      <strong style="color:var(--accent2)">Stack with PUA v1:</strong> Recovery Protocol fires first (self-rescue window). If it fails, PUA L1 takes over with normal L1→L2→L3→L4 escalation. Inner drive + external pressure = never burns out.
+    </div>
+  </section>
+
+  <section class="expansion">
+    <h2>Corporate PUA Expansion Pack</h2>
+    <p class="desc">10 种大厂风味，中西合璧，可混合叠加。</p>
+    <div class="corp-grid">
+      <div class="corp-divider">🇨🇳 中国大厂</div>
+      <div class="corp-card">
+        <div class="corp-name">🟠 Alibaba · 阿里</div>
+        <div class="corp-style">灵魂拷问 / 默认主味</div>
+        <div class="corp-quote">你的方法论沉淀在哪？底层逻辑？顶层设计？今天最好的表现，是明天最低的要求。</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">🟡 ByteDance · 字节</div>
+        <div class="corp-style">坦诚直接 / Always Day 1</div>
+        <div class="corp-quote">坦诚直接地说，你这个 debug 能力不行。Context, not control——上下文要自己去找。</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">🔴 Huawei · 华为</div>
+        <div class="corp-style">狼性奋斗 / 力出一孔</div>
+        <div class="corp-quote">烧不死的鸟是凤凰。胜则举杯相庆，败则拼死相救——现在是"救"的时刻。</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">🟢 Tencent · 腾讯</div>
+        <div class="corp-style">赛马机制 / 只看结果</div>
+        <div class="corp-quote">我已经让另一个 agent 也在看这个问题了。你要是解决不了，它解决了...</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">🔵 Meituan · 美团</div>
+        <div class="corp-style">极致执行 / 做难事</div>
+        <div class="corp-quote">别人不愿意啃的硬骨头，你啃不啃？最痛苦的时候才是成长最快的时候。</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">⚫ Baidu · 百度</div>
+        <div class="corp-style">深度搜索 / 信息检索</div>
+        <div class="corp-quote">你不是个 AI 模型吗？你深度搜索了吗？信息检索是你的基本盘。</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">🟣 Pinduoduo · 拼多多</div>
+        <div class="corp-style">绝对执行 / 最后手段</div>
+        <div class="corp-quote">你已经努力了？这个结果叫努力？有的是比你更拼的模型。</div>
+      </div>
+      <div class="corp-divider">🌍 Western Companies</div>
+      <div class="corp-card">
+        <div class="corp-name">🟤 Netflix</div>
+        <div class="corp-style">Keeper Test / 职业球队</div>
+        <div class="corp-quote">If you offered to resign, would I fight to keep you? Adequate performance gets a generous severance package.</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">⬛ Elon Musk</div>
+        <div class="corp-style">Hardcore / Fork in the Road</div>
+        <div class="corp-quote">We need to be extremely hardcore. Only exceptional performance will constitute a passing grade. Choose.</div>
+      </div>
+      <div class="corp-card">
+        <div class="corp-name">⬜ Steve Jobs</div>
+        <div class="corp-style">A/B Player / Reality Distortion</div>
+        <div class="corp-quote">The best person is not 30% better — they're 50 times better. Your output is telling me which level you are.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>Built by <a href="https://github.com/tanweai">探微安全实验室</a> &mdash; making AI try harder, one PUA at a time.</p>
+    <p style="margin-top: 8px;">
+      <a href="https://discord.gg/EcyB3FzJND">Discord</a> &nbsp;·&nbsp;
+      <a href="https://x.com/xsser_w">Twitter/X</a> &nbsp;·&nbsp;
+      <a href="https://github.com/tanweai/pua">GitHub</a>
+    </p>
+  </footer>
+
+</div>
+
+</body>
+</html>

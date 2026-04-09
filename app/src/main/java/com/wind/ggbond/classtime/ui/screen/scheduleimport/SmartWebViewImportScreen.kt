@@ -8,7 +8,6 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,6 +31,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.BuildConfig
 import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
+import com.wind.ggbond.classtime.util.AppLogger
+import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.ui.navigation.Screen
 
 /**
@@ -94,9 +96,12 @@ fun SmartWebViewImportScreen(
     val debugInfo by viewModel.debugInfo.collectAsState()
     val importedSemesterInfo by viewModel.importedSemesterInfo.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
     var webView: WebView? by remember { mutableStateOf(null) }
     var pageInspectionResult by remember { mutableStateOf<String?>(null) }
+    var sslErrorRetryCount by remember { mutableIntStateOf(0) }
     
     // ✅ 修复：添加加载超时检测
     var loadTimeout by remember { mutableStateOf(false) }
@@ -189,14 +194,14 @@ fun SmartWebViewImportScreen(
             },
             onConfirm = { name, startDate, totalWeeks ->
                 showScheduleDialog = false
-                android.util.Log.d("SmartWebView", "开始创建学期并导入课程，课程数量: ${parsedCourses.size}")
+                AppLogger.d("SmartWebView", "开始创建学期并导入课程，课程数量: ${parsedCourses.size}")
                 
                 // ⭐ 保存学校ID供自动更新使用
                 try {
                     val app = context.applicationContext as? com.wind.ggbond.classtime.CourseScheduleApp
                     app?.saveCurrentSchoolId(schoolId)
                 } catch (e: Exception) {
-                    android.util.Log.e("SmartWebView", "保存学校ID失败", e)
+                    AppLogger.e("SmartWebView", "保存学校ID失败", e)
                 }
                 
                 // 保存课程并创建学期，同时传递schoolId
@@ -255,6 +260,7 @@ fun SmartWebViewImportScreen(
     }
     
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
@@ -270,10 +276,10 @@ fun SmartWebViewImportScreen(
                     if (BuildConfig.DEBUG) {
                         IconButton(
                             onClick = {
-                                // 每次点击都重新执行检查（延迟1秒确保DOM完全渲染）
-                                Toast.makeText(context, "正在检查页面结构...", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("正在检查页面结构...")
+                                }
                                 
-                                // 使用延迟执行的脚本（等待2秒确保异步加载完成）
                                 val delayedInspectionScript = """
                                     setTimeout(function() {
                                         ${viewModel.getInspectionScript()}
@@ -284,9 +290,13 @@ fun SmartWebViewImportScreen(
                                     pageInspectionResult = result?.removeSurrounding("\"")?.replace("\\n", "\n")
                                     if (pageInspectionResult != null) {
                                         copyTextToClipboard(context, pageInspectionResult!!)
-                                        Toast.makeText(context, "页面信息已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("页面信息已复制到剪贴板")
+                                        }
                                     } else {
-                                        Toast.makeText(context, "检查失败", Toast.LENGTH_SHORT).show()
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("检查失败")
+                                        }
                                     }
                                 }
                             }
@@ -295,7 +305,7 @@ fun SmartWebViewImportScreen(
                         }
                     }
                     
-                    IconButton(onClick = { webView?.reload() }) {
+                    IconButton(onClick = { sslErrorRetryCount = 0; webView?.reload() }) {
                         Icon(Icons.Default.Refresh, "刷新")
                     }
                     
@@ -305,7 +315,7 @@ fun SmartWebViewImportScreen(
                             webView?.let { wv ->
                                 val url = wv.url ?: ""
                                 if (url.contains("kb") || url.contains("schedule") || url.contains("course")) {
-                                    android.util.Log.d("SmartWebView", "开始提取课表数据")
+                                    AppLogger.d("SmartWebView", "开始提取课表数据")
                                     isLoading = true
                                     
                                     // 注入JavaScript提取数据
@@ -425,15 +435,21 @@ fun SmartWebViewImportScreen(
                                             if (result != null && result != "null") {
                                                 viewModel.parseScheduleWithExtractor(schoolId, result)
                                             } else {
-                                                Toast.makeText(context, "未找到课表数据", Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("未找到课表数据")
+                                                }
                                             }
                                         }
                                     } else {
                                         isLoading = false
-                                        Toast.makeText(context, "该学校暂未适配自动提取功能", Toast.LENGTH_SHORT).show()
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("该学校暂未适配自动提取功能")
+                                        }
                                     }
                                 } else {
-                                    Toast.makeText(context, "请先登录并进入课表页面", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("请先登录并进入课表页面")
+                                    }
                                 }
                             }
                         }
@@ -453,6 +469,7 @@ fun SmartWebViewImportScreen(
             Box(
                 modifier = Modifier.weight(1f)
             ) {
+                val darkTheme = isSystemInDarkTheme()
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
@@ -507,8 +524,9 @@ fun SmartWebViewImportScreen(
                         // ✅ 启用硬件加速
                         setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         
-                        // ✅ 设置背景色和填充
-                        setBackgroundColor(Color.WHITE)
+                        // ✅ 设置背景色和填充（适配深色模式）
+                        val bgColor = if (darkTheme) 0xFF1C1B1F.toInt() else Color.WHITE
+                        setBackgroundColor(bgColor)
                         setPadding(0, 0, 0, 0)  // 移除默认padding
                         
                         // ✅ 设置滚动条样式
@@ -519,6 +537,7 @@ fun SmartWebViewImportScreen(
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                     isLoading = true
+                                    sslErrorRetryCount = 0
                                 }
                                 
                                 override fun onReceivedError(
@@ -534,38 +553,47 @@ fun SmartWebViewImportScreen(
                                 val failingUrl = request.url?.toString()
                                 val errorCode = error.errorCode
 
-                                android.util.Log.e("SmartWebView", "?????????: $description (????? $errorCode, URL: $failingUrl)")
+                                AppLogger.e("SmartWebView", "页面加载错误: $description (错误码 $errorCode, URL: $failingUrl)")
 
-                                // ????????HTTP/2??????
+                                val isSslProtocolError = description.contains("ERR_SSL_PROTOCOL_ERROR", ignoreCase = true) ||
+                                    description.contains("ERR_SSL_VERSION_OR_CIPHER_MISMATCH", ignoreCase = true)
+
+                                if (isSslProtocolError && sslErrorRetryCount < 3 && failingUrl != null) {
+                                    sslErrorRetryCount++
+                                    AppLogger.w("SmartWebView", "SSL协议错误，正在重试 ($sslErrorRetryCount/3): $failingUrl")
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("SSL连接异常，正在重试... ($sslErrorRetryCount/3)")
+                                    }
+                                    view.clearCache(true)
+                                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                        isLoading = true
+                                        view.loadUrl(failingUrl)
+                                    }, 1000L * sslErrorRetryCount)
+                                    return
+                                }
+
                                 if (description.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true) ||
                                     description.contains("ERR_SPDY_PROTOCOL_ERROR", ignoreCase = true)) {
-                                    // HTTP/2?????????????TTP
                                     if (failingUrl?.startsWith("https://") == true) {
                                         val httpUrl = failingUrl.replace("https://", "http://")
-                                        android.util.Log.d("SmartWebView", "?????HTTP/2??????????TTP: $httpUrl")
-                                        Toast.makeText(
-                                            context,
-                                            "????????????????????????????..",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
+                                        AppLogger.d("SmartWebView", "HTTP/2协议错误，尝试降级为HTTP: $httpUrl")
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("连接异常，尝试切换协议...")
+                                        }
                                         view.loadUrl(httpUrl)
                                         return
                                     }
                                 }
 
-                                // ?????TTP????????TTPS???
                                 if (failingUrl?.startsWith("http://") == true &&
                                     !description.contains("ERR_HTTP2_PROTOCOL_ERROR", ignoreCase = true)) {
                                     val httpsUrl = failingUrl.replace("http://", "https://")
-                                    android.util.Log.d("SmartWebView", "HTTP???????????TTPS: $httpsUrl")
+                                    AppLogger.d("SmartWebView", "HTTP加载失败，尝试升级为HTTPS: $httpsUrl")
                                     view.loadUrl(httpsUrl)
                                 } else {
-                                    // ?????????????????
-                                    Toast.makeText(
-                                        context,
-                                        "?????????: $description\n?????????????????",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("页面加载失败: $description")
+                                    }
                                 }
                             }
                                 
@@ -575,7 +603,7 @@ fun SmartWebViewImportScreen(
                                     errorResponse: android.webkit.WebResourceResponse?
                                 ) {
                                     super.onReceivedHttpError(view, request, errorResponse)
-                                    android.util.Log.w(
+                                    AppLogger.w(
                                         "SmartWebView",
                                         "HTTP错误: ${errorResponse?.statusCode} - ${request?.url}"
                                     )
@@ -587,14 +615,12 @@ fun SmartWebViewImportScreen(
                                     error: android.net.http.SslError?
                                 ) {
                                     // 警告：生产环境中应该谨慎处理SSL错误
-                                    android.util.Log.w("SmartWebView", "SSL证书错误: ${error?.toString()}")
+                                    AppLogger.w("SmartWebView", "SSL证书错误: ${error?.toString()}")
                                     // 可以选择继续加载（不安全）或取消
-                                    handler?.proceed() // 继续加载，忽略SSL错误（仅用于教务系统兼容）
-                                    Toast.makeText(
-                                        context,
-                                        "检测到不安全的连接，已继续加载",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    handler?.proceed()
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("检测到不安全的连接，已继续加载")
+                                    }
                                 }
                                 
                                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -613,10 +639,10 @@ fun SmartWebViewImportScreen(
                                                         cookies = cookies,
                                                         lifetimeMs = java.util.concurrent.TimeUnit.DAYS.toMillis(30)
                                                     )
-                                                    android.util.Log.d("SmartWebView", "✓ Cookie已保存，可用于自动更新: $domain")
+                                                    AppLogger.d("SmartWebView", "✓ Cookie已保存，可用于自动更新: $domain")
                                                 }
                                             } catch (e: Exception) {
-                                                android.util.Log.e("SmartWebView", "保存Cookie失败", e)
+                                                AppLogger.e("SmartWebView", "保存Cookie失败", e)
                                             }
                                         }
                                     }
@@ -636,7 +662,7 @@ fun SmartWebViewImportScreen(
                                         url?.let {
                                             val inspectionScript = viewModel.getInspectionScript()
                                             view?.evaluateJavascript(inspectionScript) { result ->
-                                                android.util.Log.d("PageInspection", "页面结构检查结果: $result")
+                                                AppLogger.d("PageInspection", "页面结构检查结果: $result")
                                                 // 保存检查结果到状态变量，供复制按钮使用
                                                 pageInspectionResult = result?.removeSurrounding("\"")?.replace("\\n", "\n")
                                             }
@@ -648,6 +674,10 @@ fun SmartWebViewImportScreen(
                             loadUrl(schoolUrl)
                             webView = this
                         }
+                    },
+                    update = { wv ->
+                        val bgColor = if (darkTheme) 0xFF1C1B1F.toInt() else Color.WHITE
+                        wv.setBackgroundColor(bgColor)
                     },
                     onRelease = { webView ->
                     // ✅ 防止内存泄漏
@@ -728,7 +758,9 @@ fun SmartWebViewImportScreen(
                                                 (parseState as ParseState.Error).message
                                             }
                                             copyTextToClipboard(context, textToCopy)
-                                            Toast.makeText(context, "信息已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("信息已复制到剪贴板")
+                                            }
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {

@@ -30,6 +30,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.widget.data.NextClassDisplayData
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.widget.data.NextClassDataProvider
 
 /**
@@ -50,7 +51,7 @@ class NextClassWidget : GlanceAppWidget() {
             WidgetDataProvider.getNextClass(context)
         } catch (e: Exception) {
             // 异常时返回空数据，避免小组件崩溃
-            android.util.Log.e("NextClassWidget", "加载数据失败", e)
+            AppLogger.e("NextClassWidget", "加载数据失败", e)
             NextClassDisplayData(
                 hasNextClass = false,
                 message = "数据加载失败"

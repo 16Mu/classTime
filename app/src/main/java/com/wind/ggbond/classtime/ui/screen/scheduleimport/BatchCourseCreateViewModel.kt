@@ -1,6 +1,5 @@
 package com.wind.ggbond.classtime.ui.screen.scheduleimport
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
@@ -21,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -41,19 +41,20 @@ data class TimeSlot(
  * 包含基础信息和多个时间段
  */
 data class BatchCourseItem(
-    val id: Long = System.nanoTime(),       // 唯一标识
-    val courseName: String = "",            // 课程名称
-    val teacher: String = "",               // 教师
-    val defaultClassroom: String = "",      // 默认教室
-    val credit: Float = 0f,                 // 学分
-    val weeks: List<Int> = emptyList(),     // 全局周次
-    val timeSlots: List<TimeSlot> = listOf(TimeSlot()), // 时间段列表（至少一个）
-    val color: String = "",                 // 课程颜色（空字符串表示自动分配）
-    val reminderEnabled: Boolean = true,    // 是否启用提醒
-    val reminderMinutes: Int = 10,          // 提前提醒分钟数
-    val note: String = "",                  // 备注
-    val isExpanded: Boolean = true,         // UI状态：整体是否展开
-    val isBasicInfoExpanded: Boolean = true // UI状态：基础信息区域是否展开
+    val id: Long = System.nanoTime(),
+    val courseName: String = "",
+    val teacher: String = "",
+    val defaultClassroom: String = "",
+    val credit: Float = 0f,
+    val courseCode: String = "",
+    val weeks: List<Int> = emptyList(),
+    val timeSlots: List<TimeSlot> = listOf(TimeSlot()),
+    val color: String = "",
+    val reminderEnabled: Boolean = true,
+    val reminderMinutes: Int = 10,
+    val note: String = "",
+    val isExpanded: Boolean = true,
+    val isBasicInfoExpanded: Boolean = true
 )
 
 /**
@@ -153,7 +154,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                 val classTimes = classTimeRepository.getClassTimesByConfigSync()
                 _maxSectionCount.value = classTimes.maxOfOrNull { it.sectionNumber } ?: 14
             } catch (e: Exception) {
-                Log.w(TAG, "获取最大节次数失败: ${e.message}")
+                AppLogger.w(TAG, "获取最大节次数失败: ${e.message}")
             }
         }
     }
@@ -178,7 +179,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                         .map { it.color }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "检查课表状态失败: ${e.message}")
+                AppLogger.w(TAG, "检查课表状态失败: ${e.message}")
                 _scheduleState.value = ScheduleSelectionState.NeedCreate
             }
         }
@@ -204,11 +205,11 @@ class BatchCourseCreateViewModel @Inject constructor(
                 val scheduleId = scheduleRepository.insertSchedule(schedule)
                 // 设置为当前课表
                 scheduleRepository.setCurrentSchedule(scheduleId)
-                Log.d(TAG, "创建课表成功: $name, ID: $scheduleId")
+                AppLogger.d(TAG, "创建课表成功: $name, ID: $scheduleId")
                 // 更新状态为就绪
                 _scheduleState.value = ScheduleSelectionState.Ready
             } catch (e: Exception) {
-                Log.e(TAG, "创建课表失败", e)
+                AppLogger.e(TAG, "创建课表失败", e)
                 _saveState.value = BatchSaveState.Error("创建课表失败：${e.message}")
             }
         }
@@ -219,7 +220,7 @@ class BatchCourseCreateViewModel @Inject constructor(
      */
     fun confirmUseExpiredSchedule() {
         _scheduleState.value = ScheduleSelectionState.Ready
-        Log.d(TAG, "用户选择继续使用过期课表")
+        AppLogger.d(TAG, "用户选择继续使用过期课表")
     }
 
     /**
@@ -228,7 +229,7 @@ class BatchCourseCreateViewModel @Inject constructor(
      */
     fun switchToCreateNewSchedule() {
         _scheduleState.value = ScheduleSelectionState.NeedCreate
-        Log.d(TAG, "用户选择创建新课表")
+        AppLogger.d(TAG, "用户选择创建新课表")
     }
 
     // ===================== 课程级操作 =====================
@@ -238,7 +239,7 @@ class BatchCourseCreateViewModel @Inject constructor(
      */
     fun collapseAllCourses() {
         _courseItems.value = _courseItems.value.map { it.copy(isExpanded = false) }
-        Log.d(TAG, "收缩所有课程卡片")
+        AppLogger.d(TAG, "收缩所有课程卡片")
     }
 
     /**
@@ -248,7 +249,7 @@ class BatchCourseCreateViewModel @Inject constructor(
     fun addCourseItemCollapsed(): Long {
         val newItem = BatchCourseItem(isExpanded = false)
         _courseItems.value = _courseItems.value + listOf(newItem)
-        Log.d(TAG, "添加新课程（折叠态），当前共 ${_courseItems.value.size} 门")
+        AppLogger.d(TAG, "添加新课程（折叠态），当前共 ${_courseItems.value.size} 门")
         return newItem.id
     }
 
@@ -260,7 +261,7 @@ class BatchCourseCreateViewModel @Inject constructor(
         _courseItems.value = _courseItems.value.map {
             if (it.id == courseId) it.copy(isExpanded = true) else it
         }
-        Log.d(TAG, "展开课程 $courseId")
+        AppLogger.d(TAG, "展开课程 $courseId")
     }
 
     /**
@@ -271,7 +272,7 @@ class BatchCourseCreateViewModel @Inject constructor(
         // 至少保留一门课程
         if (_courseItems.value.size <= 1) return
         _courseItems.value = _courseItems.value.filter { it.id != courseId }
-        Log.d(TAG, "删除课程，当前共 ${_courseItems.value.size} 门")
+        AppLogger.d(TAG, "删除课程，当前共 ${_courseItems.value.size} 门")
     }
 
     /**
@@ -359,7 +360,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                 ).also { usedColors.add(it) }
                 course.copy(color = assignedColor)
             }
-            Log.d(TAG, "一键分配颜色完成，共 ${_courseItems.value.size} 门课程")
+            AppLogger.d(TAG, "一键分配颜色完成，共 ${_courseItems.value.size} 门课程")
         }
     }
 
@@ -935,7 +936,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                         
                         //  修复：如果周次为空，跳过冲突检测（因为没有实际的上课时间）
                         if (weeks.isEmpty()) {
-                            Log.w(TAG, "课程「${courseItem.courseName}」的时间段周次为空，跳过冲突检测")
+                            AppLogger.w(TAG, "课程「${courseItem.courseName}」的时间段周次为空，跳过冲突检测")
                         } else {
                             //  修复：先检测同一批次内的时间段冲突
                             for (week in weeks) {
@@ -990,7 +991,8 @@ class BatchCourseCreateViewModel @Inject constructor(
                                 color = color,
                                 note = courseItem.note,
                                 reminderEnabled = courseItem.reminderEnabled,
-                                reminderMinutes = courseItem.reminderMinutes
+                                reminderMinutes = courseItem.reminderMinutes,
+                                courseCode = courseItem.courseCode
                             )
                         )
                     }
@@ -998,7 +1000,7 @@ class BatchCourseCreateViewModel @Inject constructor(
 
                 // 批量插入
                 val ids = courseRepository.insertCourses(coursesToInsert)
-                Log.d(TAG, "批量插入成功，共 ${ids.size} 条记录")
+                AppLogger.d(TAG, "批量插入成功，共 ${ids.size} 条记录")
 
                 // 为每条记录创建提醒
                 for ((index, id) in ids.withIndex()) {
@@ -1008,7 +1010,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                             reminderScheduler.scheduleCourseReminders(savedCourse)
                         }
                     } catch (e: Exception) {
-                        Log.w(TAG, "创建提醒失败: ${e.message}")
+                        AppLogger.w(TAG, "创建提醒失败: ${e.message}")
                     }
                 }
 
@@ -1017,7 +1019,7 @@ class BatchCourseCreateViewModel @Inject constructor(
                     recordCount = ids.size
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "批量保存失败", e)
+                AppLogger.e(TAG, "批量保存失败", e)
                 _saveState.value = BatchSaveState.Error("保存失败：${e.message ?: "未知错误"}")
             }
         }

@@ -256,8 +256,10 @@ class SecureCookieManager(
             
             if (!isValid) {
                 AppLogger.w(TAG, "Cookie验证失败: HTTP ${response.code}")
-                // ✅ 验证失败时自动删除Cookie
-                removeCookies(domain)
+                if (response.code == 401 || response.code == 302) {
+                    removeCookies(domain)
+                    AppLogger.d(TAG, "Cookie已失效（认证失败/重定向），已删除: $domain")
+                }
             } else {
                 AppLogger.d(TAG, "✅ Cookie验证成功: $domain")
             }

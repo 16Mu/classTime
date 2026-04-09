@@ -1,900 +1,120 @@
 package com.wind.ggbond.classtime.util.extractor
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
-/**
- * 超级智能课表提取器
- * 
- * 整合了所有教务系统的提取逻辑，能够智能识别并提取课表数据
- * 
- * 支持的教务系统：
- * - 树维教务系统 (SHUWEI)
- * - 强智教务系统 (QIANGZHI)
- * - 青果教务系统 (KINGOSOFT/QINGGUO)
- * - 正方教务系统 (ZHENGFANG)
- * - URP教务系统
- * - 金智教务系统 (JINZHI)
- * - 乘方教务系统 (CHENGFANG)
- * - 联亦科技系统 (LIANYI)
- * - 各类自研教务系统
- * 
- * 特性：
- * 1. 自动识别教务系统类型
- * 2. 多策略智能提取
- * 3. 容错能力强
- * 4. 支持多种数据格式（HTML表格、JavaScript变量、API JSON）
- * 
- * @author AI Assistant
- * @since 2025-11-05
- */
 @Singleton
 class UniversalSmartExtractor @Inject constructor() : SchoolScheduleExtractor {
-    
     override val schoolId = "universal_smart"
     override val schoolName = "通用智能提取器"
     override val systemType = "universal"
-    
+
     companion object {
-        private const val TAG = "UniversalSmartExtractor"
-        
-        // 教务系统类型枚举
-        enum class SystemType {
-            SHUWEI,          // 树维教务系统
-            QIANGZHI,        // 强智教务系统
-            KINGOSOFT,       // 青果教务系统
-            ZHENGFANG,       // 正方教务系统
-            URP,             // URP教务系统
-            JINZHI,          // 金智教务系统
-            CHENGFANG,       // 乘方教务系统
-            LIANYI,          // 联亦科技
-            CUSTOM,          // 自研系统
-            UNKNOWN          // 未知系统
-        }
-        
-        // 系统特征模式
-        private val SYSTEM_PATTERNS = mapOf(
-            SystemType.SHUWEI to listOf(
-                "/eams/",
-                "courseTableForStd",
-                "activity = new TaskActivity",
-                "var table = new TaskActivity"
-            ),
-            SystemType.QIANGZHI to listOf(
-                "/jsxsd/xskb/xskb_list.do",
-                "kbtable",
-                "div.kbcontent",
-                "强智"
-            ),
-            SystemType.KINGOSOFT to listOf(
-                "青果",
-                "kingosoft",
-                "frmDesk",
-                "wsxk.xskcb",
-                "selGS"
-            ),
-            SystemType.ZHENGFANG to listOf(
-                "zfsoft",
-                "正方",
-                "var kbList",
-                "div.kcmc"
-            ),
-            SystemType.URP to listOf(
-                "cas.urp.edu.cn",
-                "urp",
-                "datagridsearch"
-            ),
-            SystemType.JINZHI to listOf(
-                "campusphere",
-                "jinzhiapp",
-                "金智"
-            ),
-            SystemType.CHENGFANG to listOf(
-                "乘方",
-                "chengfang"
-            ),
-            SystemType.LIANYI to listOf(
-                "studentCourseSchedule",
-                "ant-spin-container",
-                "联亦"
-            )
+        private const val TAG = "UniversalExtractor"
+        enum class SystemType { SHUWEI, QIANGZHI, KINGOSOFT, ZHENGFANG, URP, JINZHI, CHENGFANG, LIANYI, UNKNOWN }
+        private val SYSTEM_PATTERNS: Map<SystemType, List<String>> = mapOf(
+            SystemType.SHUWEI to listOf("/eams/", "courseTableForStd", "activity = new TaskActivity"),
+            SystemType.QIANGZHI to listOf("/jsxsd/xskb/xskb_list.do", "kbtable", "div.kbcontent", "强智"),
+            SystemType.KINGOSOFT to listOf("青果", "kingosoft", "frmDesk", "wsxk.xskcb", "selGS"),
+            SystemType.ZHENGFANG to listOf("zfsoft", "正方", "var kbList", "div.kcmc"),
+            SystemType.URP to listOf("cas.urp.edu.cn", "urp", "datagridsearch"),
+            SystemType.JINZHI to listOf("campusphere", "jinzhiapp", "金智"),
+            SystemType.CHENGFANG to listOf("乘方", "chengfang"),
+            SystemType.LIANYI to listOf("studentCourseSchedule", "ant-spin-container", "联亦")
         )
     }
-    
-    override fun isSchedulePage(html: String, url: String): Boolean {
-        // 通用检测：只要包含课表相关关键词就认为是课表页面
-        return html.contains("课程表", ignoreCase = true) ||
-               html.contains("课表", ignoreCase = true) ||
-               html.contains("timetable", ignoreCase = true) ||
-               html.contains("schedule", ignoreCase = true) ||
-               html.contains("kbtable", ignoreCase = true) ||
-               detectSystemType(html, url) != SystemType.UNKNOWN
-    }
-    
+
+    override fun isSchedulePage(html: String, url: String): Boolean =
+        html.contains("课程表", ignoreCase = true) || html.contains("课表", ignoreCase = true) ||
+            html.contains("timetable", ignoreCase = true) || html.contains("schedule", ignoreCase = true) ||
+            html.contains("kbtable", ignoreCase = true) || detectSystemType(html, url) != SystemType.UNKNOWN
+
     override fun getLoginUrl(): String? = null
     override fun getScheduleUrl(): String? = null
-    
-    /**
-     * 智能识别教务系统类型
-     */
-    fun detectSystemType(html: String, url: String): SystemType {
-        Log.d(TAG, "🔍 开始智能识别教务系统类型...")
-        
-        // 记录每个系统的匹配分数
-        val scores = mutableMapOf<SystemType, Int>()
-        
-        // 遍历所有系统特征，计算匹配分数
-        SYSTEM_PATTERNS.forEach { (type, patterns) ->
-            var score = 0
-            patterns.forEach { pattern ->
-                if (html.contains(pattern, ignoreCase = true) || 
-                    url.contains(pattern, ignoreCase = true)) {
-                    score += 1
-                }
-            }
-            if (score > 0) {
-                scores[type] = score
-            }
-        }
-        
-        // 找出得分最高的系统类型
-        val detectedType = scores.maxByOrNull { it.value }?.key ?: SystemType.UNKNOWN
-        
-        if (detectedType != SystemType.UNKNOWN) {
-            Log.d(TAG, "✅ 识别为: ${detectedType.name} 系统 (得分: ${scores[detectedType]})")
-        } else {
-            Log.d(TAG, "⚠️ 未能识别系统类型，将使用通用解析")
-        }
-        
-        return detectedType
-    }
-    
-    override fun generateExtractionScript(): String {
-        return """
-            (function() {
-                try {
-                    console.log('🚀 超级智能提取器启动...');
-                    
-                    // ============================================
-                    // 第一步：智能识别教务系统类型
-                    // ============================================
-                    function detectSystemType() {
-                        var html = document.documentElement.outerHTML;
-                        var url = window.location.href;
-                        
-                        // 树维系统特征
-                        if (html.indexOf('activity = new TaskActivity') > -1 || 
-                            url.indexOf('/eams/') > -1) {
-                            return 'SHUWEI';
-                        }
-                        
-                        // 强智系统特征
-                        if (html.indexOf('kbtable') > -1 && 
-                            (html.indexOf('kbcontent') > -1 || url.indexOf('/jsxsd/xskb/') > -1)) {
-                            return 'QIANGZHI';
-                        }
-                        
-                        // 青果系统特征
-                        if (html.indexOf('frmDesk') > -1 || 
-                            html.indexOf('selGS') > -1 || 
-                            url.indexOf('wsxk.xskcb') > -1) {
-                            return 'KINGOSOFT';
-                        }
-                        
-                        // 正方系统特征
-                        if (html.indexOf('var kbList') > -1 || 
-                            html.indexOf('zfsoft') > -1 ||
-                            html.indexOf('div.kcmc') > -1) {
-                            return 'ZHENGFANG';
-                        }
-                        
-                        // 联亦科技特征
-                        if (html.indexOf('studentCourseSchedule') > -1 || 
-                            html.indexOf('ant-spin-container') > -1) {
-                            return 'LIANYI';
-                        }
-                        
-                        return 'UNKNOWN';
-                    }
-                    
-                    var systemType = detectSystemType();
-                    console.log('📌 识别到系统类型: ' + systemType);
-                    
-                    // ============================================
-                    // 第二步：根据系统类型选择提取策略
-                    // ============================================
-                    
-                    // 通用辅助函数
-                    ${generateHelperFunctions()}
-                    
-                    // 根据系统类型提取
-                    var courses = [];
-                    
-                    if (systemType === 'SHUWEI') {
-                        courses = ${generateShuweiExtraction()};
-                    } else if (systemType === 'QIANGZHI') {
-                        courses = ${generateQiangzhiExtraction()};
-                    } else if (systemType === 'KINGOSOFT') {
-                        courses = ${generateKingosoftExtraction()};
-                    } else if (systemType === 'ZHENGFANG') {
-                        courses = ${generateZhengfangExtraction()};
-                    } else if (systemType === 'LIANYI') {
-                        courses = ${generateLianyiExtraction()};
-                    } else {
-                        // 未知系统，使用通用提取
-                        courses = ${generateGenericExtraction()};
-                    }
-                    
-                    console.log('✅ 提取完成，共 ' + courses.length + ' 门课程');
-                    return JSON.stringify({
-                        courses: courses,
-                        systemType: systemType
-                    });
-                    
-                } catch (error) {
-                    console.error('❌ 提取失败:', error);
-                    return JSON.stringify({
-                        courses: [],
-                        error: '提取失败: ' + error.message
-                    });
-                }
-            })();
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成通用辅助函数（JavaScript）
-     */
-    private fun generateHelperFunctions(): String {
-        return """
-            // ========== 通用辅助函数 ==========
-            
-            // 解析周次字符串
-            function parseWeeks(str) {
-                if (!str) return [];
-                
-                function range(start, end, step) {
-                    var result = [];
-                    if (step === 1 || step === 2) {
-                        for (var i = start; i <= end; i++) {
-                            if (i % step === 0 || step === 1) result.push(i);
-                        }
-                    } else { // 单周
-                        for (var i = start; i <= end; i++) {
-                            if (i % 2 !== 0) result.push(i);
-                        }
-                    }
-                    return result;
-                }
-                
-                str = str.replace(/[(){}|第\[\]]/g, '').replace(/到/g, '-');
-                var weeks = [];
-                var segments = [];
-                
-                while (str.search(/周|\s/) !== -1) {
-                    var index = str.search(/周|\s/);
-                    var segment = '';
-                    if (str[index + 1] === '单' || str[index + 1] === '双') {
-                        segment = str.slice(0, index + 2).replace(/周|\s/g, '');
-                        index += 2;
-                    } else {
-                        segment = str.slice(0, index + 1).replace(/周|\s/g, '');
-                        index += 1;
-                    }
-                    segments.push(segment);
-                    str = str.slice(index);
-                    index = str.search(/\d/);
-                    if (index !== -1) str = str.slice(index);
-                    else str = '';
-                }
-                if (str.length !== 0) segments.push(str);
-                
-                segments.forEach(function(seg) {
-                    var parts = seg.replace(/单|双/g, '').split(',');
-                    parts.forEach(function(part) {
-                        var nums = part.split('-');
-                        if (nums.length === 1) {
-                            weeks.push(parseInt(nums[0]));
-                        } else {
-                            var start = parseInt(nums[0]);
-                            var end = parseInt(nums[nums.length - 1]);
-                            if (seg.indexOf('双') > -1) {
-                                weeks.push.apply(weeks, range(start, end, 2));
-                            } else if (seg.indexOf('单') > -1) {
-                                weeks.push.apply(weeks, range(start, end, 3));
-                            } else {
-                                weeks.push.apply(weeks, range(start, end, 1));
-                            }
-                        }
-                    });
-                });
-                
-                return weeks.filter(function(v, i, a) { return a.indexOf(v) === i; }).sort(function(a, b) { return a - b; });
-            }
-            
-            // 解析节次字符串
-            function parseSections(str) {
-                if (!str) return [];
-                var sections = [];
-                var nums = str.replace(/节|\[|\]/g, '').split('-');
-                if (nums.length === 1) {
-                    sections.push(parseInt(nums[0]));
-                } else {
-                    var start = parseInt(nums[0]);
-                    var end = parseInt(nums[nums.length - 1]);
-                    for (var i = start; i <= end; i++) {
-                        sections.push(i);
-                    }
-                }
-                return sections;
-            }
-            
-            // 清理文本
-            function cleanText(text) {
-                return text ? text.replace(/\s+/g, ' ').replace(/\\n/g, '').trim() : '';
-            }
-            
-            // 中文星期转数字
-            function dayToNumber(dayStr) {
-                var map = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '日': 7};
-                for (var key in map) {
-                    if (dayStr.indexOf(key) > -1) return map[key];
-                }
-                return parseInt(dayStr) || 1;
-            }
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成树维系统提取逻辑
-     */
-    private fun generateShuweiExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用树维系统提取器...');
-                var courses = [];
-                var html = document.documentElement.outerHTML;
-                var blocks = html.split(/activity = new /);
-                
-                for (var i = 1; i < blocks.length; i++) {
-                    try {
-                        var block = blocks[i];
-                        var match = block.match(/TaskActivity\((.*?)\);/);
-                        if (!match) continue;
-                        
-                        var params = match[1].split('","').map(function(p) { 
-                            return p.replace(/^"|"$/g, ''); 
-                        });
-                        
-                        if (params.length < 7) continue;
-                        
-                        var dayMatch = block.match(/index\s*=\s*(\d+)\s*\*\s*unitCount/);
-                        var day = dayMatch ? parseInt(dayMatch[1]) + 1 : 1;
-                        
-                        var sectionMatches = block.match(/unitCount\+(\d+);/g);
-                        var sections = [];
-                        if (sectionMatches) {
-                            var sectionSet = {};
-                            sectionMatches.forEach(function(m) {
-                                var num = parseInt(m.match(/\d+/)[0]) + 1;
-                                sectionSet[num] = true;
-                            });
-                            sections = Object.keys(sectionSet).map(Number).sort(function(a, b) { return a - b; });
-                        }
-                        
-                        var weekStr = params[6] || '';
-                        var weeks = [];
-                        for (var w = 0; w < weekStr.length; w++) {
-                            if (weekStr[w] == '1') weeks.push(w);
-                        }
-                        
-                        courses.push({
-                            courseName: cleanText(params[3]),
-                            teacher: cleanText(params[1]),
-                            classroom: cleanText(params[5]),
-                            day: day,
-                            startSection: sections[0] || 1,
-                            sectionCount: sections.length || 2,
-                            weeks: weeks
-                        });
-                    } catch (e) {
-                        console.log('解析树维课程出错:', e);
-                    }
-                }
-                return courses;
-            })()
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成强智系统提取逻辑
-     */
-    private fun generateQiangzhiExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用强智系统提取器...');
-                var courses = [];
-                
-                // 尝试从iframe获取
-                var kbtableHtml = '';
-                var iframes = document.getElementsByTagName('iframe');
-                for (var i = 0; i < iframes.length; i++) {
-                    try {
-                        var iframe = iframes[i];
-                        if (iframe.src && iframe.src.indexOf('/jsxsd/xskb/') > -1) {
-                            var doc = iframe.contentDocument || iframe.contentWindow.document;
-                            var table = doc.getElementById('kbtable');
-                            if (table) {
-                                kbtableHtml = table.outerHTML;
-                                break;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('访问iframe失败(可能跨域):', e.message);
-                    }
-                }
-                
-                if (!kbtableHtml) {
-                    var table = document.getElementById('kbtable');
-                    if (table) kbtableHtml = table.outerHTML;
-                }
-                
-                if (!kbtableHtml) return courses;
-                
-                var parser = new DOMParser();
-                var doc = parser.parseFromString(kbtableHtml, 'text/html');
-                var rows = doc.querySelectorAll('tbody tr');
-                
-                rows.forEach(function(row, jcIndex) {
-                    var cells = row.querySelectorAll('td');
-                    cells.forEach(function(cell, dayIndex) {
-                        var kbcontents = cell.querySelectorAll('div.kbcontent');
-                        if (kbcontents.length === 0) return;
-                        
-                        kbcontents.forEach(function(content) {
-                            try {
-                                var html = content.innerHTML;
-                                var parts = html.split(/<br>/i);
-                                
-                                if (parts.length >= 3) {
-                                    var courseName = cleanText(parts[0].replace(/<.*?>/g, ''));
-                                    var weeks = parseWeeks(parts[1]);
-                                    var sections = parseSections(parts[2]);
-                                    var teacher = parts.length > 3 ? cleanText(parts[3].replace(/<.*?>/g, '')) : '';
-                                    var classroom = parts.length > 4 ? cleanText(parts[4].replace(/<.*?>/g, '')) : '';
-                                    
-                                    courses.push({
-                                        courseName: courseName,
-                                        teacher: teacher,
-                                        classroom: classroom,
-                                        day: dayIndex,
-                                        startSection: sections[0] || (jcIndex * 2 + 1),
-                                        sectionCount: sections.length || 2,
-                                        weeks: weeks
-                                    });
-                                }
-                            } catch (e) {
-                                console.log('解析强智课程出错:', e);
-                            }
-                        });
-                    });
-                });
-                
-                return courses;
-            })()
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成青果系统提取逻辑
-     */
-    private fun generateKingosoftExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用青果系统提取器...');
-                var courses = [];
-                var html = '';
-                
-                // 从frmDesk获取
-                try {
-                    if (window.frames && window.frames['frmDesk']) {
-                        var frmDesk = window.frames['frmDesk'];
-                        if (frmDesk.frames['frmReport']) {
-                            var tables = frmDesk.frames['frmReport'].document.getElementsByTagName('table');
-                            for (var i = 0; i < tables.length; i++) {
-                                html += tables[i].outerHTML;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.log('从frmDesk获取失败:', e);
-                }
-                
-                if (!html) {
-                    var tables = document.getElementsByTagName('table');
-                    for (var i = 0; i < tables.length; i++) {
-                        html += tables[i].outerHTML;
-                    }
-                }
-                
-                if (!html) return courses;
-                
-                var parser = new DOMParser();
-                var doc = parser.parseFromString(html, 'text/html');
-                var rows = doc.querySelectorAll('tr');
-                
-                rows.forEach(function(row) {
-                    var cells = row.querySelectorAll('td');
-                    cells.forEach(function(cell, index) {
-                        var text = cell.innerText || cell.textContent;
-                        if (!text || text.length < 10) return;
-                        
-                        try {
-                            var lines = text.split('\\n').filter(function(l) { return l.trim(); });
-                            if (lines.length >= 3) {
-                                var courseName = cleanText(lines[0]);
-                                var weeks = parseWeeks(lines[1]);
-                                var sections = parseSections(lines[2]);
-                                var teacher = lines.length > 3 ? cleanText(lines[3]) : '';
-                                var classroom = lines.length > 4 ? cleanText(lines[4]) : '';
-                                
-                                courses.push({
-                                    courseName: courseName,
-                                    teacher: teacher,
-                                    classroom: classroom,
-                                    day: (index % 7) || 1,
-                                    startSection: sections[0] || 1,
-                                    sectionCount: sections.length || 2,
-                                    weeks: weeks
-                                });
-                            }
-                        } catch (e) {
-                            console.log('解析青果课程出错:', e);
-                        }
-                    });
-                });
-                
-                return courses;
-            })()
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成正方系统提取逻辑
-     */
-    private fun generateZhengfangExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用正方系统提取器...');
-                var courses = [];
-                
-                // 尝试从JavaScript变量提取
-                var html = document.documentElement.outerHTML;
-                var match = html.match(/var kbList\s*=\s*(\[[\s\S]*?\]);/);
-                if (match) {
-                    try {
-                        var kbList = eval(match[1]);
-                        kbList.forEach(function(item) {
-                            courses.push({
-                                courseName: cleanText(item.kcmc || ''),
-                                teacher: cleanText(item.xm || ''),
-                                classroom: cleanText(item.cdmc || ''),
-                                day: parseInt(item.xqj) || 1,
-                                startSection: parseInt(item.jcs) || 1,
-                                sectionCount: parseInt(item.jcs) || 2,
-                                weeks: parseWeeks(item.zcd || '')
-                            });
-                        });
-                        return courses;
-                    } catch (e) {
-                        console.log('从kbList解析失败:', e);
-                    }
-                }
-                
-                // 从HTML表格提取
-                var table = document.getElementById('kbtable');
-                if (!table) {
-                    var tables = document.querySelectorAll('table');
-                    for (var i = 0; i < tables.length; i++) {
-                        if (tables[i].innerHTML.indexOf('kbcontent') > -1) {
-                            table = tables[i];
-                            break;
-                        }
-                    }
-                }
-                
-                if (table) {
-                    var rows = table.querySelectorAll('tr');
-                    rows.forEach(function(row, rowIndex) {
-                        var cells = row.querySelectorAll('td');
-                        cells.forEach(function(cell, dayIndex) {
-                            var kbcontents = cell.querySelectorAll('div.kbcontent');
-                            kbcontents.forEach(function(content) {
-                                try {
-                                    var text = content.textContent || content.innerText;
-                                    var lines = text.split('\\n').filter(function(l) { return l.trim(); });
-                                    if (lines.length >= 3) {
-                                        courses.push({
-                                            courseName: cleanText(lines[0]),
-                                            teacher: cleanText(lines.length > 3 ? lines[3] : ''),
-                                            classroom: cleanText(lines.length > 2 ? lines[2] : ''),
-                                            day: dayIndex || 1,
-                                            startSection: (rowIndex - 1) * 2 + 1,
-                                            sectionCount: 2,
-                                            weeks: parseWeeks(lines.length > 1 ? lines[1] : '')
-                                        });
-                                    }
-                                } catch (e) {
-                                    console.warn('解析青果kbcontent失败:', e.message);
-                                }
-                            });
-                        });
-                    });
-                }
 
-                return courses;
-            })()
-        """.trimIndent()
+    fun detectSystemType(html: String, url: String): SystemType =
+        SYSTEM_PATTERNS.mapValues { (_, patterns) -> patterns.count { p -> html.contains(p, ignoreCase = true) || url.contains(p, ignoreCase = true) } }
+            .filter { it.value > 0 }.maxByOrNull { it.value }?.key ?: SystemType.UNKNOWN
+
+    override fun generateExtractionScript(): String = """
+(function() {
+    try {
+        var type = detectSystem();
+        ${generateHelperFunctions()}
+        var courses = [];
+        switch(type) {
+            case 'SHUWEI': courses = extractShuwei(); break;
+            case 'QIANGZHI': courses = extractQiangzhi(); break;
+            case 'KINGOSOFT': courses = extractKingosoft(); break;
+            case 'ZHENGFANG': courses = extractZhengfang(); break;
+            case 'LIANYI': courses = extractLianyi(); break;
+            default: courses = extractGeneric();
+        }
+        return JSON.stringify({courses: courses, systemType: type});
+    } catch(e) { return JSON.stringify({courses:[],error:e.message}); }
+
+    function detectSystem() {
+        var h = document.documentElement.outerHTML; var u = location.href;
+        if (h.indexOf('activity = new TaskActivity') > -1 || u.indexOf('/eams/') > -1) return 'SHUWEI';
+        if ((h.indexOf('kbtable') > -1 && h.indexOf('kbcontent') > -1) || u.indexOf('/jsxsd/xskb/') > -1) return 'QIANGZHI';
+        if (h.indexOf('frmDesk') > -1 || u.indexOf('wsxk.xskcb') > -1) return 'KINGOSOFT';
+        if (h.indexOf('var kbList') > -1 || h.indexOf('zfsoft') > -1 || h.indexOf('div.kcmc') > -1) return 'ZHENGFANG';
+        if (h.indexOf('studentCourseSchedule') > -1 || h.indexOf('ant-spin-container') > -1) return 'LIANYI';
+        return 'UNKNOWN';
     }
 
-    /**
-     * 生成联亦科技系统提取逻辑
-     */
-    private fun generateLianyiExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用联亦科技提取器...');
-                var courses = [];
-                
-                // 尝试从API获取
-                var bodyText = document.getElementsByTagName("body")[0].outerText.replace(/\\n|\\s/g, "");
-                var idMatch = bodyText.match(/(?<=学号:).*?(?=姓名)/);
-                
-                if (idMatch) {
-                    // 这里需要异步获取，返回空数组，让后台处理
-                    console.log('检测到API模式，需要后台处理');
-                    return courses;
-                }
-                
-                // 从HTML表格提取
-                var container = document.getElementsByClassName("ant-spin-container")[0];
-                if (container) {
-                    var table = container.getElementsByTagName("table")[0];
-                    if (table) {
-                        var rows = table.querySelectorAll('tbody tr');
-                        rows.forEach(function(row, rowIndex) {
-                            var cells = row.querySelectorAll('td');
-                            cells.forEach(function(cell, dayIndex) {
-                                var text = cell.textContent || cell.innerText;
-                                if (text && text.length > 10) {
-                                    try {
-                                        var lines = text.split('\\n').filter(function(l) { return l.trim(); });
-                                        if (lines.length >= 3) {
-                                            courses.push({
-                                                courseName: cleanText(lines[0]),
-                                                teacher: cleanText(lines.length > 1 ? lines[1] : ''),
-                                                classroom: cleanText(lines.length > 2 ? lines[2] : ''),
-                                                day: dayIndex || 1,
-                                                startSection: rowIndex * 2 + 1,
-                                                sectionCount: 2,
-                                                weeks: parseWeeks(lines.length > 3 ? lines[3] : '')
-                                            });
-                                        }
-                                    } catch (e) {
-                                        console.warn('解析联亦课程文本失败:', e.message);
-                                    }
-                                }
-                            });
-                        });
-                    }
-                }
-                
-                return courses;
-            })()
-        """.trimIndent()
-    }
-    
-    /**
-     * 生成通用提取逻辑（兜底方案）
-     */
-    private fun generateGenericExtraction(): String {
-        return """
-            (function() {
-                console.log('📦 使用通用提取器（兜底方案）...');
-                var courses = [];
-                
-                // 策略1：查找所有表格，遍历单元格
-                var tables = document.getElementsByTagName('table');
-                for (var t = 0; t < tables.length; t++) {
-                    var rows = tables[t].querySelectorAll('tr');
-                    rows.forEach(function(row, rowIndex) {
-                        if (rowIndex === 0) return; // 跳过表头
-                        
-                        var cells = row.querySelectorAll('td');
-                        cells.forEach(function(cell, dayIndex) {
-                            var text = (cell.textContent || cell.innerText || '').trim();
-                            
-                            // 判断是否像课程信息
-                            if (text.length > 10 && text.length < 200) {
-                                var lines = text.split('\\n').filter(function(l) { return l.trim(); });
-                                
-                                // 至少要有课程名
-                                if (lines.length >= 1) {
-                                    var courseName = cleanText(lines[0]);
-                                    
-                                    // 过滤掉明显不是课程的文本
-                                    if (courseName.length < 2 || 
-                                        courseName.indexOf('节次') > -1 ||
-                                        courseName.indexOf('星期') > -1 ||
-                                        courseName.indexOf('周次') > -1) {
-                                        return;
-                                    }
-                                    
-                                    var teacher = '';
-                                    var classroom = '';
-                                    var weekText = '';
-                                    
-                                    // 智能提取教师、教室、周次
-                                    lines.forEach(function(line, i) {
-                                        if (i === 0) return;
-                                        line = cleanText(line);
-                                        
-                                        if (line.indexOf('周') > -1 || line.match(/\\d+-\\d+/)) {
-                                            weekText = line;
-                                        } else if (line.length < 10 && !classroom) {
-                                            teacher = line;
-                                        } else if (!classroom) {
-                                            classroom = line;
-                                        }
-                                    });
-                                    
-                                    courses.push({
-                                        courseName: courseName,
-                                        teacher: teacher,
-                                        classroom: classroom,
-                                        day: (dayIndex % 7) || 1,
-                                        startSection: Math.max(1, rowIndex * 2 - 1),
-                                        sectionCount: 2,
-                                        weeks: parseWeeks(weekText)
-                                    });
-                                }
-                            }
-                        });
-                    });
-                }
-                
-                return courses;
-            })()
-        """.trimIndent()
-    }
-    
+    function parseWeeks(str) { if (!str) return []; str = str.replace(/[(){}|第\[\]]/g,'').replace(/到/g,'-'); var weeks=[],segs=[]; while(str.search(/周|\s/) !== -1){var i=str.search(/周|\s/);var s=(str[i+1]==='单'||str[i+1]==='双')?str.slice(0,i+2).replace(/周|\s/g,''):str.slice(0,i+1).replace(/周|\s/g,'');segs.push(s);str=str.slice(i+(str[i+1]==='单'||str[i+1]==='双'?2:1));i=str.search(/\d/);str=i!==-1?str.slice(i):'';} if(str.length) segs.push(str);
+        segs.forEach(function(seg){var parts=seg.replace(/单|双/g,'').split(',');parts.forEach(function(p){var nums=p.split('-');if(nums.length===1)weeks.push(parseInt(nums[0]));else{var s=parseInt(nums[0]),e=parseInt(nums[nums.length-1]);if(seg.indexOf('双')>-1){for(var i=s;i<=e;i+=2)weeks.push(i);}else if(seg.indexOf('单')>-1){for(var i=s;i<=e;i++)if(i%2!==0)weeks.push(i);}else{for(var i=s;i<=e;i++)weeks.push(i);}}}}); return weeks.filter(function(v,i,a){return a.indexOf(v)===i}).sort(function(a,b){return a-b});}
+    function parseSections(str) { if(!str) return []; var n=str.replace(/节|\[|\]/g,'').split('-'); if(n.length===1)return[parseInt(n[0))];var s=parseInt(n[0]),e=parseInt(n[n.length-1]),r=[];for(var i=s;i<=e;i++)r.push(i);return r;}
+    function cleanText(t) { return t ? t.replace(/\s+/g,' ').replace(/\\n/g,'').trim() : ''; }
+    function dayToNum(d) { var m={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'日':7}; for(var k in m) if(d.indexOf(k)>-1) return m[k]; return parseInt(d)||1; }
+
+    function extractShuwei() { var c=[],b=document.documentElement.outerHTML.split(/activity = new /); for(var i=1;i<b.length;i++){try{var m=b[i].match(/TaskActivity\((.*?)\);/);if(!m)continue;var p=m[1].split('","').map(function(x){return x.replace(/^"|"$/g,'');});if(p.length<7)continue;var dm=b[i].match(/index\s*=\s*(\d+)\s*\*\s*unitCount/),day=dm?parseInt(dm[1])+1:1;var sm=b[i].match(/unitCount\+(\d+);/g),secs={};if(sm)sm.forEach(function(x){secs[parseInt(x.match(/\d+/)[0])+1]=true;});var sk=Object.keys(secs).map(Number).sort(function(a,b){return a-b;}),ws=[];(p[6]||'').split('').forEach(function(ch,i){if(ch==='1')ws.push(i)});c.push({courseName:cleanText(p[3]),teacher:cleanText(p[1]),classroom:cleanText(p[5]),day:day,startSection:sk[0]||1,sectionCount:sk.length||2,weeks:ws})}catch(e){}} return c; }
+
+    function extractQiangzhi() { var c=[],html=''; var ifs=document.getElementsByTagName('iframe'); for(var i=0;i<ifs.length;i++){try{var f=ifs[i];if(f.src&&f.src.indexOf('/jsxsd/xskb/')>-1){var d=f.contentDocument||f.contentWindow.document,t=d.getElementById('kbtable');if(t){html=t.outerHTML;break}}}catch(e){}} if(!html){var tb=document.getElementById('kbtable');if(tb)html=tb.outerHTML;} if(!html) return c; var doc=new DOMParser().parseFromString(html,'text/html'),rows=doc.querySelectorAll('tbody tr');
+        rows.forEach(function(ri,row){row.querySelectorAll('td').forEach(function(ci,cell){cell.querySelectorAll('div.kbcontent').forEach(function(content){try{var ps=content.innerHTML.split(/<br>/i);if(ps.length>=3)c.push({courseName:cleanText(ps[0].replace(/<.*?>/g,'')),teacher:ps.length>3?cleanText(ps[3].replace(/<.*?>/g,'')):'',classroom:ps.length>4?cleanText(ps[4].replace(/<.*?>/g,'')):'',day:ci,startSection:ps[2]?parseSections(ps[2])[0]||(ri*2+1):1,sectionCount:ps[2]?parseSections(ps[2]).length||2:2,weeks:parseWeeks(ps[1])})}catch(e){}})})}); return c; }
+
+    function extractKingosoft() { var c=[],html=''; try{if(window.frames&&window.frames['frmDesk']&&window.frames['frmDesk'].frames['frmReport']){var ts=window.frames['frmDesk'].frames['frmReport'].document.getElementsByTagName('table');for(var i=0;i<ts.length;i++)html+=ts[i].outerHTML;}}catch(e){} if(!html){var ts=document.getElementsByTagName('table');for(var i=0;i<ts.length;i++)html+=ts[i].outerHTML;} if(!html) return c; var doc=new DOMParser().parseFromString(html,'text/html');doc.querySelectorAll('tr').forEach(function(row){row.querySelectorAll('td').forEach(function(cell,idx){var t=cell.innerText||cell.textContent;if(!t||t.length<10)return;var ls=t.split('\\n').filter(function(l){return l.trim()});if(ls.length>=3)c.push({courseName:cleanText(ls[0]),teacher:ls.length>3?cleanText(ls[3]):'',classroom:ls.length>4?cleanText(ls[4]):'',day:(idx%7)||1,startSection:1,sectionCount:2,weeks:parseWeeks(ls[1])})})}); return c; }
+
+    function extractZhengfang() { var c=[],html=document.documentElement.outerHTML,m=html.match(/var kbList\s*=\s*(\[[\s\S]*?\]);/); if(m){try{eval(m[1]).forEach(function(it){c.push({courseName:cleanText(it.kcmc||''),teacher:cleanText(it.xm||''),classroom:cleanText(it.cdmc||''),day:parseInt(it.xqj)||1,startSection:parseInt(it.jcs)||1,sectionCount:parseInt(it.jcs)||2,weeks:parseWeeks(it.zcd||'')})});return c}catch(e){}}
+        var tb=document.getElementById('kbtable');if(!tb){var ts=document.querySelectorAll('table');for(var i=0;i<ts.length;i++){if(ts[i].innerHTML.indexOf('kbcontent')>-1){tb=ts[i];break}}} if(tb)tb.querySelectorAll('tr').forEach(function(ri,row){row.querySelectorAll('td').forEach(function(ci,cell){cell.querySelectorAll('div.kbcontent').forEach(function(content){try{var ls=(content.textContent||content.innerText).split('\\n').filter(function(l){return l.trim()});if(ls.length>=3)c.push({courseName:cleanText(ls[0]),teacher:ls.length>3?cleanText(ls[3]):'',classroom:ls.length>2?cleanText(ls[2]):'',day:ci||1,startSection:(ri-1)*2+1,sectionCount:2,weeks:parseWeeks(ls[1]||'')})}catch(e){}})})}); return c; }
+
+    function extractLianyi() { var c[],ct=document.getElementsByClassName('ant-spin-container')[0]; if(ct){var tb=ct.getElementsByTagName('table')[0];if(tb)tb.querySelectorAll('tbody tr').forEach(function(ri,row){row.querySelectorAll('td').forEach(function(ci,cell){var t=cell.textContent||cell.innerText;if(t&&t.length>10){try{var ls=t.split('\\n').filter(function(l){return l.trim()});if(ls.length>=3)c.push({courseName:cleanText(ls[0]),teacher:ls.length>1?cleanText(ls[1]):'',classroom:ls.length>2?cleanText(ls[2]):'',day:ci||1,startSection:ri*2+1,sectionCount:2,weeks:parseWeeks(ls.length>3?ls[3]:'')})}catch(e){}})})} return c; }
+
+    function extractGeneric() { var c=[];document.getElementsByTagName('table').forEach(function(tb){tb.querySelectorAll('tr').forEach(function(ri,row){if(ri===0)return;row.querySelectorAll('td').forEach(function(ci,cell){var t=(cell.textContent||cell.innerText||'').trim();if(t.length>10&&t.length<200){var ls=t.split('\\n').filter(function(l){return l.trim()}),cn=cleanText(ls[0]);if(cn.length<2||cn.indexOf('节次')>-1||cn.indexOf('星期')>-1||cn.indexOf('周次')>-1)return;var tr='',cr='',wt='';ls.forEach(function(l,i){if(i===0)return;l=cleanText(l);if(l.indexOf('周')>-1||l.match(/\\d+-\\d+/))wt=l;else if(l.length<10&&!cr)tr=l;else if(!cr)cr=l});c.push({courseName:cn,teacher:tr,classroom:cr,day:(ci%7)||1,startSection:Math.max(1,ri*2-1),sectionCount:2,weeks:parseWeeks(wt)})}})})}); return c; }
+})()
+""".trimIndent()
+
+    private fun generateHelperFunctions(): String = ""
+
     override fun parseCourses(jsonData: String): List<ParsedCourse> {
         val courses = mutableListOf<ParsedCourse>()
-        
         try {
-            Log.d(TAG, "开始解析课程数据...")
-            
-            // 清理 JSON 字符串
-            val cleanJson = jsonData.trim()
-                .removePrefix("\"").removeSuffix("\"")
-                .replace("\\\"", "\"")
-                .replace("\\n", "")
-                .replace("\\r", "")
-            
-            val jsonObject = JSONObject(cleanJson)
-            
-            // 检查是否有错误
-            if (jsonObject.has("error")) {
-                val error = jsonObject.getString("error")
-                Log.e(TAG, "提取失败: $error")
-                throw Exception(error)
+            val cleanJson = jsonData.trim().removePrefix("\"").removeSuffix("\"").replace("\\\"", "\"").replace("\\n", "").replace("\\r", "")
+            val json = JSONObject(cleanJson)
+            if (json.has("error")) throw Exception(json.getString("error"))
+            val arr = json.getJSONArray("courses")
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val name = obj.optString("courseName", "").trim()
+                if (name.isEmpty()) continue
+                val dayOfWeek = obj.optInt("day", obj.optInt("dayOfWeek", 1)).coerceIn(1, 7)
+                val startSection = obj.optInt("startSection", 1).coerceAtLeast(1)
+                val sectionCount = obj.optInt("sectionCount", 2).coerceAtLeast(1)
+                val weekArr = obj.optJSONArray("weeks")
+                val weeks = (if (weekArr != null && weekArr.length() > 0) (0 until weekArr.length()).mapNotNull { weekArr.optInt(it)?.takeIf { it > 0 } }.toMutableList() else null) ?: (1..16).toMutableList()
+                val credit = obj.optDouble("credit", 0.0f.toDouble()).toFloat()
+                courses.add(ParsedCourse(name, obj.optString("teacher", "").trim(), obj.optString("classroom", "").trim(),
+                    dayOfWeek, startSection, sectionCount,
+                    "${weeks.min()}-${weeks.max()}周",
+                    weeks.sorted(), credit))
             }
-            
-            // 获取系统类型
-            val systemType = jsonObject.optString("systemType", "UNKNOWN")
-            Log.d(TAG, "系统类型: $systemType")
-            
-            // 获取课程数组
-            val coursesArray = jsonObject.getJSONArray("courses")
-            Log.d(TAG, "课程数量: ${coursesArray.length()}")
-            
-            for (i in 0 until coursesArray.length()) {
-                val courseObj = coursesArray.getJSONObject(i)
-                
-                try {
-                    // 提取课程名称
-                    val courseName = courseObj.optString("courseName", "").trim()
-                    if (courseName.isEmpty()) {
-                        Log.w(TAG, "课程名称为空，跳过")
-                        continue
-                    }
-                    
-                    // 提取教师
-                    val teacher = courseObj.optString("teacher", "").trim()
-                    
-                    // 提取教室
-                    val classroom = courseObj.optString("classroom", "").trim()
-                    
-                    // 提取星期（day 或 dayOfWeek）
-                    val dayOfWeek = courseObj.optInt("day", courseObj.optInt("dayOfWeek", 1))
-                    if (dayOfWeek < 1 || dayOfWeek > 7) {
-                        Log.w(TAG, "星期数无效: $dayOfWeek，跳过课程: $courseName")
-                        continue
-                    }
-                    
-                    // 提取开始节次
-                    val startSection = courseObj.optInt("startSection", 1)
-                    if (startSection < 1) {
-                        Log.w(TAG, "开始节次无效: $startSection，跳过课程: $courseName")
-                        continue
-                    }
-                    
-                    // 提取节数
-                    val sectionCount = courseObj.optInt("sectionCount", 2)
-                    if (sectionCount < 1) {
-                        Log.w(TAG, "节数无效: $sectionCount，跳过课程: $courseName")
-                        continue
-                    }
-                    
-                    // 提取周次
-                    val weeksArray = courseObj.optJSONArray("weeks")
-                    val weeks = mutableListOf<Int>()
-                    if (weeksArray != null && weeksArray.length() > 0) {
-                        for (j in 0 until weeksArray.length()) {
-                            val week = weeksArray.optInt(j, 0)
-                            if (week > 0) {
-                                weeks.add(week)
-                            }
-                        }
-                    }
-                    
-                    // 如果周次为空，使用默认值 1-16周
-                    if (weeks.isEmpty()) {
-                        Log.w(TAG, "周次为空，使用默认值 1-16周")
-                        weeks.addAll(1..16)
-                    }
-                    
-                    // 提取学分（可选）
-                    val credit = courseObj.optDouble("credit", 0.0).toFloat()
-                    
-                    // 创建 ParsedCourse 对象
-                    val parsedCourse = ParsedCourse(
-                        courseName = courseName,
-                        teacher = teacher,
-                        classroom = classroom,
-                        dayOfWeek = dayOfWeek,
-                        startSection = startSection,
-                        sectionCount = sectionCount,
-                        weeks = weeks.sorted(),
-                        credit = credit,
-                        weekExpression = if (weeks.isNotEmpty()) {
-                            "${weeks.min()}-${weeks.max()}周"
-                        } else {
-                            ""
-                        }
-                    )
-                    
-                    courses.add(parsedCourse)
-                    Log.d(TAG, "✓ 解析课程: $courseName (星期$dayOfWeek, 第${startSection}节, ${weeks.size}周)")
-                    
-                } catch (e: Exception) {
-                    Log.e(TAG, "解析单个课程失败", e)
-                    // 继续处理下一个课程
-                }
-            }
-            
-            Log.d(TAG, "✅ 解析完成，成功解析 ${courses.size} 门课程")
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "解析课程数据失败", e)
-            throw e
-        }
-        
+            AppLogger.d(TAG, "解析完成: ${courses.size} 门课程 (${json.optString("systemType","UNKNOWN")})")
+        } catch (e: Exception) { AppLogger.e(TAG, "解析失败", e); throw e }
         return courses
     }
 }
-

@@ -10,7 +10,10 @@ import java.time.LocalDate
  * 课表是用户管理的核心单位，包含课表昵称、学期时间信息和课程配置。
  * 用户可以创建多个课表，每个课表拥有独立的开始日期、总周数和时间配置。
  */
-@Entity(tableName = "schedules")
+@Entity(
+    tableName = "schedules",
+    indices = [androidx.room.Index("isCurrent")]
+)
 data class Schedule(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

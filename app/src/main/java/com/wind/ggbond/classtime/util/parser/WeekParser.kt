@@ -1,5 +1,7 @@
 package com.wind.ggbond.classtime.util.parser
 
+import com.wind.ggbond.classtime.util.AppLogger
+
 /**
  * 周次表达式解析器
  * 支持格式：
@@ -21,7 +23,7 @@ object WeekParser {
         val result = mutableSetOf<Int>()
         
         // Debug日志
-        android.util.Log.d("WeekParser", "原始表达式: $expression")
+        AppLogger.d("WeekParser", "原始表达式: $expression")
         
         // 第一步：先按逗号分割（保留单双周标记）
         val segments = expression
@@ -46,7 +48,7 @@ object WeekParser {
                             withoutSection.matches(Regex(".*[0-9]+双.*"))
             
             // Debug日志
-            android.util.Log.d("WeekParser", "  段落: $segment -> 去节次后: $withoutSection")
+            AppLogger.d("WeekParser", "  段落: $segment -> 去节次后: $withoutSection")
             
             // 第三步：提取数字部分（去除所有非数字非连字符的字符）
             val numberPart = withoutSection
@@ -55,7 +57,7 @@ object WeekParser {
                 .split(Regex("\\s+"))  // 按空格分割，获取所有数字段
                 .firstOrNull { it.isNotBlank() }  // 取第一个非空的数字段
             
-            android.util.Log.d("WeekParser", "  数字部分: $numberPart, 单周: $isOddWeek, 双周: $isEvenWeek")
+            AppLogger.d("WeekParser", "  数字部分: $numberPart, 单周: $isOddWeek, 双周: $isEvenWeek")
             
             if (numberPart.isNullOrBlank()) continue
             
@@ -76,7 +78,7 @@ object WeekParser {
                             }
                         }
                     } catch (e: NumberFormatException) {
-                        android.util.Log.w("WeekParser", "周次范围解析失败: $numberPart", e)
+                        AppLogger.e("WeekParser", "周次范围解析失败: $numberPart", e)
                     }
                 }
             } else {
@@ -85,13 +87,13 @@ object WeekParser {
                     val week = numberPart.toInt()
                     result.add(week)
                 } catch (e: NumberFormatException) {
-                    android.util.Log.w("WeekParser", "周次数字解析失败: $numberPart", e)
+                    AppLogger.e("WeekParser", "周次数字解析失败: $numberPart", e)
                 }
             }
         }
         
         val sorted = result.sorted()
-        android.util.Log.d("WeekParser", "解析结果: $sorted (共${sorted.size}周)")
+        AppLogger.d("WeekParser", "解析结果: $sorted (共${sorted.size}周)")
         
         return sorted
     }

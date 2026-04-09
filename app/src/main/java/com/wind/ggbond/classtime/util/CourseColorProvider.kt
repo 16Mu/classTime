@@ -1,6 +1,5 @@
 package com.wind.ggbond.classtime.util
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.repository.SettingsRepository
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 
@@ -39,7 +38,7 @@ object CourseColorProvider {
                 CourseColorPalette.getColorForCourse(courseName, existingColors)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "getColorForCourse failed, fallback to fixed palette", e)
+            AppLogger.w(TAG, "getColorForCourse failed, fallback to fixed palette: ${e.message}")
             CourseColorPalette.getColorForCourse(courseName, existingColors)
         }
     }
@@ -63,7 +62,7 @@ object CourseColorProvider {
                 CourseColorPalette.assignColorsForCourses(courseNames)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "assignColorsForCourses failed, fallback to fixed palette", e)
+            AppLogger.w(TAG, "assignColorsForCourses failed, fallback to fixed palette: ${e.message}")
             CourseColorPalette.assignColorsForCourses(courseNames)
         }
     }

@@ -358,9 +358,9 @@ fun ScheduleDialog(
         }
     }
     
-    var name by remember { mutableStateOf(defaultScheduleName) }
-    var startDate by remember { mutableStateOf(defaultStartDate) }
-    var totalWeeks by remember { mutableStateOf(schedule?.totalWeeks ?: 20) }
+    var name by remember(schedule?.id) { mutableStateOf(defaultScheduleName) }
+    var startDate by remember(schedule?.id) { mutableStateOf(defaultStartDate) }
+    var totalWeeks by remember(schedule?.id) { mutableStateOf(schedule?.totalWeeks ?: 20) }
     var showDatePicker by remember { mutableStateOf(false) }
     
     // 根据开始日期和总周数自动计算结束日期

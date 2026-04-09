@@ -62,6 +62,7 @@ fun ClassTimeConfigScreen(
     val currentSchedule by viewModel.currentSchedule.collectAsState()
     val currentConfigName by viewModel.currentConfigName.collectAsState()
     val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
     
     // 底部弹窗状态
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -359,8 +360,8 @@ fun ClassTimeConfigScreen(
                     }
                     
                     // ✅ 修复：延迟关闭底部卡片，确保保存操作完成
-                    kotlinx.coroutines.GlobalScope.launch {
-                        kotlinx.coroutines.delay(300) // 等待300ms确保保存完成
+                    coroutineScope.launch {
+                        kotlinx.coroutines.delay(300)
                         viewModel.hideEditDialog()
                     }
                 }
@@ -467,22 +468,12 @@ fun ClassTimeEditBottomSheet(
     var endHour by remember(classTime.id) { mutableIntStateOf(classTime.endTime.hour) }
     var endMinute by remember(classTime.id) { mutableIntStateOf(classTime.endTime.minute) }
     
-    // 使用全局设置的课程时长（而不是当前课程的实际时长）
     val fixedDurationMinutes = classDuration
     
-    // 标志位：是否正在初始化
-    var isInitializing by remember(classTime.id) { mutableStateOf(true) }
+    var userModifiedEndTime by remember(classTime.id) { mutableStateOf(false) }
     
-    // 初始化完成后，标记为 false
-    LaunchedEffect(classTime.id) {
-        kotlinx.coroutines.delay(100) // 短暂延迟确保状态已设置
-        isInitializing = false
-    }
-    
-    // 当开始时间改变时，自动调整结束时间（保持固定时长）
-    // 但在初始化时不执行，避免覆盖初始值
-    LaunchedEffect(startHour, startMinute, isInitializing) {
-        if (!isInitializing) {
+    LaunchedEffect(startHour, startMinute) {
+        if (!userModifiedEndTime) {
             val newStartTime = LocalTime.of(startHour, startMinute)
             val newEndTime = newStartTime.plusMinutes(fixedDurationMinutes.toLong())
             endHour = newEndTime.hour
@@ -543,8 +534,8 @@ fun ClassTimeEditBottomSheet(
             endMinute = endMinute,
             onStartHourChange = { startHour = it },
             onStartMinuteChange = { startMinute = it },
-            onEndHourChange = { endHour = it },
-            onEndMinuteChange = { endMinute = it },
+            onEndHourChange = { endHour = it; userModifiedEndTime = true },
+            onEndMinuteChange = { endMinute = it; userModifiedEndTime = true },
             resetKey = dialogKey
         )
         

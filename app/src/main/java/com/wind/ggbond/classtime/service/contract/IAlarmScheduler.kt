@@ -40,7 +40,8 @@ interface IAlarmScheduler {
         triggerTime: Long,
         isNextCourse: Boolean = false,
         currentCourseName: String = "",
-        isSameCourseClassroom: Boolean = false
+        isSameCourseClassroom: Boolean = false,
+        isClassEnd: Boolean = false
     ): Boolean
 
     data class ReminderStats(

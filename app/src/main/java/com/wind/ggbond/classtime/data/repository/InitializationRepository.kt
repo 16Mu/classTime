@@ -4,6 +4,7 @@ import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import kotlinx.coroutines.flow.first
 import java.time.LocalTime
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -29,17 +30,17 @@ class InitializationRepository @Inject constructor(
      * 这符合小爱课程表等应用的设计：先创建课表（设置昵称+开始日期）再导入课程
      */
     suspend fun initializeDefaultData() {
-        android.util.Log.d(TAG, "开始初始化默认数据...")
+        AppLogger.d(TAG, "开始初始化默认数据...")
         
         // 检查是否已有上课时间配置
         val existingClassTimes = classTimeRepository.getClassTimesByConfig("default").first()
         if (existingClassTimes.isEmpty()) {
-            android.util.Log.d(TAG, "未找到上课时间配置，创建默认配置")
+            AppLogger.d(TAG, "未找到上课时间配置，创建默认配置")
             // 只创建默认上下课时间，不创建默认课表
             createDefaultClassTimes()
         }
         
-        android.util.Log.d(TAG, "默认数据初始化完成")
+        AppLogger.d(TAG, "默认数据初始化完成")
     }
     
     /**
@@ -47,28 +48,28 @@ class InitializationRepository @Inject constructor(
      * 在应用启动时调用，确保主界面能立即显示数据
      */
     suspend fun preloadCoreData() {
-        android.util.Log.d(TAG, "开始预加载核心数据...")
+        AppLogger.d(TAG, "开始预加载核心数据...")
         val startTime = System.currentTimeMillis()
         
         try {
             // 预加载当前课表（包含学期时间信息）
             val schedule = scheduleRepository.getCurrentSchedule()
-            android.util.Log.d(TAG, "预加载课表: ${schedule?.name}")
+            AppLogger.d(TAG, "预加载课表: ${schedule?.name}")
             
             // 预加载上课时间
             val classTimes = classTimeRepository.getClassTimesByConfig("default").first()
-            android.util.Log.d(TAG, "预加载上课时间: ${classTimes.size}个时间段")
+            AppLogger.d(TAG, "预加载上课时间: ${classTimes.size}个时间段")
             
             // ✅ 关键：预加载所有课程数据
             if (schedule != null) {
                 val courses = courseRepository.getAllCoursesBySchedule(schedule.id).first()
-                android.util.Log.d(TAG, "预加载课程: ${courses.size}门课程")
+                AppLogger.d(TAG, "预加载课程: ${courses.size}门课程")
             }
             
             val duration = System.currentTimeMillis() - startTime
-            android.util.Log.d(TAG, "核心数据预加载完成，耗时: ${duration}ms")
+            AppLogger.d(TAG, "核心数据预加载完成，耗时: ${duration}ms")
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "预加载数据失败", e)
+            AppLogger.e(TAG, "预加载数据失败", e)
             // 不抛出异常，允许应用继续运行
         }
     }

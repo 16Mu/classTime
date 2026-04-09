@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -21,7 +23,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.wind.ggbond.classtime.ui.components.glassModifier
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
@@ -50,6 +51,7 @@ fun WeekViewContainer(
     classTimes: List<ClassTime>,
     compactModeEnabled: Boolean,
     showWeekendEnabled: Boolean,
+    glassEffectEnabled: Boolean,
     allCourses: List<Course>,
     adjustments: List<CourseAdjustment>,
     clipboard: Pair<Course, Int>?,
@@ -60,11 +62,25 @@ fun WeekViewContainer(
     isDataReady: Boolean,
     onCourseSelected: (Long) -> Unit,
     onAdjustmentRequest: (Long) -> Unit,
+    isWallpaperEnabled: Boolean = false,
+    courseColors: List<String> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val totalWeeks = currentSchedule?.totalWeeks ?: 20
-    var courseColorMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // [Monet] 将课程颜色列表转换为Map - 使用课程名称作为key
+    val courseColorMap = remember(courseColors, allCourses) {
+        if (courseColors.isEmpty()) {
+            emptyMap()
+        } else {
+            val uniqueCourseNames = allCourses.map { it.courseName }.distinct()
+            uniqueCourseNames.mapIndexed { index, courseName ->
+                val color = courseColors.getOrNull(index % courseColors.size) ?: courseColors.first()
+                courseName to color
+            }.toMap()
+        }
+    }
     
     Box(
         modifier = modifier.fillMaxSize()
@@ -175,7 +191,8 @@ fun WeekViewContainer(
                             getAdjustmentInfo = { courseId, week, day, section ->
                                 viewModel.isAdjustedCourse(courseId, week, day, section)
                             },
-                            courseColorMap = courseColorMap
+                            courseColorMap = courseColorMap,
+                            isWallpaperEnabled = isWallpaperEnabled
                         )
                     }
                     1 -> {
@@ -195,7 +212,8 @@ fun WeekViewContainer(
                                 viewModel.isAdjustedCourse(courseId, week, day, section)
                             },
                             semesterStartDate = currentSchedule?.startDate,
-                            courseColorMap = courseColorMap
+                            courseColorMap = courseColorMap,
+                            isWallpaperEnabled = isWallpaperEnabled
                         )
                     }
                 }
@@ -220,12 +238,20 @@ fun WeekViewContainer(
                 },
                 shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
-                    .glassModifier(
-                        alpha = 0.58f,
-                        tintColor = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(24.dp),
-                        borderWidth = 0.6.dp,
-                        borderColor = Color.White.copy(alpha = 0.25f)
+                    .background(
+                        color = if (glassEffectEnabled) MaterialTheme.colorScheme.surface.copy(alpha = 0.92f) else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .then(
+                        if (glassEffectEnabled) {
+                            Modifier.border(
+                                width = 0.8.dp,
+                                color = Color.White.copy(alpha = 0.35f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                        } else {
+                            Modifier
+                        }
                     ),
                 color = Color.Transparent
             ) {
@@ -233,7 +259,7 @@ fun WeekViewContainer(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Today, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Today, contentDescription = "回到本周", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("回到第${actualWeekNumber}周", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                 }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -64,10 +65,8 @@ class UpdateChecker @Inject constructor() {
                 val currentVersion = getCurrentVersion(context)
                 AppLogger.d(TAG, "当前版本: $currentVersion, 开始检查更新...")
                 
-                // 方式1：读取 version.json（推荐）
                 var result = fetchVersionInfo(VERSION_URL)
                 
-                // 方式2：如果失败，尝试 Releases API
                 if (result == null) {
                     AppLogger.d(TAG, "version.json 获取失败，尝试 Releases API...")
                     result = fetchFromReleasesApi()
@@ -89,13 +88,16 @@ class UpdateChecker @Inject constructor() {
     }
     
     private fun fetchVersionInfo(url: String): VersionInfo? {
+        var response: Response? = null
         return try {
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Classtime-App/${BuildConfig.VERSION_NAME}")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10) Classtime-App/${BuildConfig.VERSION_NAME}")
+                .header("Accept", "application/json")
+                .header("Referer", "https://gitee.com/ggbondpy/classTime")
                 .build()
             
-            val response = client.newCall(request).execute()
+            response = client.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: return null
                 val json = JSONObject(body)
@@ -116,17 +118,21 @@ class UpdateChecker @Inject constructor() {
         } catch (e: Exception) {
             AppLogger.e(TAG, "fetchVersionInfo 异常: ${e.message}")
             null
+        } finally {
+            response?.close()
         }
     }
     
     private fun fetchFromReleasesApi(): VersionInfo? {
+        var response: Response? = null
         return try {
             val request = Request.Builder()
                 .url(RELEASES_API)
-                .header("User-Agent", "Classtime-App/${BuildConfig.VERSION_NAME}")
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android 10) Classtime-App/${BuildConfig.VERSION_NAME}")
+                .header("Accept", "application/json")
                 .build()
             
-            val response = client.newCall(request).execute()
+            response = client.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: return null
                 val json = JSONObject(body)
@@ -155,6 +161,8 @@ class UpdateChecker @Inject constructor() {
         } catch (e: Exception) {
             AppLogger.e(TAG, "fetchFromReleasesApi 异常: ${e.message}")
             null
+        } finally {
+            response?.close()
         }
     }
     

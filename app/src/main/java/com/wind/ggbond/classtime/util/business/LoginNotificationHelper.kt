@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.wind.ggbond.classtime.R
 import com.wind.ggbond.classtime.util.AutoLoginResultCode
@@ -15,6 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import java.text.SimpleDateFormat
 import java.util.Date
+import com.wind.ggbond.classtime.util.AppLogger
 import java.util.Locale
 
 @Singleton
@@ -51,9 +51,9 @@ class LoginNotificationHelper @Inject constructor(
 
             notificationManager.notify(NOTIFICATION_ID, notification)
 
-            Log.d(TAG, "成功通知已发送: $message")
+            AppLogger.d(TAG, "成功通知已发送: $message")
         } catch (e: Exception) {
-            Log.e(TAG, "发送成功通知失败", e)
+            AppLogger.e(TAG, "发送成功通知失败", e)
         }
     }
 
@@ -104,9 +104,9 @@ class LoginNotificationHelper @Inject constructor(
 
             notificationManager.notify(NOTIFICATION_ID, notification)
 
-            Log.d(TAG, "通知已发送: $title - $content")
+            AppLogger.d(TAG, "通知已发送: $title - $content")
         } catch (e: Exception) {
-            Log.e(TAG, "发送通知失败", e)
+            AppLogger.e(TAG, "发送通知失败", e)
         }
     }
 
@@ -121,9 +121,9 @@ class LoginNotificationHelper @Inject constructor(
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.cancel(NOTIFICATION_ID)
-            Log.d(TAG, "通知已取消")
+            AppLogger.d(TAG, "通知已取消")
         } catch (e: Exception) {
-            Log.e(TAG, "取消通知失败", e)
+            AppLogger.e(TAG, "取消通知失败", e)
         }
     }
 

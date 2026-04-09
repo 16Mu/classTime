@@ -31,6 +31,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.widget.data.TomorrowCourseDisplayData
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.widget.data.WidgetCourseItem
 
 class TomorrowCourseWidget : GlanceAppWidget() {
@@ -39,7 +40,7 @@ class TomorrowCourseWidget : GlanceAppWidget() {
         val data = try {
             WidgetDataProvider.getSmartCourses(context)
         } catch (e: Exception) {
-            android.util.Log.e("TomorrowCourseWidget", "加载数据失败", e)
+            AppLogger.e("TomorrowCourseWidget", "加载数据失败", e)
             TomorrowCourseDisplayData.empty("数据加载失败")
         }
 

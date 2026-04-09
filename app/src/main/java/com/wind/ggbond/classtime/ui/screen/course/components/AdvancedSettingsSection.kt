@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.ui.theme.CourseColors
+import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +54,7 @@ fun AdvancedSettingsSection(
                 expanded = !expanded
             },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             border = BorderStroke(
                 1.dp,
@@ -103,7 +104,7 @@ fun AdvancedSettingsSection(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
                     ),
@@ -183,7 +184,7 @@ fun AdvancedSettingsSection(
                                         Icon(
                                             Icons.Default.Check,
                                             contentDescription = "已选中",
-                                            tint = Color.White,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -193,13 +194,13 @@ fun AdvancedSettingsSection(
                                         Icon(
                                             Icons.Default.AutoAwesome,
                                             contentDescription = "自动",
-                                            tint = Color.White.copy(alpha = if (selectedColor.isEmpty()) 0f else 0.9f),
+                                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (selectedColor.isEmpty()) 0f else 0.9f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Text(
                                             "自动",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White.copy(alpha = if (selectedColor.isEmpty()) 0f else 0.9f),
+                                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (selectedColor.isEmpty()) 0f else 0.9f),
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -228,7 +229,7 @@ fun AdvancedSettingsSection(
                                             Icon(
                                                 Icons.Default.Check,
                                                 contentDescription = "已选中",
-                                                tint = Color.White,
+                                                tint = contentColorForBackground(color),
                                                 modifier = Modifier.size(24.dp)
                                             )
                                         }
@@ -253,7 +254,7 @@ fun AdvancedSettingsSection(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                     ),
@@ -342,7 +343,7 @@ fun AdvancedSettingsSection(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     ),
@@ -385,7 +386,11 @@ fun AdvancedSettingsSection(
                             value = creditText,
                             onValueChange = { newValue ->
                                 creditText = newValue
-                                newValue.toFloatOrNull()?.let { num -> onCreditChange(num) }
+                                if (newValue.isBlank()) {
+                                    onCreditChange(0f)
+                                } else {
+                                    newValue.toFloatOrNull()?.let { num -> onCreditChange(num) }
+                                }
                             },
                             label = { Text("课程学分") },
                             placeholder = { Text("例如: 3.0") },
@@ -406,7 +411,7 @@ fun AdvancedSettingsSection(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     ),

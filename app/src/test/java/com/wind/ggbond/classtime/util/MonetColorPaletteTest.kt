@@ -92,9 +92,8 @@ class MonetColorPaletteTest {
     @Test
     fun `test different courses get different colors`() {
         val courses = listOf("数学", "英语", "物理", "化学", "生物")
-        val colors = courses.map {
-            MonetColorPalette.getColorForCourse(it, testSeedColor, MonetColorPalette.SaturationLevel.STANDARD)
-        }.distinct()
+        val colorMap = MonetColorPalette.assignColorsForCourses(courses, testSeedColor, MonetColorPalette.SaturationLevel.STANDARD)
+        val colors = courses.map { colorMap[it]!! }.distinct()
 
         assertEquals(5, colors.size)
     }

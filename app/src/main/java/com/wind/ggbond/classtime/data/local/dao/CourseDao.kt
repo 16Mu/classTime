@@ -33,6 +33,15 @@ interface CourseDao {
     
     @Update
     suspend fun updateCourse(course: Course)
+
+    @Update
+    suspend fun updateCourses(courses: List<Course>)
+
+    @Query("UPDATE courses SET reminderEnabled = :enabled, reminderMinutes = CASE WHEN :enabled THEN CASE WHEN reminderMinutes > 0 THEN reminderMinutes ELSE :minutes END ELSE :minutes END, updatedAt = :updatedAt WHERE scheduleId = :scheduleId AND reminderEnabled != :enabled")
+    suspend fun updateReminderBySchedule(scheduleId: Long, enabled: Boolean, minutes: Int, updatedAt: Long): Int
+
+    @Query("DELETE FROM courses WHERE id IN (:ids)")
+    suspend fun deleteCoursesByIds(ids: List<Long>)
     
     @Delete
     suspend fun deleteCourse(course: Course)

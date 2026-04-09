@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.work.HiltWorker
@@ -31,6 +30,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
+import com.wind.ggbond.classtime.util.AppLogger
 import java.util.concurrent.TimeUnit
 
 @HiltWorker
@@ -67,7 +67,7 @@ class ReminderCheckWorker @AssistedInject constructor(
                 ExistingPeriodicWorkPolicy.KEEP,
                 request
             )
-            Log.d(TAG, "兜底检查任务已注册（每15分钟）")
+            AppLogger.d(TAG, "兜底检查任务已注册（每15分钟）")
         }
 
         /**
@@ -77,17 +77,17 @@ class ReminderCheckWorker @AssistedInject constructor(
          */
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
-            Log.d(TAG, "兜底检查任务已取消")
+            AppLogger.d(TAG, "兜底检查任务已取消")
         }
     }
 
     override suspend fun doWork(): Result {
-        Log.d(TAG, "===== 兜底检查开始 =====")
+        AppLogger.d(TAG, "===== 兜底检查开始 =====")
         try {
             // 获取当前课表（包含学期时间信息）
             val schedule = scheduleRepository.getCurrentSchedule()
             if (schedule == null) {
-                Log.d(TAG, "未设置课表，跳过检查")
+                AppLogger.d(TAG, "未设置课表，跳过检查")
                 return Result.success()
             }
 
@@ -99,7 +99,7 @@ class ReminderCheckWorker @AssistedInject constructor(
             // 获取上课时间配置
             val classTimes = classTimeRepository.getClassTimesByConfigSync()
             if (classTimes.isEmpty()) {
-                Log.d(TAG, "未配置上课时间，跳过检查")
+                AppLogger.d(TAG, "未配置上课时间，跳过检查")
                 return Result.success()
             }
 
@@ -113,7 +113,7 @@ class ReminderCheckWorker @AssistedInject constructor(
             }
 
             if (todayCourses.isEmpty()) {
-                Log.d(TAG, "今天没有需要提醒的课程")
+                AppLogger.d(TAG, "今天没有需要提醒的课程")
                 // 即使今天没课，也尝试重新注册未来的AlarmManager提醒（自愈）
                 tryRescheduleAlarms()
                 return Result.success()
@@ -134,23 +134,23 @@ class ReminderCheckWorker @AssistedInject constructor(
 
                 // 判断提醒时间是否在检查窗口内
                 if (reminderTime.isAfter(now.minusMinutes(2)) && reminderTime.isBefore(checkWindowEnd)) {
-                    Log.d(TAG, "发现到期提醒: ${course.courseName}, 提醒时间=$reminderTime")
+                    AppLogger.d(TAG, "发现到期提醒: ${course.courseName}, 提醒时间=$reminderTime")
                     // 直接发送通知（兜底触发）
                     sendReminderNotification(course, classTime, currentWeekNumber)
                     triggeredCount++
                 }
             }
 
-            Log.d(TAG, "兜底检查完成，触发了 $triggeredCount 条提醒")
+            AppLogger.d(TAG, "兜底检查完成，触发了 $triggeredCount 条提醒")
 
             // 自愈：重新注册AlarmManager提醒（防止下次检查前的提醒丢失）
             tryRescheduleAlarms()
 
-            Log.d(TAG, "===== 兜底检查结束 =====")
+            AppLogger.d(TAG, "===== 兜底检查结束 =====")
             return Result.success()
 
         } catch (e: Exception) {
-            Log.e(TAG, "兜底检查异常", e)
+            AppLogger.e(TAG, "兜底检查异常", e)
             return Result.retry()
         }
     }
@@ -162,9 +162,9 @@ class ReminderCheckWorker @AssistedInject constructor(
     private suspend fun tryRescheduleAlarms() {
         try {
             alarmReminderScheduler.rescheduleAllReminders()
-            Log.d(TAG, "AlarmManager提醒已重新注册（自愈）")
+            AppLogger.d(TAG, "AlarmManager提醒已重新注册（自愈）")
         } catch (e: Exception) {
-            Log.e(TAG, "重新注册AlarmManager失败", e)
+            AppLogger.e(TAG, "重新注册AlarmManager失败", e)
         }
     }
 
@@ -180,7 +180,7 @@ class ReminderCheckWorker @AssistedInject constructor(
             val notificationManager = NotificationManagerCompat.from(context)
             // 检查通知权限
             if (!notificationManager.areNotificationsEnabled()) {
-                Log.w(TAG, "通知权限未授予")
+                AppLogger.w(TAG, "通知权限未授予")
                 return
             }
 
@@ -240,10 +240,10 @@ class ReminderCheckWorker @AssistedInject constructor(
                 .build()
 
             notificationManager.notify(notificationId, notification)
-            Log.d(TAG, "兜底通知已发送: ${course.courseName}, ID=$notificationId")
+            AppLogger.d(TAG, "兜底通知已发送: ${course.courseName}, ID=$notificationId")
 
         } catch (e: Exception) {
-            Log.e(TAG, "发送兜底通知失败: ${e.message}", e)
+            AppLogger.e(TAG, "发送兜底通知失败: ${e.message}", e)
         }
     }
 }

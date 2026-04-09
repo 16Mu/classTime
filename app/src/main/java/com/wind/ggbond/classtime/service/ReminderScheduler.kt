@@ -1,7 +1,6 @@
 package com.wind.ggbond.classtime.service
 
 import android.content.Context
-import android.util.Log
 import androidx.work.*
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
@@ -22,6 +21,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.withContext
 
 /**
@@ -73,17 +73,17 @@ class LegacyReminderScheduler @Inject constructor(
      * ✅ WorkManager已在Application中确保正确初始化，无需检查可用性
      */
     suspend fun scheduleCourseReminders(course: Course) {
-        Log.d(TAG, "✅ scheduleCourseReminders called for: ${course.courseName}, reminderEnabled = ${course.reminderEnabled}")
+        AppLogger.d(TAG, "✅ scheduleCourseReminders called for: ${course.courseName}, reminderEnabled = ${course.reminderEnabled}")
         
         if (!course.reminderEnabled) {
-            Log.w(TAG, "⚠️ 课程 ${course.courseName} 已禁用提醒，reminderEnabled = false")
+            AppLogger.w(TAG, "⚠️ 课程 ${course.courseName} 已禁用提醒，reminderEnabled = false")
             return
         }
         
-        Log.d(TAG, "✅ 开始为课程 ${course.courseName} 创建提醒，共 ${course.weeks.size} 个周次")
+        AppLogger.d(TAG, "✅ 开始为课程 ${course.courseName} 创建提醒，共 ${course.weeks.size} 个周次")
         
         val schedule = scheduleRepository.getCurrentSchedule() ?: run {
-            Log.w(TAG, "未找到当前课表")
+            AppLogger.w(TAG, "未找到当前课表")
             return
         }
         
@@ -105,10 +105,10 @@ class LegacyReminderScheduler @Inject constructor(
         }
         
         if (failedCount > 0) {
-            Log.w(TAG, "课程 ${course.courseName} 有 $failedCount 个提醒创建失败")
+            AppLogger.w(TAG, "课程 ${course.courseName} 有 $failedCount 个提醒创建失败")
         }
         
-        Log.d(TAG, "为课程 ${course.courseName} 创建了 $scheduledCount 个提醒（失败：$failedCount）")
+        AppLogger.d(TAG, "为课程 ${course.courseName} 创建了 $scheduledCount 个提醒（失败：$failedCount）")
     }
     
     /**
@@ -117,21 +117,21 @@ class LegacyReminderScheduler @Inject constructor(
      * ✅ 优化：并发生成WorkRequest + 批量入队
      */
     suspend fun scheduleAllCourseReminders(scheduleId: Long) {
-        Log.d(TAG, "开始批量创建提醒，课表ID: $scheduleId")
+        AppLogger.d(TAG, "开始批量创建提醒，课表ID: $scheduleId")
         
         val courses = courseRepository.getAllCoursesBySchedule(scheduleId).first()
         val enabledCourses = courses.filter { it.reminderEnabled }
         
         if (enabledCourses.isEmpty()) {
-            Log.d(TAG, "没有启用提醒的课程")
+            AppLogger.d(TAG, "没有启用提醒的课程")
             return
         }
         
-        Log.d(TAG, "找到 ${enabledCourses.size} 门启用提醒的课程")
+        AppLogger.d(TAG, "找到 ${enabledCourses.size} 门启用提醒的课程")
         
         // 获取课表和时间配置（一次性获取，避免重复查询）
         val schedule = scheduleRepository.getCurrentSchedule() ?: run {
-            Log.w(TAG, "未找到当前课表")
+            AppLogger.w(TAG, "未找到当前课表")
             return
         }
         val classTimes = classTimeRepository.getClassTimesByConfigSync()
@@ -159,27 +159,27 @@ class LegacyReminderScheduler @Inject constructor(
                         allReminders.add(workRequest.second)
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "创建提醒失败: ${course.courseName}, 周$weekNumber", e)
+                    AppLogger.e(TAG, "创建提醒失败: ${course.courseName}, 周$weekNumber", e)
                 }
             }
         }
         
         if (allWorkRequests.isEmpty()) {
-            Log.w(TAG, "没有创建任何提醒")
+            AppLogger.w(TAG, "没有创建任何提醒")
             return
         }
         
         // ✅ 批量入队WorkRequest（比逐个入队快10倍）
         try {
-            Log.d(TAG, "批量入队 ${allWorkRequests.size} 个提醒任务...")
+            AppLogger.d(TAG, "批量入队 ${allWorkRequests.size} 个提醒任务...")
             WorkManager.getInstance(context).enqueue(allWorkRequests)
             
             // ✅ 批量保存提醒记录到数据库
             reminderRepository.insertAll(allReminders)
             
-            Log.d(TAG, "✅ 批量创建完成: 共创建 ${allWorkRequests.size} 个提醒")
+            AppLogger.d(TAG, "✅ 批量创建完成: 共创建 ${allWorkRequests.size} 个提醒")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 批量入队失败", e)
+            AppLogger.e(TAG, "❌ 批量入队失败", e)
         }
     }
     
@@ -292,7 +292,7 @@ class LegacyReminderScheduler @Inject constructor(
             // 获取上课时间
             val classTime = classTimes.find { it.sectionNumber == course.startSection } 
                 ?: run {
-                    Log.w(TAG, "未找到节次 ${course.startSection} 的时间配置")
+                    AppLogger.w(TAG, "未找到节次 ${course.startSection} 的时间配置")
                     return false
                 }
             
@@ -364,24 +364,24 @@ class LegacyReminderScheduler @Inject constructor(
                         
                         reminderRepository.insert(reminder)
                         
-                        Log.d(TAG, "已创建提醒: ${course.courseName}, 周$weekNumber, ${reminderDateTime}")
+                        AppLogger.d(TAG, "已创建提醒: ${course.courseName}, 周$weekNumber, ${reminderDateTime}")
                         
                         // ✅ 添加：检测下节课并创建下课前提醒
                         scheduleNextCourseReminder(course, schedule, weekNumber, classTimes)
                         
                         true
                     } else {
-                        Log.e(TAG, "WorkManager enqueue返回null: ${course.courseName}, 周$weekNumber")
+                        AppLogger.e(TAG, "WorkManager enqueue返回null: ${course.courseName}, 周$weekNumber")
                         false
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "等待WorkManager结果失败: ${e.message}", e)
+                    AppLogger.e(TAG, "等待WorkManager结果失败: ${e.message}", e)
                     false
                 }
             }
             
         } catch (e: Exception) {
-            Log.e(TAG, "创建提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "创建提醒失败: ${e.message}", e)
             return false
         }
     }
@@ -409,9 +409,9 @@ class LegacyReminderScheduler @Inject constructor(
             // 3. 从数据库删除提醒记录
             reminderRepository.deleteRemindersByCourse(courseId)
             
-            Log.d(TAG, "已取消课程ID $courseId 的所有提醒（包括正常提醒和下节课提醒）")
+            AppLogger.d(TAG, "已取消课程ID $courseId 的所有提醒（包括正常提醒和下节课提醒）")
         } catch (e: Exception) {
-            Log.e(TAG, "取消提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "取消提醒失败: ${e.message}", e)
         }
     }
     
@@ -422,9 +422,9 @@ class LegacyReminderScheduler @Inject constructor(
         try {
             WorkManager.getInstance(context).cancelAllWorkByTag(BATCH_TAG)
             reminderRepository.deleteAll()
-            Log.d(TAG, "已取消所有提醒")
+            AppLogger.d(TAG, "已取消所有提醒")
         } catch (e: Exception) {
-            Log.e(TAG, "取消所有提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "取消所有提醒失败: ${e.message}", e)
         }
     }
     
@@ -441,9 +441,9 @@ class LegacyReminderScheduler @Inject constructor(
                 cancelCourseReminders(course.id)
             }
             
-            Log.d(TAG, "已取消课表 $scheduleId 下所有 ${courses.size} 门课程的提醒")
+            AppLogger.d(TAG, "已取消课表 $scheduleId 下所有 ${courses.size} 门课程的提醒")
         } catch (e: Exception) {
-            Log.e(TAG, "批量取消课程提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "批量取消课程提醒失败: ${e.message}", e)
         }
     }
     
@@ -453,9 +453,9 @@ class LegacyReminderScheduler @Inject constructor(
     suspend fun cleanExpiredReminders() {
         try {
             val deletedCount = reminderRepository.deleteExpiredReminders()
-            Log.d(TAG, "清理了 $deletedCount 个过期提醒")
+            AppLogger.d(TAG, "清理了 $deletedCount 个过期提醒")
         } catch (e: Exception) {
-            Log.e(TAG, "清理过期提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "清理过期提醒失败: ${e.message}", e)
         }
     }
     
@@ -502,7 +502,7 @@ class LegacyReminderScheduler @Inject constructor(
             dailyWorkRequest
         )
         
-        Log.d(TAG, "已设置每日自动同步提醒")
+        AppLogger.d(TAG, "已设置每日自动同步提醒")
     }
     
     /**
@@ -598,13 +598,13 @@ class LegacyReminderScheduler @Inject constructor(
             // ✅ 关键判断：只在第2、4、6、8、10节结束时提醒
             // 这些是大节的第二小节（如第1-2节是一大节，第2节结束时提醒第3节）
             if (currentEndSection !in listOf(2, 4, 6, 8, 10)) {
-                Log.d(TAG, "当前课程结束节次为第${currentEndSection}节，不是偶数节次，无需检查下节课提醒")
+                AppLogger.d(TAG, "当前课程结束节次为第${currentEndSection}节，不是偶数节次，无需检查下节课提醒")
                 return
             }
             
             val currentEndClassTime = classTimes.find { it.sectionNumber == currentEndSection }
                 ?: run {
-                    Log.w(TAG, "未找到节次 ${currentEndSection} 的时间配置")
+                    AppLogger.w(TAG, "未找到节次 ${currentEndSection} 的时间配置")
                     return
                 }
             
@@ -635,7 +635,7 @@ class LegacyReminderScheduler @Inject constructor(
             val exactNextCourse = nextCourses.find { it.startSection == nextSectionNumber }
             
             if (exactNextCourse == null) {
-                Log.d(TAG, "第${currentEndSection}节后无第${nextSectionNumber}节课程，无需提醒")
+                AppLogger.d(TAG, "第${currentEndSection}节后无第${nextSectionNumber}节课程，无需提醒")
                 return
             }
             
@@ -661,10 +661,10 @@ class LegacyReminderScheduler @Inject constructor(
             )
             
             val reminderType = if (isSameCourseAndClassroom) "继续上课" else "换课提醒"
-            Log.d(TAG, "已创建下节课提醒(${reminderType}): ${currentCourse.courseName} → ${exactNextCourse.courseName}, 提醒时间: $reminderTime")
+            AppLogger.d(TAG, "已创建下节课提醒(${reminderType}): ${currentCourse.courseName} → ${exactNextCourse.courseName}, 提醒时间: $reminderTime")
             
         } catch (e: Exception) {
-            Log.e(TAG, "创建下节课提醒失败: ${e.message}", e)
+            AppLogger.e(TAG, "创建下节课提醒失败: ${e.message}", e)
         }
     }
     
@@ -780,10 +780,10 @@ class LegacyReminderScheduler @Inject constructor(
                     )
                     
                     reminderRepository.insert(reminder)
-                    Log.d(TAG, "下节课提醒已创建: ${nextCourse.courseName}, 提醒时间: $reminderTime")
+                    AppLogger.d(TAG, "下节课提醒已创建: ${nextCourse.courseName}, 提醒时间: $reminderTime")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "创建下节课提醒失败: ${e.message}", e)
+                AppLogger.e(TAG, "创建下节课提醒失败: ${e.message}", e)
             }
         }
     }
@@ -798,7 +798,7 @@ class DailyReminderSyncWorker(
 ) : CoroutineWorker(context, params) {
     
     override suspend fun doWork(): Result {
-        Log.d("DailyReminderSync", "开始每日提醒同步")
+        AppLogger.d("DailyReminderSync", "开始每日提醒同步")
         
         // 这里可以添加清理过期提醒、重新调度等逻辑
         // 由于需要依赖注入，实际实现时需要使用 @HiltWorker

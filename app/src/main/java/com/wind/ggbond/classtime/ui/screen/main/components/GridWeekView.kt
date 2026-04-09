@@ -19,19 +19,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.animateFloatAsState
+import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
+import com.wind.ggbond.classtime.ui.theme.WallpaperAwareSurface
+import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.EaseInOut
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,6 +73,41 @@ import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.secondaryContentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.topGradientOverlayAlpha
 import com.wind.ggbond.classtime.ui.theme.LocalScheduleColors
+import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
+
+private const val COMPACT_ANIM_DURATION_MS = 220
+private const val MAX_DAY_STAGGER_INDEX = 5
+private const val DAY_STAGGER_DELAY_MS = 60
+private const val MAX_SECTION_STAGGER_INDEX = 5
+private const val SECTION_STAGGER_DELAY_MS = 70
+private const val MAX_STAGGER_DELAY_MS = MAX_SECTION_STAGGER_INDEX * SECTION_STAGGER_DELAY_MS
+private const val TOTAL_COMPACT_ANIM_MS = COMPACT_ANIM_DURATION_MS + MAX_STAGGER_DELAY_MS
+
+@Stable
+private fun staggerProgress(
+    linearProgress: Float,
+    delayMs: Int,
+    durationMs: Int = COMPACT_ANIM_DURATION_MS,
+    totalMs: Int = TOTAL_COMPACT_ANIM_MS
+): Float {
+    val rawProgress = ((linearProgress * totalMs - delayMs) / durationMs).coerceIn(0f, 1f)
+    return FastOutSlowInEasing.transform(rawProgress)
+}
+
+@Stable
+private fun lerpFloat(start: Float, stop: Float, fraction: Float): Float {
+    return start + (stop - start) * fraction
+}
+
+@Stable
+private fun lerpColor(start: Color, stop: Color, fraction: Float): Color {
+    return Color(
+        red = start.red + (stop.red - start.red) * fraction,
+        green = start.green + (stop.green - start.green) * fraction,
+        blue = start.blue + (stop.blue - start.blue) * fraction,
+        alpha = start.alpha + (stop.alpha - start.alpha) * fraction
+    )
+}
 
 /**
  * 网格式周视图 - 主流课程表设计（完全自适应屏幕）
@@ -100,7 +135,8 @@ fun GridWeekView(
     hasClipboard: Boolean = false,
     currentWeekNumber: Int = weekNumber,
     getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
-    courseColorMap: Map<String, String> = emptyMap()
+    courseColorMap: Map<String, String> = emptyMap(),
+    isWallpaperEnabled: Boolean = false
 ) {
     // ✅ 生产环境移除调试日志
     
@@ -175,20 +211,20 @@ fun GridWeekView(
     
     // ✅ 优化：紧凑模式使用固定尺寸而不是权重
     // 空行/列使用固定最小尺寸，有课的行/列平分剩余空间
-    val compactSectionHeight = 18.dp  // 空节次的固定高度：刚好容纳节次数字
-    val compactDayWidth = 18.dp  // 空星期的固定宽度：刚好容纳星期标记
+    val compactSectionHeight = 18.dp
+    val compactDayWidth = 18.dp
 
-    // ✅ 全局紧凑模式动画进度：0f = 普通模式，1f = 紧凑模式
-    // 后续所有列宽/行高变化都通过这个进度做 lerp，避免先跳到终态再动画
-    val compactProgress by animateFloatAsState(
-        targetValue = if (compactModeEnabled) 1f else 0f,
-        animationSpec = tween(
-            // 全局紧凑进度采用稍短的缓出曲线，提升干脆感
-            durationMillis = 220,
-            easing = FastOutSlowInEasing
-        ),
-        label = "compact_progress"
-    )
+    val compactAnimatable = remember { Animatable(if (compactModeEnabled) 1f else 0f) }
+    LaunchedEffect(compactModeEnabled) {
+        val target = if (compactModeEnabled) 1f else 0f
+        val distance = kotlin.math.abs(target - compactAnimatable.value)
+        val duration = (TOTAL_COMPACT_ANIM_MS * distance).toInt().coerceAtLeast(50)
+        compactAnimatable.animateTo(
+            targetValue = target,
+            animationSpec = tween(durationMillis = duration, easing = LinearEasing)
+        )
+    }
+    val compactLinearProgress by compactAnimatable.asState()
 
     // ✅ 预处理：按天缓存排好序的课程列表，避免在动画期间重复排序
     val sortedCoursesByDay by remember(coursesMap) {
@@ -218,6 +254,7 @@ fun GridWeekView(
     
     // ✅ 通过 CompositionLocal 获取课表颜色，无需手动判断 isDarkTheme
     val scheduleColors = LocalScheduleColors.current
+
     val sectionBackground = scheduleColors.sectionBackground
     val textPrimary = scheduleColors.textPrimary
     val textSecondary = scheduleColors.textSecondary
@@ -245,7 +282,13 @@ fun GridWeekView(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .then(
+                if (isWallpaperEnabled) {
+                    Modifier
+                } else {
+                    Modifier.wallpaperAwareBackground(MaterialTheme.colorScheme.background)
+                }
+            )
     ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -267,11 +310,13 @@ fun GridWeekView(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .glassModifier(
-                    alpha = 0.78f,
-                    tintColor = MaterialTheme.colorScheme.surface,
-                    borderWidth = 0.dp,
-                    borderColor = Color.Transparent
+                .wallpaperAwareBackground(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                )
+                .border(
+                    width = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
                 )
         ) {
             val dayCount = dayRange.count()
@@ -303,7 +348,7 @@ fun GridWeekView(
                     modifier = Modifier
                         .width(40.dp)  // 固定宽度，与节次列一致
                         .height(48.dp)
-                        .background(sectionBackground),
+                        .wallpaperAwareBackground(sectionBackground),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -315,8 +360,8 @@ fun GridWeekView(
                     )
                 }
                 
-                // 星期标题（固定高度，宽度跟随课程列，通过 compactProgress + 每日错峰进度平滑过渡）
                 dayRange.forEachIndexed { index, dayOfWeek ->
+                    key(dayOfWeek) {
                     val hasClassOnThisDay = dayOfWeek in daysWithCourses
                     val dateForDay = if (weekDates.isNotEmpty() && dayOfWeek <= weekDates.size) {
                         weekDates[dayOfWeek - 1]
@@ -329,27 +374,17 @@ fun GridWeekView(
                         else -> compactDayWidth
                     }
 
-                    // 从普通模式宽度 fullWidthPerDay 连续插值到紧凑宽度
-                    // 通过每日错峰进度 dayCompactProgress 控制：星期越靠后，动画越晚开始
                     val dayStaggerIndex = (dayOfWeek - 1).coerceAtLeast(0)
-                    // 控制最大错峰，避免尾部拖得太长
-                    val clampedDayIndex = dayStaggerIndex.coerceIn(0, 5)
-                    val dayDelay = clampedDayIndex * 60  // 每列 60ms，波浪更紧凑
-                    val dayCompactProgress by animateFloatAsState(
-                        targetValue = if (compactModeEnabled) 1f else 0f,
-                        animationSpec = tween(
-                            durationMillis = 220,
-                            delayMillis = dayDelay,
-                            easing = FastOutSlowInEasing
-                        ),
-                        label = "day_compact_progress_header_$dayOfWeek"
-                    )
+                    val clampedDayIndex = dayStaggerIndex.coerceIn(0, MAX_DAY_STAGGER_INDEX)
+                    val dayDelay = clampedDayIndex * DAY_STAGGER_DELAY_MS
+                    val dayCompactProgress = staggerProgress(compactLinearProgress, dayDelay)
                     val dayWidth = lerp(fullWidthPerDay, compactWidth, dayCompactProgress)
 
                     WeekDayHeaderAdaptive(
                         dayOfWeek = dayOfWeek,
                         date = dateForDay,
                         isCompact = compactModeEnabled && !hasClassOnThisDay,
+                        compactProgress = if (!hasClassOnThisDay) dayCompactProgress else 0f,
                         modifier = Modifier
                             .width(dayWidth)
                             .then(
@@ -367,6 +402,7 @@ fun GridWeekView(
                                 }
                             )
                     )
+                    }
                 }
             }
         }
@@ -383,7 +419,7 @@ fun GridWeekView(
                 modifier = Modifier
                     .width(40.dp)
                     .fillMaxHeight()
-                    .background(sectionBackground)
+                    .wallpaperAwareBackground(sectionBackground)
                     .padding(end = 2.dp)
             ) {
                 val totalHeight = maxHeight
@@ -409,6 +445,7 @@ fun GridWeekView(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     (1..maxSection).forEach { section ->
+                        key(section) {
                         val hasClassThisSection = section in sectionsWithCoursesRaw
 
                         val compactHeight = when {
@@ -417,20 +454,10 @@ fun GridWeekView(
                             else -> compactSectionHeight
                         }
 
-                        // 每一节的高度使用独立的错峰进度：节次越靠后，动画越晚开始
                         val sectionStaggerIndex = (section - 1).coerceAtLeast(0)
-                        // 限制错峰层级，避免最后几节明显滞后
-                    val clampedSectionIndex = sectionStaggerIndex.coerceIn(0, 5)
-                    val sectionDelay = clampedSectionIndex * 70  // 每节 70ms，整体波浪收紧
-                        val sectionCompactProgress by animateFloatAsState(
-                            targetValue = if (compactModeEnabled) 1f else 0f,
-                            animationSpec = tween(
-                                durationMillis = 220,
-                                delayMillis = sectionDelay,
-                                easing = FastOutSlowInEasing
-                            ),
-                            label = "section_compact_progress_left_$section"
-                        )
+                        val clampedSectionIndex = sectionStaggerIndex.coerceIn(0, MAX_SECTION_STAGGER_INDEX)
+                        val sectionDelay = clampedSectionIndex * SECTION_STAGGER_DELAY_MS
+                        val sectionCompactProgress = staggerProgress(compactLinearProgress, sectionDelay)
 
                         val rowHeight = lerp(fullHeightPerSection, compactHeight, sectionCompactProgress)
 
@@ -438,8 +465,10 @@ fun GridWeekView(
                             section = section,
                             classTime = classTimes.find { it.sectionNumber == section },
                             isCompact = compactModeEnabled && !hasClassThisSection,
+                            compactProgress = if (!hasClassThisSection) sectionCompactProgress else 0f,
                             modifier = Modifier.height(rowHeight)
                         )
+                        }
                     }
                 }
             }
@@ -499,20 +528,10 @@ fun GridWeekView(
                         else -> compactSectionHeight
                     }
 
-                    // 课程网格内也使用按节次错峰的高度进度，保证与左侧节次列和课程卡片文本节奏一致
                     val sectionStaggerIndex = (section - 1).coerceAtLeast(0)
-                    // 与左侧节次列保持一致的错峰策略，但整体节奏收紧
-                    val clampedSectionIndex = sectionStaggerIndex.coerceIn(0, 5)
-                    val sectionDelay = clampedSectionIndex * 70
-                    val sectionCompactProgress by animateFloatAsState(
-                        targetValue = if (compactModeEnabled) 1f else 0f,
-                        animationSpec = tween(
-                            durationMillis = 220,
-                            delayMillis = sectionDelay,
-                            easing = FastOutSlowInEasing
-                        ),
-                        label = "section_compact_progress_grid_$section"
-                    )
+                    val clampedSectionIndex = sectionStaggerIndex.coerceIn(0, MAX_SECTION_STAGGER_INDEX)
+                    val sectionDelay = clampedSectionIndex * SECTION_STAGGER_DELAY_MS
+                    val sectionCompactProgress = staggerProgress(compactLinearProgress, sectionDelay)
 
                     lerp(fullHeightPerSection, compactHeight, sectionCompactProgress)
                 }
@@ -520,8 +539,8 @@ fun GridWeekView(
                 Row(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // 课程网格（自适应宽度和高度）- 同一容器内根据 compactProgress 插值每一列的宽度和行高
                     dayRange.forEachIndexed { index, dayOfWeek ->
+                        key(dayOfWeek) {
                         // ✅ 修复：基于具体日期判断是否为今天，而不是星期几
                         val isToday = if (weekDates.isNotEmpty() && index < weekDates.size) {
                             weekDates[index] == today
@@ -536,19 +555,10 @@ fun GridWeekView(
                             else -> compactDayWidth
                         }
 
-                        // 列宽错峰：星期越靠后，列宽动画越晚开始
                         val dayStaggerIndex = (dayOfWeek - 1).coerceAtLeast(0)
-                        val clampedDayIndex = dayStaggerIndex.coerceIn(0, 5)
-                        val dayDelay = clampedDayIndex * 60  // 与顶部星期头一致的更紧凑波浪
-                        val dayCompactProgress by animateFloatAsState(
-                            targetValue = if (compactModeEnabled) 1f else 0f,
-                            animationSpec = tween(
-                                durationMillis = 220,
-                                delayMillis = dayDelay,
-                                easing = FastOutSlowInEasing
-                            ),
-                            label = "day_compact_progress_grid_$dayOfWeek"
-                        )
+                        val clampedDayIndex = dayStaggerIndex.coerceIn(0, MAX_DAY_STAGGER_INDEX)
+                        val dayDelay = clampedDayIndex * DAY_STAGGER_DELAY_MS
+                        val dayCompactProgress = staggerProgress(compactLinearProgress, dayDelay)
 
                         val columnWidth = lerp(fullWidthPerDay, compactWidth, dayCompactProgress)
 
@@ -557,7 +567,7 @@ fun GridWeekView(
                                 .width(columnWidth)
                                 .fillMaxHeight()
                                 .padding(horizontal = 0.5.dp)  // 最小列间距
-                                .background(
+                                .wallpaperAwareBackground(
                                     // 整列添加今日高亮背景（无边框）
                                     if (isToday) todayHighlight.copy(alpha = 0.12f)
                                     else Color.Transparent
@@ -602,8 +612,10 @@ fun GridWeekView(
 
                                     if (courseAtSection != null) {
                                         val baseHeight = rowHeights.getOrNull(currentSection - 1) ?: fullHeightPerSection
-                                        // 根据起始节次计算错峰索引：越往后的节次，动画开始越晚
                                         val staggerIndex = (courseAtSection.startSection - 1).coerceAtLeast(0)
+                                        val clampedStaggerIdx = staggerIndex.coerceIn(0, MAX_SECTION_STAGGER_INDEX)
+                                        val courseStaggerDelay = clampedStaggerIdx * SECTION_STAGGER_DELAY_MS
+                                        val courseCompactProgress = staggerProgress(compactLinearProgress, courseStaggerDelay)
                                     val adjustmentInfoForCourse = getAdjustmentInfo?.invoke(
                                         courseAtSection.id,
                                         weekNumber,
@@ -617,7 +629,7 @@ fun GridWeekView(
                                         compactModeEnabled = compactModeEnabled,
                                         showWeekend = showWeekend,
                                         onCourseClick = onCourseClick,
-                                        onCourseLongClick = { course, positionY, positionX ->  // ✅ 接收课程卡片顶部 Y 和中心 X
+                                        onCourseLongClick = { course, positionY, positionX ->
                                             onCourseLongClick?.invoke(course)
                                             selectedSlotForAction = Triple(dayOfWeek, courseAtSection.startSection, listOf(course))
                                             slotPositionY = positionY
@@ -625,6 +637,7 @@ fun GridWeekView(
                                         },
                                         modifier = Modifier.height(baseHeight * courseAtSection.sectionCount.toFloat()),
                                         staggerIndex = staggerIndex,
+                                        compactProgress = courseCompactProgress,
                                         semesterStartDate = semesterStartDate,
                                         adjustmentInfo = adjustmentInfoForCourse,
                                         courseColorMap = courseColorMap
@@ -661,6 +674,7 @@ fun GridWeekView(
                                 }
                             }
                         }
+                        }
                     }
                 }
             }
@@ -676,7 +690,7 @@ fun GridWeekView(
             contentAlignment = Alignment.TopCenter  // 顶部居中，通过内部 padding 控制垂直位置
         ) {
             // 半透明提示卡片，位于网格上部 1/3 区域，避开右下角 FAB
-            Surface(
+            WallpaperAwareSurface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                 modifier = Modifier
@@ -820,34 +834,24 @@ fun WeekDayHeaderAdaptive(
     dayOfWeek: Int,
     date: java.time.LocalDate? = null,
     isCompact: Boolean = false,
+    compactProgress: Float = 0f,
     modifier: Modifier = Modifier
 ) {
-    // ✅ 修复：基于具体日期判断是否为今天，而不是星期几
     val isToday = date != null && date == java.time.LocalDate.now()
     
-    // ✅ 通过 CompositionLocal 获取课表颜色
     val scheduleColors = LocalScheduleColors.current
     val sectionBackground = scheduleColors.sectionBackground
     val textPrimary = scheduleColors.textPrimary
     val todayHighlight = scheduleColors.todayHighlight
     
-    // 顶部完整「星期+日期」与紧凑一字缩写之间做交叉淡入淡出
-    val fullHeaderAlpha by animateFloatAsState(
-        targetValue = if (isCompact) 0f else 1f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "HeaderFullAlpha"
-    )
-    val compactHeaderAlpha by animateFloatAsState(
-        targetValue = if (isCompact) 1f else 0f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "HeaderCompactAlpha"
-    )
+    val fullHeaderAlpha = 1f - compactProgress
+    val compactHeaderAlpha = compactProgress
     
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)  // 增加高度以容纳两行
-            .background(
+            .wallpaperAwareBackground(
                 // 今日使用更明显的背景色（无边框）
                 if (isToday) todayHighlight.copy(alpha = 0.5f)
                 else sectionBackground
@@ -908,7 +912,7 @@ fun WeekDayHeader(dayOfWeek: Int) {
         modifier = Modifier
             .width(110.dp)
             .height(50.dp)
-            .background(
+            .wallpaperAwareBackground(
                 if (isToday) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surface
             ),
@@ -945,32 +949,23 @@ fun SectionCellAdaptive(
     section: Int,
     classTime: com.wind.ggbond.classtime.data.local.entity.ClassTime? = null,
     isCompact: Boolean = false,
+    compactProgress: Float = 0f,
     modifier: Modifier = Modifier
 ) {
-    // ✅ 通过 CompositionLocal 获取课表颜色
     val scheduleColors = LocalScheduleColors.current
     val sectionBackground = scheduleColors.sectionBackground
     val textSecondary = scheduleColors.textSecondary
     val gridLine = scheduleColors.gridLine
     
-    // 优化方案：紧凑模式动画过渡
-    val alpha by animateFloatAsState(
-        targetValue = if (isCompact) 0.4f else 1f,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "SectionAlpha"
-    )
+    val alpha = lerpFloat(1f, 0.4f, compactProgress)
 
     val targetBackground = if (isCompact) gridLine else sectionBackground
-    val backgroundColor by animateColorAsState(
-        targetValue = targetBackground,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "SectionBackground"
-    )
+    val backgroundColor = lerpColor(sectionBackground, targetBackground, compactProgress)
     
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(backgroundColor)
+            .wallpaperAwareBackground(backgroundColor)
             .padding(horizontal = 2.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1024,7 +1019,7 @@ fun SectionCell(section: Int) {
         modifier = Modifier
             .width(50.dp)
             .height(90.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .wallpaperAwareBackground(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -1052,9 +1047,9 @@ fun CourseCellAdaptive(
     onEmptyCellClick: ((dayOfWeek: Int, section: Int) -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    // ✅ 使用全局壁纸感知 Surface，自动适配透明度
+    WallpaperAwareSurface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
         Box(
@@ -1139,7 +1134,7 @@ fun CourseCellAdaptive(
                                 bottomEnd = bottomCorner
                             )
                         )
-                        .background(displayColor)
+                        .wallpaperAwareBackground(displayColor)
                         .then(
                             // 正在上课时添加边框高亮
                             if (isOngoing && isFirstSection) {
@@ -1166,6 +1161,7 @@ fun CourseCellAdaptive(
                 ) {
                     // 课程冲突角标（右下角三角形 - 参照主流APP设计）
                     if (hasMultipleCourses && isLastSection) {
+                        val badgeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
@@ -1174,13 +1170,13 @@ fun CourseCellAdaptive(
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val trianglePath = Path().apply {
                                     moveTo(size.width, size.height)
-                                    lineTo(size.width, size.height * 0.3f)  // 更大的三角形
+                                    lineTo(size.width, size.height * 0.3f)
                                     lineTo(size.width * 0.3f, size.height)
                                     close()
                                 }
                                 drawPath(
                                     path = trianglePath,
-                                    color = Color.White.copy(alpha = 0.85f)  // 更不透明
+                                    color = badgeColor
                                 )
                             }
                             Text(
@@ -1396,7 +1392,7 @@ fun CourseCell(
         modifier = Modifier
             .width(110.dp)
             .height(90.dp)
-            .background(MaterialTheme.colorScheme.surface)
+            .wallpaperAwareBackground(MaterialTheme.colorScheme.surface)
     ) {
         if (courses.isNotEmpty()) {
             val course = courses.first() // 如果有冲突，显示第一个
@@ -1480,7 +1476,7 @@ fun CourseCell(
                         .fillMaxSize()
                         .padding(2.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(
+                        .wallpaperAwareBackground(
                             try {
                                 Color(android.graphics.Color.parseColor(course.color)).copy(alpha = 0.5f)
                             } catch (e: Exception) {
@@ -1510,6 +1506,7 @@ fun CourseCardCell(
     onCourseLongClick: ((Course, Float, Float) -> Unit)? = null,
     modifier: Modifier = Modifier,
     staggerIndex: Int = 0,
+    compactProgress: Float = 0f,
     semesterStartDate: java.time.LocalDate? = null,
     adjustmentInfo: com.wind.ggbond.classtime.data.local.entity.CourseAdjustment? = null,
     courseColorMap: Map<String, String> = emptyMap()
@@ -1571,18 +1568,6 @@ fun CourseCardCell(
         }
     }
     
-    // ✅ 优化：使用derivedStateOf计算显示颜色
-    val displayColor by remember {
-        derivedStateOf {
-            when {
-                !shouldShowThisWeek -> baseColor.copy(alpha = 0.08f)
-                isPast -> baseColor.copy(alpha = 0.35f)
-                isOngoing -> baseColor
-                else -> baseColor.copy(alpha = 0.95f)
-            }
-        }
-    }
-    
     // ✅ 优化：基于课程卡片实际背景色计算文字颜色（WCAG 对比度算法）
     val baseTextColor = remember(baseColor) {
         contentColorForBackground(baseColor)
@@ -1609,21 +1594,29 @@ fun CourseCardCell(
     // 记录课程卡片在根布局中的「顶部」Y 和中心 X 坐标，用于定位操作面板
     var cellPositionY by remember { mutableStateOf(0f) }
     var cellCenterX by remember { mutableStateOf(0f) }
-    
-    // 错峰动画延迟：根据 staggerIndex 控制卡片和文字动画的起步时间
-    // staggerIndex 通常由起始节次推导：节次越靠后，延迟越大
-    // 为了让波浪更明显，这里拉大每一级的间隔
-    val clampedStagger = staggerIndex.coerceIn(0, 6)
-    // 收紧每一级的延迟，避免后几节课明显“掉队”，但保留轻微波浪感
-    val staggerDelay = clampedStagger * 70
+
+    val isWallpaperEnabledForCard = LocalWallpaperEnabled.current
+
+    val wallpaperAlphaMultiplier = if (isWallpaperEnabledForCard) 0.7f else 1f
+
+    val displayColor by remember {
+        derivedStateOf {
+            when {
+                !shouldShowThisWeek -> baseColor.copy(alpha = 0.08f * wallpaperAlphaMultiplier)
+                isPast -> baseColor.copy(alpha = 0.35f * wallpaperAlphaMultiplier)
+                isOngoing -> baseColor.copy(alpha = wallpaperAlphaMultiplier)
+                else -> baseColor.copy(alpha = 0.95f * wallpaperAlphaMultiplier)
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)  // 填充矩形区域，与EmptyCell的Surface颜色一致，消除圆角色差
-            .padding(horizontal = 1.dp, vertical = 1.dp)  // 最小卡片间距
-            .clip(RoundedCornerShape(6.dp))  // 小圆角6dp
-            .background(displayColor)  // 纯色背景，无阴影
+            .wallpaperAwareBackground(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 1.dp, vertical = 1.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .wallpaperAwareBackground(displayColor)
             .then(
                 // 正在上课时添加纯色边框
                 if (isOngoing) {
@@ -1705,7 +1698,7 @@ fun CourseCardCell(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF10B981))
+                            .wallpaperAwareBackground(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
@@ -1722,25 +1715,11 @@ fun CourseCardCell(
                 verticalArrangement = if (useProportionalLayout) Arrangement.Top else Arrangement.spacedBy(2.dp),
                 horizontalAlignment = Alignment.Start  // 左对齐
             ) {
-                // 课程名称字体配置 - 增大基础字体
-                // 紧凑模式下字体放大，隐藏周末时格子更宽，字体可以更大
-                val targetFontScale = when {
-                    compactModeEnabled && !showWeekend -> 1.2f  // 隐藏周末：放大20%（降低以显示更多内容）
-                    compactModeEnabled -> 1.1f  // 显示周末：放大10%
-                    else -> 1.0f  // 普通模式
+                val compactFontScale = when {
+                    !showWeekend -> 1.2f
+                    else -> 1.1f
                 }
-
-                // ✅ 精准微动画：字体缩放动画（平滑过渡，无Q弹）
-                // 使用与卡片容器相同的 staggerDelay，让卡片整体和文字一起形成明显的错峰波浪
-                val fontScale by animateFloatAsState(
-                    targetValue = targetFontScale,
-                    animationSpec = tween(
-            durationMillis = 220,
-                        delayMillis = staggerDelay,
-            easing = FastOutSlowInEasing
-                    ),
-                    label = "course_font_scale"
-                )
+                val fontScale = lerpFloat(1.0f, compactFontScale, compactProgress)
                 val (nameFontSize, nameLineHeight, maxNameLines) = when {
                     course.sectionCount >= 8 -> Triple((15 * fontScale).sp, (17 * fontScale).sp, Int.MAX_VALUE)
                     course.sectionCount >= 6 -> Triple((14 * fontScale).sp, (16 * fontScale).sp, 10)
@@ -1807,7 +1786,7 @@ fun CourseCardCell(
                                 },
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .background(
+                                    .wallpaperAwareBackground(
                                         when {
                                             !shouldShowThisWeek -> textColor.copy(alpha = 0.03f)
                                             isPast -> textColor.copy(alpha = 0.08f)
@@ -1930,7 +1909,7 @@ fun CourseCardCell(
                                 },
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(50))
-                                    .background(
+                                    .wallpaperAwareBackground(
                                         when {
                                             !shouldShowThisWeek -> textColor.copy(alpha = 0.03f)
                                             isPast -> textColor.copy(alpha = 0.08f)
@@ -2007,10 +1986,9 @@ fun EmptyCell(
     // 记录空白格子在根布局中的顶部 Y 和中心 X，用于定位操作面板
     var cellPositionY by remember { mutableStateOf(0f) }
     var cellCenterX by remember { mutableStateOf(0f) }
-    
-    Surface(
+
+    WallpaperAwareSurface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp
     ) {
         Box(
@@ -2025,7 +2003,7 @@ fun EmptyCell(
                 .then(
                     // 今天的空白格子使用纯色淡背景（紧凑模式下不显示）
                     if (isToday && !isCompact) {
-                        Modifier.background(
+                        Modifier.wallpaperAwareBackground(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.04f)
                         )
                     } else {
@@ -2050,12 +2028,10 @@ fun EmptyCell(
         ) {
             // ✅ 简化：移除选中状态，紧凑模式下不显示装饰图案
             if (!isCompact) {
+                val todayDotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                val normalDotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.02f)
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val dotColor = if (isToday) {
-                        androidx.compose.ui.graphics.Color(0xFF6366F1).copy(alpha = 0.08f)
-                    } else {
-                        androidx.compose.ui.graphics.Color(0xFF000000).copy(alpha = 0.02f)
-                    }
+                    val dotColor = if (isToday) todayDotColor else normalDotColor
                     
                     // 绘制网格点状装饰
                     val spacing = 20f

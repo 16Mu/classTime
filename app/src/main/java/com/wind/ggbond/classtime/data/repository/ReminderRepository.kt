@@ -3,9 +3,6 @@ package com.wind.ggbond.classtime.data.repository
 import com.wind.ggbond.classtime.data.local.dao.ReminderDao
 import com.wind.ggbond.classtime.data.local.entity.Reminder
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -22,7 +19,7 @@ class ReminderRepository @Inject constructor(
 
     override suspend fun getById(id: Long): Reminder? = dao.getReminderById(id)
 
-    override fun getByIdFlow(id: Long): Flow<Reminder?> = flowOf(runBlocking { getById(id) })
+    override fun getByIdFlow(id: Long): Flow<Reminder?> = dao.getReminderByIdFlow(id)
 
     override suspend fun insert(entity: Reminder): Long = dao.insertReminder(entity)
 

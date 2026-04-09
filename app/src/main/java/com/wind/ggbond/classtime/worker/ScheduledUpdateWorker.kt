@@ -1,7 +1,6 @@
 package com.wind.ggbond.classtime.worker
 
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
@@ -13,6 +12,7 @@ import com.wind.ggbond.classtime.ui.screen.update.FloatingUpdateActivity
 import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.flow.first
 
 /**
@@ -36,7 +36,7 @@ class ScheduledUpdateWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            Log.d("ScheduledUpdateWorker", "开始执行定时更新任务")
+            AppLogger.d("ScheduledUpdateWorker", "开始执行定时更新任务")
             
             // 读取设置
             val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
@@ -47,7 +47,7 @@ class ScheduledUpdateWorker @AssistedInject constructor(
                 ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_ENABLED
             
             if (!autoUpdateEnabled) {
-                Log.d("ScheduledUpdateWorker", "自动更新未启用，跳过")
+                AppLogger.d("ScheduledUpdateWorker", "自动更新未启用，跳过")
                 return Result.success()
             }
             
@@ -56,7 +56,7 @@ class ScheduledUpdateWorker @AssistedInject constructor(
                 ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_ENABLED
             
             if (!scheduledUpdateEnabled) {
-                Log.d("ScheduledUpdateWorker", "定时更新未启用，跳过")
+                AppLogger.d("ScheduledUpdateWorker", "定时更新未启用，跳过")
                 return Result.success()
             }
             
@@ -67,24 +67,24 @@ class ScheduledUpdateWorker @AssistedInject constructor(
             val timeSinceLastUpdate = now - lastUpdateTime
             
             if (timeSinceLastUpdate < dedupIntervalMs) {
-                Log.d("ScheduledUpdateWorker", "防重复：距离上次更新不足5分钟，跳过")
+                AppLogger.d("ScheduledUpdateWorker", "防重复：距离上次更新不足5分钟，跳过")
                 return Result.success()
             }
             
             // 检查前置条件：课表和学校配置
             val currentSchedule = scheduleRepository.getCurrentSchedule()
             if (currentSchedule == null) {
-                Log.d("ScheduledUpdateWorker", "未导入课表，跳过更新")
+                AppLogger.d("ScheduledUpdateWorker", "未导入课表，跳过更新")
                 return Result.success()
             }
             
             val schoolId = currentSchedule.schoolName
             if (schoolId.isNullOrEmpty()) {
-                Log.d("ScheduledUpdateWorker", "课表缺少学校配置，跳过更新")
+                AppLogger.d("ScheduledUpdateWorker", "课表缺少学校配置，跳过更新")
                 return Result.success()
             }
             
-            Log.d("ScheduledUpdateWorker", "前置条件满足，执行更新 (课表: ${currentSchedule.name}, 学校: $schoolId)")
+            AppLogger.d("ScheduledUpdateWorker", "前置条件满足，执行更新 (课表: ${currentSchedule.name}, 学校: $schoolId)")
             
             // 更新最后更新时间
             settingsDataStore.updateData { prefs ->
@@ -104,12 +104,12 @@ class ScheduledUpdateWorker @AssistedInject constructor(
                 failureReason = if (!success) message else null
             )
             
-            Log.d("ScheduledUpdateWorker", "定时更新完成: ${if (success) "成功" else "失败"} - $message")
+            AppLogger.d("ScheduledUpdateWorker", "定时更新完成: ${if (success) "成功" else "失败"} - $message")
             
             return Result.success()
             
         } catch (e: Exception) {
-            Log.e("ScheduledUpdateWorker", "定时更新异常", e)
+            AppLogger.e("ScheduledUpdateWorker", "定时更新异常", e)
             
             try {
                 logRepository.logUpdate(
@@ -118,7 +118,7 @@ class ScheduledUpdateWorker @AssistedInject constructor(
                     failureReason = "定时更新异常: ${e.message}"
                 )
             } catch (logError: Exception) {
-                Log.e("ScheduledUpdateWorker", "记录异常日志失败", logError)
+                AppLogger.e("ScheduledUpdateWorker", "记录异常日志失败", logError)
             }
             
             // 重试一次

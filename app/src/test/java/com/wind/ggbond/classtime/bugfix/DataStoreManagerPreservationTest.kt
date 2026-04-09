@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.bugfix
+﻿package com.wind.ggbond.classtime.bugfix
 
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import org.junit.Test
@@ -242,9 +242,9 @@ class DataStoreManagerPreservationTest {
         )
         
         assertEquals(
-            "DEFAULT_BOTTOM_BAR_BLUR_ENABLED should be true",
+            "DEFAULT_GLASS_EFFECT_ENABLED should be true",
             true,
-            DataStoreManager.SettingsKeys.DEFAULT_BOTTOM_BAR_BLUR_ENABLED
+            DataStoreManager.SettingsKeys.DEFAULT_GLASS_EFFECT_ENABLED
         )
         
         assertEquals(

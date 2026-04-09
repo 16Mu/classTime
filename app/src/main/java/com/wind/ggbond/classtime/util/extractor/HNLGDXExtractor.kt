@@ -1,9 +1,9 @@
 package com.wind.ggbond.classtime.util.extractor
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import org.json.JSONObject
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 @Singleton
@@ -79,7 +79,7 @@ class HNLGDXExtractor @Inject constructor() : SchoolScheduleExtractor {
                 if (weeksArray != null) for (j in 0 until weeksArray.length()) weeks.add(weeksArray.getInt(j))
                 courses.add(ParsedCourse(courseName = courseObj.optString("courseName", "").trim(), teacher = courseObj.optString("teacher", "").trim(), classroom = courseObj.optString("classroom", "").trim(), dayOfWeek = courseObj.optInt("day", 1), startSection = courseObj.optInt("startSection", 1), sectionCount = courseObj.optInt("sectionCount", 2), weeks = weeks, credit = courseObj.optDouble("credit", 0.0).toFloat(), weekExpression = if (weeks.isNotEmpty()) weeks.sorted().joinToString(",") + "周" else ""))
             }
-        } catch (e: Exception) { Log.e(TAG, "解析课程数据失败", e); throw e }
+        } catch (e: Exception) { AppLogger.e(TAG, "解析课程数据失败", e); throw e }
         return courses
     }
 }

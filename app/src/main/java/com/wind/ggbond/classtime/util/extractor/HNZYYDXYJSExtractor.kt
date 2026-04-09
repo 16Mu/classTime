@@ -1,9 +1,9 @@
 package com.wind.ggbond.classtime.util.extractor
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import org.json.JSONObject
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -65,7 +65,7 @@ class HNZYYDXYJSExtractor @Inject constructor() : SchoolScheduleExtractor {
     override fun parseCourses(jsonData: String): List<ParsedCourse> {
         val courses = mutableListOf<ParsedCourse>()
         try {
-            Log.d(TAG, "开始解析${schoolName}课程数据...")
+            AppLogger.d(TAG, "开始解析${schoolName}课程数据...")
             
             val cleanJson = jsonData.trim()
                 .removePrefix("\"").removeSuffix("\"")
@@ -85,10 +85,10 @@ class HNZYYDXYJSExtractor @Inject constructor() : SchoolScheduleExtractor {
             val rawCourses = parseGraduateTable(html)
             val resolvedCourses = resolveCourseConflicts(rawCourses)
             
-            Log.d(TAG, "✅ 成功解析 ${resolvedCourses.size} 门课程")
+            AppLogger.d(TAG, "✅ 成功解析 ${resolvedCourses.size} 门课程")
             return resolvedCourses
         } catch (e: Exception) {
-            Log.e(TAG, "解析课程数据失败", e)
+            AppLogger.e(TAG, "解析课程数据失败", e)
             throw e
         }
     }

@@ -19,11 +19,14 @@ interface ClassTimeDao {
     @Query("SELECT * FROM class_times WHERE configName = :configName AND sectionNumber = :sectionNumber LIMIT 1")
     suspend fun getClassTime(configName: String = "default", sectionNumber: Int): ClassTime?
     
+    @Query("SELECT * FROM class_times WHERE id = :id LIMIT 1")
+    suspend fun getClassTimeById(id: Long): ClassTime?
+    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertClassTime(classTime: ClassTime): Long
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertClassTimes(classTimes: List<ClassTime>)
+    suspend fun insertClassTimes(classTimes: List<ClassTime>): List<Long>
     
     @Update
     suspend fun updateClassTime(classTime: ClassTime)

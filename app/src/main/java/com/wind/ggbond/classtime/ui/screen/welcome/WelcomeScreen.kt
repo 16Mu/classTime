@@ -29,6 +29,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.wind.ggbond.classtime.R
 import kotlinx.coroutines.delay
 import java.io.BufferedReader
+import com.wind.ggbond.classtime.util.AppLogger
 import java.io.InputStreamReader
 
 /**
@@ -394,7 +395,7 @@ private fun FullDisclaimerStep(
                     }
                 } catch (e: Exception) {
                     // 如果读取失败，回退到字符串资源
-                    android.util.Log.e("WelcomeScreen", "Failed to read disclaimer.txt", e)
+                    AppLogger.e("WelcomeScreen", "Failed to read disclaimer.txt", e)
                     fallbackText
                 }
             }
@@ -443,7 +444,7 @@ private fun FullDisclaimerStep(
                             progress = { 
                                 when {
                                     !hasScrolledToBottom -> 0.5f
-                                    else -> 0.5f + (10 - countdownSeconds) / 20f
+                                    else -> 0.5f + (5 - countdownSeconds) / 10f
                                 }
                             },
                             modifier = Modifier

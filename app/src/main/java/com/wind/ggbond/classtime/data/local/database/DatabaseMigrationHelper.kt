@@ -1,9 +1,9 @@
 package com.wind.ggbond.classtime.data.local.database
 
 import android.content.Context
-import android.util.Log
 import java.io.File
 import java.io.FileInputStream
+import com.wind.ggbond.classtime.util.AppLogger
 import java.io.FileOutputStream
 
 /**
@@ -39,33 +39,33 @@ object DatabaseMigrationHelper {
         migration: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit
     ): Boolean {
         val startTime = System.currentTimeMillis()
-        Log.i(TAG, "========== 开始安全迁移 $fromVersion -> $toVersion ==========")
+        AppLogger.i(TAG, "========== 开始安全迁移 $fromVersion -> $toVersion ==========")
         
         try {
             // 1. 创建备份
             val backupPath = createBackup(context, dbName, fromVersion, toVersion)
-            Log.i(TAG, "✅ 数据库备份成功: $backupPath")
+            AppLogger.i(TAG, "✅ 数据库备份成功: $backupPath")
             
             // 2. 获取数据库实例执行迁移
             val dbFile = context.getDatabasePath(dbName)
             if (!dbFile.exists()) {
-                Log.w(TAG, "⚠️ 数据库文件不存在，跳过迁移")
+                AppLogger.w(TAG, "⚠️ 数据库文件不存在，跳过迁移")
                 return true
             }
             
             // 3. 打开数据库并执行迁移（通过回调方式）
             // 注意：这里不直接打开数据库，而是由 Room 在适当时机调用 migration 回调
             // 我们只负责备份和记录日志
-            Log.i(TAG, "✅ 准备就绪，等待 Room 执行实际迁移逻辑...")
+            AppLogger.i(TAG, "✅ 准备就绪，等待 Room 执行实际迁移逻辑...")
             
             return true
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 迁移准备阶段失败: ${e.message}", e)
+            AppLogger.e(TAG, "❌ 迁移准备阶段失败: ${e.message}", e)
             return false
         } finally {
             val duration = System.currentTimeMillis() - startTime
-            Log.i(TAG, "========== 迁移 $fromVersion -> $toVersion 准备完成，耗时: ${duration}ms ==========")
+            AppLogger.i(TAG, "========== 迁移 $fromVersion -> $toVersion 准备完成，耗时: ${duration}ms ==========")
         }
     }
     
@@ -87,7 +87,7 @@ object DatabaseMigrationHelper {
         try {
             val dbFile = context.getDatabasePath(dbName)
             if (!dbFile.exists()) {
-                Log.w(TAG, "数据库文件不存在，无需备份: ${dbFile.absolutePath}")
+                AppLogger.w(TAG, "数据库文件不存在，无需备份: ${dbFile.absolutePath}")
                 return null
             }
             
@@ -109,7 +109,7 @@ object DatabaseMigrationHelper {
                 }
             }
             
-            Log.i(TAG, "✅ 备份创建成功: ${backupFile.absolutePath} (${formatFileSize(backupFile.length())})")
+            AppLogger.i(TAG, "✅ 备份创建成功: ${backupFile.absolutePath} (${formatFileSize(backupFile.length())})")
             
             // 清理旧备份（保留最近的 MAX_BACKUPS 个）
             cleanOldBackups(backupDir, dbName)
@@ -117,7 +117,7 @@ object DatabaseMigrationHelper {
             return backupFile.absolutePath
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 创建备份失败", e)
+            AppLogger.e(TAG, "❌ 创建备份失败", e)
             return null
         }
     }
@@ -140,7 +140,7 @@ object DatabaseMigrationHelper {
             val backupFile = File(backupPath)
             
             if (!backupFile.exists()) {
-                Log.e(TAG, "❌ 备份文件不存在: $backupPath")
+                AppLogger.e(TAG, "❌ 备份文件不存在: $backupPath")
                 return false
             }
             
@@ -150,7 +150,7 @@ object DatabaseMigrationHelper {
             // 删除当前损坏的数据库
             if (dbFile.exists()) {
                 dbFile.delete()
-                Log.i(TAG, "已删除损坏的数据库文件")
+                AppLogger.i(TAG, "已删除损坏的数据库文件")
                 
                 // 同时删除 -wal 和 -shm 文件
                 File("${dbFile.path}-wal").delete()
@@ -164,11 +164,11 @@ object DatabaseMigrationHelper {
                 }
             }
             
-            Log.i(TAG, "✅ 数据库恢复成功: ${dbFile.absolutePath}")
+            AppLogger.i(TAG, "✅ 数据库恢复成功: ${dbFile.absolutePath}")
             return true
             
         } catch (e: Exception) {
-            Log.e(TAG, "❌ 从备份恢复失败", e)
+            AppLogger.e(TAG, "❌ 从备份恢复失败", e)
             return false
         }
     }
@@ -204,7 +204,7 @@ object DatabaseMigrationHelper {
                 }
             
         } catch (e: Exception) {
-            Log.e(TAG, "获取备份列表失败", e)
+            AppLogger.e(TAG, "获取备份列表失败", e)
         }
         
         return backups
@@ -227,13 +227,13 @@ object DatabaseMigrationHelper {
             if (backupFiles.size > MAX_BACKUPS) {
                 backupFiles.drop(MAX_BACKUPS).forEach { file ->
                     if (file.delete()) {
-                        Log.d(TAG, "已清理旧备份: ${file.name}")
+                        AppLogger.d(TAG, "已清理旧备份: ${file.name}")
                     }
                 }
             }
             
         } catch (e: Exception) {
-            Log.w(TAG, "清理旧备份失败", e)
+            AppLogger.e(TAG, "清理旧备份失败", e)
         }
     }
     
@@ -259,19 +259,19 @@ object DatabaseMigrationHelper {
         return try {
             val dbFile = context.getDatabasePath(dbName)
             if (!dbFile.exists()) {
-                Log.w(TAG, "数据库文件不存在")
+                AppLogger.w(TAG, "数据库文件不存在")
                 return false
             }
             
             // 简单检查：文件大小是否合理（至少 1KB）
             if (dbFile.length() < 1024) {
-                Log.w(TAG, "数据库文件过小，可能损坏: ${dbFile.length()} bytes")
+                AppLogger.w(TAG, "数据库文件过小，可能损坏: ${dbFile.length()} bytes")
                 return false
             }
             
             true
         } catch (e: Exception) {
-            Log.e(TAG, "验证数据库完整性失败", e)
+            AppLogger.e(TAG, "验证数据库完整性失败", e)
             false
         }
     }

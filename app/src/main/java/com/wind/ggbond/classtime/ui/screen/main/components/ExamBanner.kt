@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wind.ggbond.classtime.data.local.entity.Exam
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.DateUtils
 
 /**
@@ -96,7 +97,7 @@ private fun ExamBannerContent(
                 } + " • "  // 结尾添加分隔符，让循环更自然
             }
         } catch (e: Exception) {
-            android.util.Log.e("ExamBanner", "Error creating exam text", e)
+            AppLogger.e("ExamBanner", "Error creating exam text", e)
             "考试信息加载中..."
         }
     }

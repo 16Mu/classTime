@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime.ui.theme
 
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
+import com.wind.ggbond.classtime.util.AppLogger
 
 enum class BackgroundType(val value: String) {
     IMAGE("image"),
@@ -42,45 +43,28 @@ data class BackgroundScheme(
                     createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                 )
             } catch (e: Exception) {
+                AppLogger.e("BackgroundScheme", "fromJson failed", e)
                 null
             }
         }
         
         fun fromJsonArray(json: String?): List<BackgroundScheme> {
-            android.util.Log.d("BackgroundScheme", "[fromJsonArray] Input json = $json")
-            
-            if (json.isNullOrBlank()) {
-                android.util.Log.d("BackgroundScheme", "[fromJsonArray] JSON is null or blank, returning empty list")
-                return emptyList()
-            }
+            if (json.isNullOrBlank()) return emptyList()
             
             return try {
                 val array = org.json.JSONArray(json)
-                android.util.Log.d("BackgroundScheme", "[fromJsonArray] JSON array length = ${array.length()}")
-                
-                val result = (0 until array.length()).mapNotNull { index ->
-                    val itemJson = array.optString(index, "")
-                    android.util.Log.d("BackgroundScheme", "[fromJsonArray] Parsing item $index: $itemJson")
-                    val scheme = fromJson(itemJson)
-                    if (scheme == null) {
-                        android.util.Log.w("BackgroundScheme", "[fromJsonArray] Failed to parse item $index")
-                    }
-                    scheme
+                (0 until array.length()).mapNotNull { index ->
+                    fromJson(array.optString(index, ""))
                 }
-                
-                android.util.Log.d("BackgroundScheme", "[fromJsonArray] Parsed ${result.size} schemes")
-                result
             } catch (e: Exception) {
-                android.util.Log.e("BackgroundScheme", "[fromJsonArray] Exception parsing JSON", e)
+                AppLogger.e("BackgroundScheme", "fromJsonArray failed", e)
                 emptyList()
             }
         }
         
         fun toJsonArray(schemes: List<BackgroundScheme>): String {
             val array = org.json.JSONArray()
-            schemes.forEach { scheme ->
-                array.put(scheme.toJson())
-            }
+            schemes.forEach { scheme -> array.put(scheme.toJson()) }
             return array.toString()
         }
     }

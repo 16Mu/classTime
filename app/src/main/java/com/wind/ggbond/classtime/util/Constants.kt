@@ -86,7 +86,7 @@ object Constants {
      */
     object Database {
         const val DATABASE_NAME = "course_schedule.db"
-        const val DATABASE_VERSION = 12
+        const val DATABASE_VERSION = 14
         
         // 备份
         const val AUTO_BACKUP_ENABLED = true

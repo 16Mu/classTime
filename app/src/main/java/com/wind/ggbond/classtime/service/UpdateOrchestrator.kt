@@ -1,17 +1,17 @@
 package com.wind.ggbond.classtime.service
 
 import android.content.Context
-import android.util.Log
 import androidx.datastore.preferences.core.edit
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.service.contract.IUpdateManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import com.wind.ggbond.classtime.util.AppLogger
+import java.util.concurrent.atomic.AtomicLong
 
 @Singleton
 class UpdateOrchestrator @Inject constructor(
@@ -25,7 +25,7 @@ class UpdateOrchestrator @Inject constructor(
         private const val MIN_CHECK_INTERVAL_MS = 60_000L
     }
 
-    private var lastCheckTime: Long = 0
+    private val lastCheckTime = AtomicLong(0)
 
     data class UpdateConfig(
         val enabled: Boolean,
@@ -43,7 +43,7 @@ class UpdateOrchestrator @Inject constructor(
         val config = loadUpdateConfig()
 
         if (!config.enabled) {
-            Log.d(TAG, "自动更新未启用")
+            AppLogger.d(TAG, "自动更新未启用")
             return IUpdateManager.UpdateDecision(false, "自动更新未启用")
         }
 
@@ -58,12 +58,12 @@ class UpdateOrchestrator @Inject constructor(
 
     private fun shouldPerformCheck(): Boolean {
         val now = System.currentTimeMillis()
-        if (now - lastCheckTime < MIN_CHECK_INTERVAL_MS) {
-            Log.d(TAG, "跳过检查（距离上次不足1分钟）")
+        val last = lastCheckTime.get()
+        if (now - last < MIN_CHECK_INTERVAL_MS) {
+            AppLogger.d(TAG, "跳过检查（距离上次不足1分钟）")
             return false
         }
-        lastCheckTime = now
-        return true
+        return lastCheckTime.compareAndSet(last, now)
     }
 
     private suspend fun loadUpdateConfig(): UpdateConfig {
@@ -96,11 +96,11 @@ class UpdateOrchestrator @Inject constructor(
         val now = System.currentTimeMillis()
         val timeSinceLastUpdate = now - config.lastUpdateTime
 
-        Log.d(TAG, "自动更新检查:")
-        Log.d(TAG, "  启用状态: ${config.enabled}")
-        Log.d(TAG, "  间隔更新启用: ${config.intervalEnabled}")
-        Log.d(TAG, "  更新间隔: ${config.intervalHours}小时")
-        Log.d(TAG, "  距离上次: ${timeSinceLastUpdate / (60 * 1000)}分钟")
+        AppLogger.d(TAG, "自动更新检查:")
+        AppLogger.d(TAG, "  启用状态: ${config.enabled}")
+        AppLogger.d(TAG, "  间隔更新启用: ${config.intervalEnabled}")
+        AppLogger.d(TAG, "  更新间隔: ${config.intervalHours}小时")
+        AppLogger.d(TAG, "  距离上次: ${timeSinceLastUpdate / (60 * 1000)}分钟")
 
         if (timeSinceLastUpdate < config.dedupIntervalMs) {
             return IUpdateManager.UpdateDecision(false, "防重复：距离上次更新不足5分钟")
@@ -129,7 +129,7 @@ class UpdateOrchestrator @Inject constructor(
     }
 
     private suspend fun executeUpdate(config: UpdateConfig) {
-        Log.d(TAG, "✅ 触发自动更新")
+        AppLogger.d(TAG, "✅ 触发自动更新")
 
         val now = System.currentTimeMillis()
         val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
@@ -142,11 +142,9 @@ class UpdateOrchestrator @Inject constructor(
         com.wind.ggbond.classtime.ui.screen.update.FloatingUpdateActivity.start(context)
     }
 
-    override fun isUpdateEnabled(): Boolean {
+    override suspend fun isUpdateEnabled(): Boolean {
         val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
-        return runBlocking {
-            settingsDataStore.data.first()[DataStoreManager.SettingsKeys.AUTO_UPDATE_ENABLED_KEY]
-                ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_ENABLED
-        }
+        return settingsDataStore.data.first()[DataStoreManager.SettingsKeys.AUTO_UPDATE_ENABLED_KEY]
+            ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_ENABLED
     }
 }

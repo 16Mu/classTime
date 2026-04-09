@@ -81,8 +81,8 @@ fun CompactUpdateFloatingView(
                 shape = CircleShape,
                 color = when {
                     isUpdating -> MaterialTheme.colorScheme.primaryContainer
-                    updateResult?.first == true -> Color(0xFF4CAF50).copy(alpha = 0.9f)
-                    updateResult?.first == false -> Color(0xFFF44336).copy(alpha = 0.9f)
+                    updateResult?.first == true -> MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                    updateResult?.first == false -> MaterialTheme.colorScheme.error.copy(alpha = 0.9f)
                     else -> MaterialTheme.colorScheme.surface
                 },
                 shadowElevation = 8.dp,

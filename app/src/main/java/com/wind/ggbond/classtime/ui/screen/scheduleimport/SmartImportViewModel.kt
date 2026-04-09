@@ -18,6 +18,7 @@ import com.wind.ggbond.classtime.util.extractor.ElementInspector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -75,10 +76,10 @@ class SmartImportViewModel @Inject constructor(
         return flow {
             try {
                 val school = schoolRepository.getSchoolById(schoolId)
-                android.util.Log.d("SmartImportVM", "获取学校信息: schoolId=$schoolId, result=${school?.name}")
+                AppLogger.d("SmartImportVM", "获取学校信息: schoolId=$schoolId, result=${school?.name}")
                 emit(school)
             } catch (e: Exception) {
-                android.util.Log.e("SmartImportVM", "获取学校信息失败: schoolId=$schoolId", e)
+                AppLogger.e("SmartImportVM", "获取学校信息失败: schoolId=$schoolId", e)
                 emit(null)
             }
         }
@@ -133,20 +134,20 @@ class SmartImportViewModel @Inject constructor(
                         val semesterInfo = extractor.parseSemesterInfo(jsonData)
                         if (semesterInfo != null) {
                             _importedSemesterInfo.value = semesterInfo
-                            android.util.Log.d("SmartImportVM", "成功解析学期信息: 开始=${semesterInfo.startDate}, 总周数=${semesterInfo.totalWeeks}")
+                            AppLogger.d("SmartImportVM", "成功解析学期信息: 开始=${semesterInfo.startDate}, 总周数=${semesterInfo.totalWeeks}")
                         } else {
                             _importedSemesterInfo.value = null
-                            android.util.Log.d("SmartImportVM", "未能解析学期信息，将由用户手动设置")
+                            AppLogger.d("SmartImportVM", "未能解析学期信息，将由用户手动设置")
                         }
                     } catch (e: Exception) {
-                        android.util.Log.w("SmartImportVM", "解析学期信息失败: ${e.message}")
+                        AppLogger.e("SmartImportVM", "解析学期信息失败: ${e.message}")
                         _importedSemesterInfo.value = null
                     }
                     
                     _parseState.value = ParseState.Success()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("SmartImportVM", "使用提取器解析失败", e)
+                AppLogger.e("SmartImportVM", "使用提取器解析失败", e)
                 _parseState.value = ParseState.Error("解析失败：${e.message}")
             }
         }
@@ -186,7 +187,7 @@ class SmartImportViewModel @Inject constructor(
                     .replace("\\n", "\n")
                     .replace("\\\\", "\\")
                 
-                android.util.Log.d("SmartImportVM", "清理后的JSON: $cleanJson")
+                AppLogger.d("SmartImportVM", "清理后的JSON: $cleanJson")
                 
                 // 使用Gson解析JSON
                 val gson = com.google.gson.Gson()
@@ -201,7 +202,7 @@ class SmartImportViewModel @Inject constructor(
                     
                     // 输出调试信息
                     debugResponse.debug?.forEach { debugMsg ->
-                        android.util.Log.d("SmartImportVM", "JS调试: $debugMsg")
+                        AppLogger.d("SmartImportVM", "JS调试: $debugMsg")
                     }
                     
                     // 检查是否有错误信息
@@ -212,7 +213,7 @@ class SmartImportViewModel @Inject constructor(
                     }
                     
                     val aiCourses = debugResponse.courses ?: emptyList()
-                    android.util.Log.d("SmartImportVM", "解析到 ${aiCourses.size} 门课程")
+                    AppLogger.d("SmartImportVM", "解析到 ${aiCourses.size} 门课程")
                     
                     if (aiCourses.isEmpty()) {
                         // 显示**所有**调试信息帮助用户 ⭐
@@ -222,20 +223,20 @@ class SmartImportViewModel @Inject constructor(
                     }
                     
                     // ✅ 第二步：转换前过滤和验证数据
-                    android.util.Log.d("SmartImportVM", "===== 开始转换课程 =====")
+                    AppLogger.d("SmartImportVM", "===== 开始转换课程 =====")
                     val parsedCourses = aiCourses.mapIndexedNotNull { index, aiCourse ->
                         // 解析课程名称（兼容两种格式）
                         var courseName = aiCourse.resolveCourseName()
                         val originalCourseName = courseName  // 保存原始名称用于日志
                         
-                        android.util.Log.d("SmartImportVM", "课程${index + 1} 原始名称: '$courseName'")
+                        AppLogger.d("SmartImportVM", "课程${index + 1} 原始名称: '$courseName'")
                         
                         // 如果课程名称包含过多信息，尝试解析
                         var teacher = aiCourse.teacher
                         var classroom = aiCourse.resolveClassroom()
                         var weekInfo = aiCourse.weekInfo
                         
-                        android.util.Log.d("SmartImportVM", "  原始字段 - 教师: '$teacher', 教室: '$classroom', 周次: '$weekInfo'")
+                        AppLogger.d("SmartImportVM", "  原始字段 - 教师: '$teacher', 教室: '$classroom', 周次: '$weekInfo'")
                         
                         // 🔧 强化清理：移除课程名称中的多余信息
                         courseName = courseName
@@ -256,12 +257,12 @@ class SmartImportViewModel @Inject constructor(
                             }
                         }
                         
-                        android.util.Log.d("SmartImportVM", "  -> 清理后: '$courseName', 教师: '$teacher', 教室: '$classroom'")
-                        android.util.Log.d("SmartImportVM", "  -> 最终字段 - 教师: '$teacher', 教室: '$classroom'")
+                        AppLogger.d("SmartImportVM", "  -> 清理后: '$courseName', 教师: '$teacher', 教室: '$classroom'")
+                        AppLogger.d("SmartImportVM", "  -> 最终字段 - 教师: '$teacher', 教室: '$classroom'")
                         
                         // 验证课程名称（基本验证，不要太严格）
                         if (courseName.isEmpty() || courseName.length < 2) {
-                            android.util.Log.w("SmartImportVM", "课程名称过短，跳过: '$originalCourseName'")
+                            AppLogger.e("SmartImportVM", "课程名称过短，跳过: '$originalCourseName'")
                             return@mapIndexedNotNull null
                         }
                         
@@ -273,13 +274,13 @@ class SmartImportViewModel @Inject constructor(
                         
                         // 验证教师姓名（只检查长度，不清空）
                         if (teacher.isNotEmpty() && teacher.length > Constants.Course.MAX_TEACHER_NAME_LENGTH) {
-                            android.util.Log.w("SmartImportVM", "教师姓名过长，截断: $teacher")
+                            AppLogger.e("SmartImportVM", "教师姓名过长，截断: $teacher")
                             teacher = teacher.take(Constants.Course.MAX_TEACHER_NAME_LENGTH)
                         }
                         
                         // 验证教室（只检查长度，不清空）
                         if (classroom.isNotEmpty() && classroom.length > Constants.Course.MAX_CLASSROOM_NAME_LENGTH) {
-                            android.util.Log.w("SmartImportVM", "教室名称过长，截断: $classroom")
+                            AppLogger.e("SmartImportVM", "教室名称过长，截断: $classroom")
                             classroom = classroom.take(Constants.Course.MAX_CLASSROOM_NAME_LENGTH)
                         }
                         
@@ -305,12 +306,12 @@ class SmartImportViewModel @Inject constructor(
                         // 解析周次（优先使用JavaScript已解析的数据）
                         val weekExpression = aiCourse.resolveWeekExpression()
                         val weekList = if (aiCourse.weeks.isNotEmpty()) {
-                            android.util.Log.d("SmartImportVM", "转换课程${index + 1}: $courseName, 使用JS解析的周次: ${aiCourse.weeks.joinToString(",")}")
+                            AppLogger.d("SmartImportVM", "转换课程${index + 1}: $courseName, 使用JS解析的周次: ${aiCourse.weeks.joinToString(",")}")
                             aiCourse.weeks  // JavaScript已经解析好了
                         } else {
-                            android.util.Log.d("SmartImportVM", "转换课程${index + 1}: $courseName, 周次表达式: $weekExpression")
+                            AppLogger.d("SmartImportVM", "转换课程${index + 1}: $courseName, 周次表达式: $weekExpression")
                             val parsed = parseWeekInfo(weekExpression)
-                            android.util.Log.d("SmartImportVM", "  -> 解析得到周次: ${parsed.joinToString(",")}")
+                            AppLogger.d("SmartImportVM", "  -> 解析得到周次: ${parsed.joinToString(",")}")
                             parsed
                         }
                         
@@ -327,14 +328,14 @@ class SmartImportViewModel @Inject constructor(
                             credit = aiCourse.credit  // 学分
                         )
                     }
-                    android.util.Log.d("SmartImportVM", "===== 转换完成，共${parsedCourses.size}门课程 =====")
+                    AppLogger.d("SmartImportVM", "===== 转换完成，共${parsedCourses.size}门课程 =====")
                     
                     _parsedCourses.value = parsedCourses
                     _parseState.value = ParseState.Success(debugInfo = _debugInfo.value)
                     
                 } catch (e: Exception) {
                     // 如果解析调试格式失败，尝试直接解析课程列表
-                    android.util.Log.w("SmartImportVM", "解析调试格式失败，尝试直接解析", e)
+                    AppLogger.e("SmartImportVM", "解析调试格式失败，尝试直接解析", e)
                     
                     val type = object : com.google.gson.reflect.TypeToken<List<com.wind.ggbond.classtime.ui.screen.scheduleimport.JsonCourse>>() {}.type
                     val jsonCourses: List<com.wind.ggbond.classtime.ui.screen.scheduleimport.JsonCourse> = gson.fromJson(cleanJson, type)
@@ -363,7 +364,7 @@ class SmartImportViewModel @Inject constructor(
                 }
                 
             } catch (e: Exception) {
-                android.util.Log.e("SmartImportVM", "解析失败", e)
+                AppLogger.e("SmartImportVM", "解析失败", e)
                 _parseState.value = ParseState.Error("解析失败：${e.message}")
             }
         }
@@ -625,15 +626,15 @@ class SmartImportViewModel @Inject constructor(
             var text = weekInfo
             
             // 调试日志：输入
-            android.util.Log.d("SmartImportVM", "【周次解析】原始输入: $weekInfo")
+            AppLogger.d("SmartImportVM", "【周次解析】原始输入: $weekInfo")
             
             // 去除节次信息：(1-2节)1-4周 -> 1-4周
             text = text.replace(Regex("\\(\\d+-\\d+节\\)"), "").trim()
-            android.util.Log.d("SmartImportVM", "【周次解析】去除节次后: $text")
+            AppLogger.d("SmartImportVM", "【周次解析】去除节次后: $text")
             
             // 分割多个周次段：1-3周(单),4-6周(双),7-15周 -> [1-3周(单), 4-6周(双), 7-15周]
             val segments = text.split(Regex("[,，;；]"))
-            android.util.Log.d("SmartImportVM", "【周次解析】分段: ${segments.joinToString(" | ")}")
+            AppLogger.d("SmartImportVM", "【周次解析】分段: ${segments.joinToString(" | ")}")
             
             val allWeeks = mutableSetOf<Int>()
             
@@ -659,35 +660,35 @@ class SmartImportViewModel @Inject constructor(
                         val start = parts[0].trim().toIntOrNull() ?: continue
                         val end = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: continue
                         
-                        android.util.Log.d("SmartImportVM", "【周次解析】处理段落: $segment -> 范围$start-$end, 单=$isSingle, 双=$isDouble")
+                        AppLogger.d("SmartImportVM", "【周次解析】处理段落: $segment -> 范围$start-$end, 单=$isSingle, 双=$isDouble")
                         
                         for (week in start..end) {
                             // 应用该段落的单双周过滤
                             if (isSingle && week % 2 == 0) {
-                                android.util.Log.d("SmartImportVM", "【周次解析】  跳过第${week}周(双周，该段要求单周)")
+                                AppLogger.d("SmartImportVM", "【周次解析】  跳过第${week}周(双周，该段要求单周)")
                                 continue
                             }
                             if (isDouble && week % 2 == 1) {
-                                android.util.Log.d("SmartImportVM", "【周次解析】  跳过第${week}周(单周，该段要求双周)")
+                                AppLogger.d("SmartImportVM", "【周次解析】  跳过第${week}周(单周，该段要求双周)")
                                 continue
                             }
-                            android.util.Log.d("SmartImportVM", "【周次解析】  ✓ 添加第${week}周")
+                            AppLogger.d("SmartImportVM", "【周次解析】  ✓ 添加第${week}周")
                             allWeeks.add(week)
                         }
                     }
                     // 单个周次：5
                     cleaned.matches(Regex("\\d+")) -> {
                         val week = cleaned.toInt()
-                        android.util.Log.d("SmartImportVM", "【周次解析】处理段落: $segment -> 单个周次$week, 单=$isSingle, 双=$isDouble")
+                        AppLogger.d("SmartImportVM", "【周次解析】处理段落: $segment -> 单个周次$week, 单=$isSingle, 双=$isDouble")
                         if (isSingle && week % 2 == 0) {
-                            android.util.Log.d("SmartImportVM", "【周次解析】  跳过第${week}周(双周，该段要求单周)")
+                            AppLogger.d("SmartImportVM", "【周次解析】  跳过第${week}周(双周，该段要求单周)")
                             continue
                         }
                         if (isDouble && week % 2 == 1) {
-                            android.util.Log.d("SmartImportVM", "【周次解析】  跳过第${week}周(单周，该段要求双周)")
+                            AppLogger.d("SmartImportVM", "【周次解析】  跳过第${week}周(单周，该段要求双周)")
                             continue
                         }
-                        android.util.Log.d("SmartImportVM", "【周次解析】  ✓ 添加第${week}周")
+                        AppLogger.d("SmartImportVM", "【周次解析】  ✓ 添加第${week}周")
                         allWeeks.add(week)
                     }
                 }
@@ -699,11 +700,11 @@ class SmartImportViewModel @Inject constructor(
                 allWeeks.sorted()
             }
             
-            android.util.Log.d("SmartImportVM", "【周次解析】最终结果: ${result.joinToString(", ")}")
+            AppLogger.d("SmartImportVM", "【周次解析】最终结果: ${result.joinToString(", ")}")
             return result
             
         } catch (e: Exception) {
-            android.util.Log.e("SmartImportVM", "解析周次失败: $weekInfo", e)
+            AppLogger.e("SmartImportVM", "解析周次失败: $weekInfo", e)
             return (1..16).toList()
         }
     }
@@ -747,13 +748,13 @@ class SmartImportViewModel @Inject constructor(
                 )
                 
                 val scheduleId = scheduleRepository.insertSchedule(newSchedule)
-                android.util.Log.d("SmartImport", "创建新课表: $scheduleName, ID: $scheduleId")
+                AppLogger.d("SmartImport", "创建新课表: $scheduleName, ID: $scheduleId")
                 
                 // !!!! 这段代码在 SmartImportViewModel 中，但现在已经不用了
                 // 现在使用 ImportScheduleViewModel 的 confirmImport() 方法
-                android.util.Log.e("SmartImport", "错误：这段代码不应该被执行！")
+                AppLogger.e("SmartImport", "错误：这段代码不应该被执行！")
             } catch (e: Exception) {
-                android.util.Log.e("SmartImport", "导入失败", e)
+                AppLogger.e("SmartImport", "导入失败", e)
                 _parseState.value = ParseState.Error("导入失败：${e.message}")
             }
         }

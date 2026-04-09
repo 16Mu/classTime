@@ -601,13 +601,17 @@ private fun formatBriefChange(adjustment: CourseAdjustment): String {
     val originalDay = DateUtils.getDayOfWeekName(adjustment.originalDayOfWeek)
     val newDay = DateUtils.getDayOfWeekName(adjustment.newDayOfWeek)
     
-    return if (adjustment.originalWeekNumber == adjustment.newWeekNumber) {
-        // 同周调课
+    val timeChange = if (adjustment.originalWeekNumber == adjustment.newWeekNumber) {
         "第${adjustment.originalWeekNumber}周 $originalDay → $newDay"
     } else {
-        // 跨周调课
         "第${adjustment.originalWeekNumber}周 → 第${adjustment.newWeekNumber}周"
     }
+    
+    val classroomChange = if (adjustment.newClassroom.isNotEmpty()) " 📍${
+        adjustment.newClassroom
+    }" else ""
+    
+    return timeChange + classroomChange
 }
 
 /**

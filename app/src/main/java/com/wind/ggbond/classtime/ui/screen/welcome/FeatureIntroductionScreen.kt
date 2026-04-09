@@ -85,7 +85,7 @@ fun FeatureIntroductionScreen(
                 when (page) {
                     0 -> FeaturePage(
                         icon = Icons.Default.Refresh,
-                        iconColor = Color(0xFF4CAF50),
+                        iconColor = MaterialTheme.colorScheme.primary,
                         title = "智能自动更新",
                         subtitle = "告别旷课烦恼",
                         description = "每次打开应用自动检测课表变化\n实时发现调课、换教室等变动\n再也不用担心错过课程",
@@ -97,7 +97,7 @@ fun FeatureIntroductionScreen(
                     )
                     1 -> FeaturePage(
                         icon = Icons.Default.Edit,
-                        iconColor = Color(0xFF2196F3),
+                        iconColor = MaterialTheme.colorScheme.tertiary,
                         title = "临时调课管理",
                         subtitle = "灵活掌控课表",
                         description = "轻松应对临时调课情况\n手动设置课程时间调整\n自动标记并同步到日历",
@@ -109,7 +109,7 @@ fun FeatureIntroductionScreen(
                     )
                     2 -> FeaturePage(
                         icon = Icons.Default.School,
-                        iconColor = Color(0xFFFF9800),
+                        iconColor = MaterialTheme.colorScheme.secondary,
                         title = "一键导入课表",
                         subtitle = "全国高校通用",
                         description = "支持110+所高校教务系统\n自动识别并导入课程安排\n告别手动输入的烦恼",
@@ -121,7 +121,7 @@ fun FeatureIntroductionScreen(
                     )
                     3 -> FeaturePage(
                         icon = Icons.Default.Lock,
-                        iconColor = Color(0xFF9C27B0),
+                        iconColor = MaterialTheme.colorScheme.error,
                         title = "隐私安全保护",
                         subtitle = "数据只属于你",
                         description = "所有数据存储在本地设备\n账号密码军用级AES-256加密\n卸载即完全删除，无云端备份",

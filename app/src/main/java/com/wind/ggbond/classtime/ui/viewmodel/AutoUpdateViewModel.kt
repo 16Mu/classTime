@@ -33,6 +33,9 @@ class AutoUpdateViewModel @Inject constructor(
     
     private val _isUpdating = MutableStateFlow(false)
     val isUpdating: StateFlow<Boolean> = _isUpdating.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
     
     private val _showIntervalDialog = MutableStateFlow(false)
     val showIntervalDialog: StateFlow<Boolean> = _showIntervalDialog.asStateFlow()
@@ -88,15 +91,24 @@ class AutoUpdateViewModel @Inject constructor(
      * 立即更新
      */
     fun updateNow() {
+        if (_isUpdating.value) return
         viewModelScope.launch {
             _isUpdating.value = true
+            _errorMessage.value = null
             try {
-                // 获取当前学校ID
                 val schoolId = getCurrentSchoolId()
-                if (schoolId != null) {
-                    autoUpdateManager.updateNow(schoolId)
-                    refresh()
+                if (schoolId == null) {
+                    _errorMessage.value = "未选择学校，无法更新"
+                    return@launch
                 }
+                val success = autoUpdateManager.updateNow(schoolId)
+                if (success) {
+                    refresh()
+                } else {
+                    _errorMessage.value = "更新失败，请稍后重试"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "更新异常：${e.message ?: "未知错误"}"
             } finally {
                 _isUpdating.value = false
             }

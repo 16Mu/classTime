@@ -12,6 +12,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
 /**
@@ -36,17 +37,17 @@ object DatabaseModule {
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     super.onCreate(db)
-                    android.util.Log.i("DatabaseModule", "数据库已创建 - 版本: ${db.version}")
+                    AppLogger.i("DatabaseModule", "数据库已创建 - 版本: ${db.version}")
                 }
                 
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     super.onOpen(db)
-                    android.util.Log.i("DatabaseModule", "数据库已打开 - 版本: ${db.version}")
+                    AppLogger.i("DatabaseModule", "数据库已打开 - 版本: ${db.version}")
                 }
                 
                 override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
                     super.onDestructiveMigration(db)
-                    android.util.Log.w("DatabaseModule", 
+                    AppLogger.w("DatabaseModule", 
                         "⚠️ 数据库发生破坏性迁移！旧数据已清除。版本: ${db.version}")
                 }
             })

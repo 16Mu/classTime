@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.ui.screen.profile
+﻿package com.wind.ggbond.classtime.ui.screen.profile
 
 import android.content.Context
 import androidx.navigation.NavController
@@ -36,7 +36,7 @@ class ProfileScreenTest {
     private val testDispatcher = StandardTestDispatcher()
     
     // StateFlows for testing
-    private val bottomBarBlurEnabledFlow = MutableStateFlow(true)
+    private val glassEffectEnabledFlow = MutableStateFlow(true)
     private val compactModeEnabledFlow = MutableStateFlow(false)
     private val showWeekendEnabledFlow = MutableStateFlow(true)
     private val reminderEnabledFlow = MutableStateFlow(false)
@@ -55,7 +55,7 @@ class ProfileScreenTest {
         context = mockk(relaxed = true)
         
         // Setup StateFlow mocks
-        every { settingsViewModel.bottomBarBlurEnabled } returns bottomBarBlurEnabledFlow
+        every { settingsViewModel.glassEffectEnabled } returns glassEffectEnabledFlow
         every { settingsViewModel.compactModeEnabled } returns compactModeEnabledFlow
         every { settingsViewModel.showWeekendEnabled } returns showWeekendEnabledFlow
         every { settingsViewModel.reminderEnabled } returns reminderEnabledFlow
@@ -83,24 +83,24 @@ class ProfileScreenTest {
     @Test
     fun `bottom bar blur switch should bind to ViewModel state correctly`() = runTest {
         // Given: Initial state is enabled
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
         // When: User toggles the switch to disabled
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // Then: ViewModel method should be called with correct value
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(false) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(false) }
         
         // Given: State is now disabled
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         
         // When: User toggles the switch back to enabled
-        settingsViewModel.updateBottomBarBlurEnabled(true)
+        settingsViewModel.updateGlassEffectEnabled(true)
         advanceUntilIdle()
         
         // Then: ViewModel method should be called with correct value
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(true) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(true) }
     }
     
     /**
@@ -115,14 +115,14 @@ class ProfileScreenTest {
     @Test
     fun `bottom bar blur switch subtitle should reflect current state`() = runTest {
         // Given: Bottom bar blur is enabled
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
         // Then: Subtitle should indicate enabled state
         val enabledSubtitle = "已启用高斯模糊背景"
         assertTrue("Subtitle should show enabled state", enabledSubtitle.isNotEmpty())
         
         // Given: Bottom bar blur is disabled
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         
         // Then: Subtitle should indicate disabled state
         val disabledSubtitle = "已关闭,使用纯色背景"
@@ -182,15 +182,15 @@ class ProfileScreenTest {
     @Test
     fun `toggling bottom bar blur switch should trigger haptic feedback`() = runTest {
         // Given: Bottom bar blur is enabled
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
         // When: User toggles the switch (which should trigger haptic feedback in UI)
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // Then: ViewModel update method should be called
         // (In the actual UI, this triggers haptic feedback via HapticFeedback.performHapticFeedback)
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(false) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(false) }
     }
     
     /**
@@ -227,28 +227,28 @@ class ProfileScreenTest {
     @Test
     fun `multiple bottom bar blur toggles should maintain state consistency`() = runTest {
         // Given: Initial state
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
         // When: User toggles multiple times
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         
-        settingsViewModel.updateBottomBarBlurEnabled(true)
+        settingsViewModel.updateGlassEffectEnabled(true)
         advanceUntilIdle()
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         
         // Then: Each toggle should be recorded
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(false) }
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(true) }
-        verify(exactly = 2) { settingsViewModel.updateBottomBarBlurEnabled(false) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(false) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(true) }
+        verify(exactly = 2) { settingsViewModel.updateGlassEffectEnabled(false) }
         
         // And: Final state should be disabled
-        assertEquals(false, bottomBarBlurEnabledFlow.value)
+        assertEquals(false, glassEffectEnabledFlow.value)
     }
     
     /**
@@ -262,17 +262,17 @@ class ProfileScreenTest {
     @Test
     fun `bottom bar blur state should persist through ViewModel`() = runTest {
         // Given: User has set bottom bar blur to disabled
-        bottomBarBlurEnabledFlow.value = false
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        glassEffectEnabledFlow.value = false
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // When: Configuration change occurs (simulated by keeping ViewModel)
         // The ViewModel retains the state
-        val currentState = bottomBarBlurEnabledFlow.value
+        val currentState = glassEffectEnabledFlow.value
         
         // Then: State should still be disabled
         assertEquals(false, currentState)
-        verify(exactly = 1) { settingsViewModel.updateBottomBarBlurEnabled(false) }
+        verify(exactly = 1) { settingsViewModel.updateGlassEffectEnabled(false) }
     }
     
     /**
@@ -304,17 +304,17 @@ class ProfileScreenTest {
         // Given: Initial states
         compactModeEnabledFlow.value = false
         showWeekendEnabledFlow.value = true
-        bottomBarBlurEnabledFlow.value = true
+        glassEffectEnabledFlow.value = true
         
         // When: Toggle bottom bar blur
-        settingsViewModel.updateBottomBarBlurEnabled(false)
+        settingsViewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
-        bottomBarBlurEnabledFlow.value = false
+        glassEffectEnabledFlow.value = false
         
         // Then: Other switches should remain unchanged
         assertEquals(false, compactModeEnabledFlow.value)
         assertEquals(true, showWeekendEnabledFlow.value)
-        assertEquals(false, bottomBarBlurEnabledFlow.value)
+        assertEquals(false, glassEffectEnabledFlow.value)
         
         // When: Toggle compact mode
         settingsViewModel.updateCompactModeEnabled(true)
@@ -324,6 +324,6 @@ class ProfileScreenTest {
         // Then: Other switches should remain unchanged
         assertEquals(true, compactModeEnabledFlow.value)
         assertEquals(true, showWeekendEnabledFlow.value)
-        assertEquals(false, bottomBarBlurEnabledFlow.value)
+        assertEquals(false, glassEffectEnabledFlow.value)
     }
 }

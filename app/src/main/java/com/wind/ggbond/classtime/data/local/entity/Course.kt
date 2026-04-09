@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import com.wind.ggbond.classtime.data.local.converter.Converters
@@ -8,7 +9,21 @@ import com.wind.ggbond.classtime.data.local.converter.Converters
 /**
  * 课程实体
  */
-@Entity(tableName = "courses")
+@Entity(
+    tableName = "courses",
+    foreignKeys = [
+        ForeignKey(
+            entity = Schedule::class,
+            parentColumns = ["id"],
+            childColumns = ["scheduleId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        androidx.room.Index("scheduleId"),
+        androidx.room.Index(value = ["scheduleId", "dayOfWeek", "startSection"])
+    ]
+)
 @TypeConverters(Converters::class)
 data class Course(
     @PrimaryKey(autoGenerate = true)

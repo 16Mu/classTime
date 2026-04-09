@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -32,6 +31,7 @@ import com.wind.ggbond.classtime.ui.components.MainContent
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 /**
@@ -81,64 +81,28 @@ class MainActivity : ComponentActivity() {
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
-        // ✅ 第一步：安装SplashScreen（必须在super.onCreate之前）
         val splashScreen = installSplashScreen()
         
         super.onCreate(savedInstanceState)
         
-        // ✅ 第二步：保持SplashScreen直到初始化完成
         splashScreen.setKeepOnScreenCondition {
             initState is InitializationState.Loading
         }
         
-        // 启用边到边显示和预测性返回手势
         enableEdgeToEdge()
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
-        // 请求通知权限（Android 13+）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
+        requestNotificationPermission()
         
-        // ✅ 第三步：在后台执行初始化和预加载（带超时保护）
         lifecycleScope.launch {
-            try {
-                val initResult = appInitializer.initialize()
-
-                initState = when (initResult) {
-                    is InitializationResult.Success -> InitializationState.Success
-                    is InitializationResult.Timeout -> InitializationState.Error(
-                        message = "初始化超时（10秒），请重试",
-                        throwable = java.util.concurrent.TimeoutException("初始化操作在10秒内未完成")
-                    )
-                    is InitializationResult.Error -> InitializationState.Error(
-                        message = "初始化失败：${initResult.message}",
-                        throwable = initResult.throwable
-                    )
-                }
-
-                // ✅ 刷新小组件数据，确保从小组件进入应用时数据同步
+            initState = performInitialization()
+            
+            if (initState is InitializationState.Success) {
                 appInitializer.refreshWidgets()
-
-                // ✅ 检查是否需要自动更新课表
                 checkAndTriggerAutoUpdate()
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-                initState = InitializationState.Error(
-                    message = "初始化失败：${e.message ?: "未知错误"}",
-                    throwable = e
-                )
             }
         }
         
-        // ✅ 第四步：根据初始化状态显示UI
         setContent {
             MainContent(
                 initState = initState,
@@ -147,29 +111,38 @@ class MainActivity : ComponentActivity() {
                 intent = intent,
                 onRetry = {
                     initState = InitializationState.Loading
-                    lifecycleScope.launch {
-                        try {
-                            val retryResult = appInitializer.initialize()
-                            initState = when (retryResult) {
-                                is InitializationResult.Success -> InitializationState.Success
-                                is InitializationResult.Timeout -> InitializationState.Error(
-                                    message = "初始化超时（10秒），请重试",
-                                    throwable = java.util.concurrent.TimeoutException("初始化操作在10秒内未完成")
-                                )
-                                is InitializationResult.Error -> InitializationState.Error(
-                                    message = "初始化失败：${retryResult.message}",
-                                    throwable = retryResult.throwable
-                                )
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            initState = InitializationState.Error(
-                                message = "初始化失败：${e.message ?: "未知错误"}",
-                                throwable = e
-                            )
-                        }
-                    }
+                    lifecycleScope.launch { initState = performInitialization() }
                 }
+            )
+        }
+    }
+    
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    
+    private suspend fun performInitialization(): InitializationState {
+        return try {
+            when (val result = appInitializer.initialize()) {
+                is InitializationResult.Success -> InitializationState.Success
+                is InitializationResult.Timeout -> InitializationState.Error(
+                    message = "初始化超时（10秒），请重试",
+                    throwable = java.util.concurrent.TimeoutException("初始化操作在10秒内未完成")
+                )
+                is InitializationResult.Error -> InitializationState.Error(
+                    message = "初始化失败：${result.message}",
+                    throwable = result.throwable
+                )
+            }
+        } catch (e: Exception) {
+            InitializationState.Error(
+                message = "初始化失败：${e.message ?: "未知错误"}",
+                throwable = e
             )
         }
     }
@@ -178,12 +151,12 @@ class MainActivity : ComponentActivity() {
         try {
             val decision = updateOrchestrator.checkAndTriggerAutoUpdate()
             if (decision.shouldUpdate) {
-                Log.d("MainActivity", "✅ 自动更新已触发: ${decision.reason}")
+                AppLogger.d("MainActivity", "✅ 自动更新已触发: ${decision.reason}")
             } else {
-                Log.d("MainActivity", "跳过自动更新: ${decision.reason}")
+                AppLogger.d("MainActivity", "跳过自动更新: ${decision.reason}")
             }
         } catch (e: Exception) {
-            Log.e("MainActivity", "检查自动更新失败", e)
+            AppLogger.e("MainActivity", "检查自动更新失败", e)
         }
     }
 }

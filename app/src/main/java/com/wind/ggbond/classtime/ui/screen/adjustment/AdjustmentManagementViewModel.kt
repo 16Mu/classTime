@@ -28,6 +28,35 @@ class AdjustmentManagementViewModel @Inject constructor(
     // 所有调课记录
     private val _adjustments = MutableStateFlow<List<CourseAdjustment>>(emptyList())
     val adjustments: StateFlow<List<CourseAdjustment>> = _adjustments.asStateFlow()
+
+    val courseMap: StateFlow<Map<Long, Course>> = _currentScheduleId.flatMapLatest { scheduleId ->
+        if (scheduleId == null) flowOf(emptyMap())
+        else courseRepository.getAllCoursesBySchedule(scheduleId).map { courses -> courses.associateBy { it.id } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    private val _selectedAdjustment = MutableStateFlow<CourseAdjustment?>(null)
+    val selectedAdjustment: StateFlow<CourseAdjustment?> = _selectedAdjustment.asStateFlow()
+
+    private val _showDeleteDialog = MutableStateFlow(false)
+    val showDeleteDialog: StateFlow<Boolean> = _showDeleteDialog.asStateFlow()
+
+    fun showDeleteDialog(adjustment: CourseAdjustment) {
+        _selectedAdjustment.value = adjustment
+        _showDeleteDialog.value = true
+    }
+
+    fun hideDeleteDialog() {
+        _showDeleteDialog.value = false
+        _selectedAdjustment.value = null
+    }
+
+    fun clearAllAdjustments() {
+        viewModelScope.launch {
+            try {
+                _adjustments.value.forEach { adjustmentRepository.cancelAdjustment(it) }
+            } catch (_: Exception) {}
+        }
+    }
     
     // 调课记录及对应的课程信息
     data class AdjustmentWithCourse(

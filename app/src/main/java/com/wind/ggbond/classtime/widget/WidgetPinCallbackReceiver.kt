@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import com.wind.ggbond.classtime.util.AppLogger
 import androidx.core.app.NotificationManagerCompat
 
 class WidgetPinCallbackReceiver : BroadcastReceiver() {
@@ -32,7 +33,7 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
     }
 
     private fun handleSuccess(context: Context, widgetType: String) {
-        android.util.Log.d(TAG, "Widget pin confirmed for type: $widgetType")
+        AppLogger.d(TAG, "Widget pin confirmed for type: $widgetType")
         
         Toast.makeText(
             context,
@@ -43,12 +44,12 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
         try {
             refreshWidgetsAfterPin(context, widgetType)
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "Failed to refresh widgets after pin", e)
+            AppLogger.e(TAG, "Failed to refresh widgets after pin", e)
         }
     }
 
     private fun handleCancelled(context: Context, widgetType: String) {
-        android.util.Log.w(TAG, "Widget pin cancelled by user for type: $widgetType")
+        AppLogger.w(TAG, "Widget pin cancelled by user for type: $widgetType")
         
         Toast.makeText(
             context,
@@ -58,7 +59,7 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
     }
 
     private fun handleUnknownResult(context: Context, resultCode: Int, widgetType: String) {
-        android.util.Log.w(TAG, "Unknown result code $resultCode for widget type: $widgetType")
+        AppLogger.w(TAG, "Unknown result code $resultCode for widget type: $widgetType")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             showFallbackNotification(context, widgetType)
@@ -120,7 +121,7 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "Error refreshing widgets", e)
+            AppLogger.e(TAG, "Error refreshing widgets", e)
         }
     }
 

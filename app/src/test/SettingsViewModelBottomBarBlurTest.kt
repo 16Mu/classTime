@@ -1,4 +1,4 @@
-package com.wind.ggbond.classtime.ui.screen.settings
+﻿package com.wind.ggbond.classtime.ui.screen.settings
 
 import android.content.Context
 import com.wind.ggbond.classtime.data.repository.CourseRepository
@@ -22,7 +22,7 @@ import org.junit.Assert.*
  * **Validates: Requirements 7.7, 15.2**
  * 
  * Tests:
- * - updateBottomBarBlurEnabled updates DataStore
+ * - updateGlassEffectEnabled updates DataStore
  * - State correctly reflects DataStore values
  * - Error handling for DataStore write failures
  */
@@ -61,8 +61,8 @@ class SettingsViewModelBottomBarBlurTest {
         coEvery { settingsRepository.isDisclaimerAccepted() } returns true
         coEvery { settingsRepository.isOnboardingCompleted() } returns true
         coEvery { settingsRepository.isShowWeekendEnabled() } returns true
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns true
-        coEvery { settingsRepository.setBottomBarBlurEnabled(any()) } just Runs
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns true
+        coEvery { settingsRepository.setglassEffectEnabled(any()) } just Runs
         
         // Create ViewModel
         viewModel = SettingsViewModel(
@@ -83,42 +83,42 @@ class SettingsViewModelBottomBarBlurTest {
     }
     
     /**
-     * Test 1: updateBottomBarBlurEnabled should update DataStore
+     * Test 1: updateGlassEffectEnabled should update DataStore
      * 
      * Validates: Requirement 7.7
      * 
-     * Verifies that calling updateBottomBarBlurEnabled(true) updates the DataStore
+     * Verifies that calling updateGlassEffectEnabled(true) updates the DataStore
      * through the SettingsRepository
      */
     @Test
-    fun `updateBottomBarBlurEnabled should call repository to update DataStore`() = runTest {
+    fun `updateGlassEffectEnabled should call repository to update DataStore`() = runTest {
         // When: Update bottom bar blur to enabled
-        viewModel.updateBottomBarBlurEnabled(true)
+        viewModel.updateGlassEffectEnabled(true)
         advanceUntilIdle()
         
         // Then: Repository should be called with correct value
-        coVerify(exactly = 1) { settingsRepository.setBottomBarBlurEnabled(true) }
+        coVerify(exactly = 1) { settingsRepository.setglassEffectEnabled(true) }
     }
     
     /**
-     * Test 2: updateBottomBarBlurEnabled should update state to false
+     * Test 2: updateGlassEffectEnabled should update state to false
      * 
      * Validates: Requirement 7.7
      * 
-     * Verifies that calling updateBottomBarBlurEnabled(false) updates both
+     * Verifies that calling updateGlassEffectEnabled(false) updates both
      * the DataStore and the ViewModel state
      */
     @Test
-    fun `updateBottomBarBlurEnabled should update state to false`() = runTest {
+    fun `updateGlassEffectEnabled should update state to false`() = runTest {
         // When: Update bottom bar blur to disabled
-        viewModel.updateBottomBarBlurEnabled(false)
+        viewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // Then: Repository should be called with false
-        coVerify(exactly = 1) { settingsRepository.setBottomBarBlurEnabled(false) }
+        coVerify(exactly = 1) { settingsRepository.setglassEffectEnabled(false) }
         
         // And: ViewModel state should be updated
-        assertEquals(false, viewModel.bottomBarBlurEnabled.value)
+        assertEquals(false, viewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -132,7 +132,7 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `state should reflect DataStore value on initialization`() = runTest {
         // Given: DataStore has bottom bar blur enabled
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns true
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns true
         
         // When: Create a new ViewModel instance
         val newViewModel = SettingsViewModel(
@@ -147,7 +147,7 @@ class SettingsViewModelBottomBarBlurTest {
         advanceUntilIdle()
         
         // Then: State should be enabled
-        assertEquals(true, newViewModel.bottomBarBlurEnabled.value)
+        assertEquals(true, newViewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -161,7 +161,7 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `state should reflect disabled value from DataStore on initialization`() = runTest {
         // Given: DataStore has bottom bar blur disabled
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns false
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns false
         
         // When: Create a new ViewModel instance
         val newViewModel = SettingsViewModel(
@@ -176,7 +176,7 @@ class SettingsViewModelBottomBarBlurTest {
         advanceUntilIdle()
         
         // Then: State should be disabled
-        assertEquals(false, newViewModel.bottomBarBlurEnabled.value)
+        assertEquals(false, newViewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -190,21 +190,21 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `multiple updates should all be persisted to DataStore`() = runTest {
         // When: Toggle bottom bar blur multiple times
-        viewModel.updateBottomBarBlurEnabled(false)
+        viewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
-        viewModel.updateBottomBarBlurEnabled(true)
+        viewModel.updateGlassEffectEnabled(true)
         advanceUntilIdle()
         
-        viewModel.updateBottomBarBlurEnabled(false)
+        viewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // Then: Repository should be called for each update
-        coVerify(exactly = 2) { settingsRepository.setBottomBarBlurEnabled(false) }
-        coVerify(exactly = 1) { settingsRepository.setBottomBarBlurEnabled(true) }
+        coVerify(exactly = 2) { settingsRepository.setglassEffectEnabled(false) }
+        coVerify(exactly = 1) { settingsRepository.setglassEffectEnabled(true) }
         
         // And: Final state should be disabled
-        assertEquals(false, viewModel.bottomBarBlurEnabled.value)
+        assertEquals(false, viewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -218,18 +218,18 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `should handle DataStore write failure gracefully`() = runTest {
         // Given: DataStore write will fail
-        coEvery { settingsRepository.setBottomBarBlurEnabled(any()) } throws Exception("DataStore write failed")
+        coEvery { settingsRepository.setglassEffectEnabled(any()) } throws Exception("DataStore write failed")
         
         // When: Attempt to update bottom bar blur
         try {
-            viewModel.updateBottomBarBlurEnabled(false)
+            viewModel.updateGlassEffectEnabled(false)
             advanceUntilIdle()
         } catch (e: Exception) {
             // Exception is expected
         }
         
         // Then: Repository should have been called
-        coVerify(exactly = 1) { settingsRepository.setBottomBarBlurEnabled(false) }
+        coVerify(exactly = 1) { settingsRepository.setglassEffectEnabled(false) }
     }
     
     /**
@@ -238,20 +238,20 @@ class SettingsViewModelBottomBarBlurTest {
      * Validates: Requirement 7.7
      * 
      * Verifies that the ViewModel state is updated immediately
-     * when updateBottomBarBlurEnabled is called, even before
+     * when updateGlassEffectEnabled is called, even before
      * DataStore write completes
      */
     @Test
     fun `state update should be immediate in ViewModel`() = runTest {
         // Given: Initial state is enabled
-        assertEquals(true, viewModel.bottomBarBlurEnabled.value)
+        assertEquals(true, viewModel.glassEffectEnabled.value)
         
         // When: Update to disabled
-        viewModel.updateBottomBarBlurEnabled(false)
+        viewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // Then: State should be immediately updated
-        assertEquals(false, viewModel.bottomBarBlurEnabled.value)
+        assertEquals(false, viewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -265,12 +265,12 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `state should persist after app restart simulation`() = runTest {
         // Given: User disables bottom bar blur
-        viewModel.updateBottomBarBlurEnabled(false)
+        viewModel.updateGlassEffectEnabled(false)
         advanceUntilIdle()
         
         // When: App restarts (simulate by creating new ViewModel)
         // Mock repository to return the saved value
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns false
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns false
         
         val newViewModel = SettingsViewModel(
             context = context,
@@ -284,7 +284,7 @@ class SettingsViewModelBottomBarBlurTest {
         advanceUntilIdle()
         
         // Then: New ViewModel should load the saved state
-        assertEquals(false, newViewModel.bottomBarBlurEnabled.value)
+        assertEquals(false, newViewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -298,7 +298,7 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `default value should be true when DataStore is empty`() = runTest {
         // Given: DataStore returns default value (true)
-        coEvery { settingsRepository.isBottomBarBlurEnabled() } returns true
+        coEvery { settingsRepository.isGlassEffectEnabled() } returns true
         
         // When: Create ViewModel on first launch
         val newViewModel = SettingsViewModel(
@@ -313,7 +313,7 @@ class SettingsViewModelBottomBarBlurTest {
         advanceUntilIdle()
         
         // Then: State should be true (default)
-        assertEquals(true, newViewModel.bottomBarBlurEnabled.value)
+        assertEquals(true, newViewModel.glassEffectEnabled.value)
     }
     
     /**
@@ -327,17 +327,17 @@ class SettingsViewModelBottomBarBlurTest {
     @Test
     fun `rapid toggles should maintain state consistency`() = runTest {
         // When: Rapidly toggle bottom bar blur
-        viewModel.updateBottomBarBlurEnabled(false)
-        viewModel.updateBottomBarBlurEnabled(true)
-        viewModel.updateBottomBarBlurEnabled(false)
-        viewModel.updateBottomBarBlurEnabled(true)
+        viewModel.updateGlassEffectEnabled(false)
+        viewModel.updateGlassEffectEnabled(true)
+        viewModel.updateGlassEffectEnabled(false)
+        viewModel.updateGlassEffectEnabled(true)
         advanceUntilIdle()
         
         // Then: All updates should be persisted
-        coVerify(exactly = 2) { settingsRepository.setBottomBarBlurEnabled(false) }
-        coVerify(exactly = 2) { settingsRepository.setBottomBarBlurEnabled(true) }
+        coVerify(exactly = 2) { settingsRepository.setglassEffectEnabled(false) }
+        coVerify(exactly = 2) { settingsRepository.setglassEffectEnabled(true) }
         
         // And: Final state should be enabled
-        assertEquals(true, viewModel.bottomBarBlurEnabled.value)
+        assertEquals(true, viewModel.glassEffectEnabled.value)
     }
 }

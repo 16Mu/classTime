@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.wind.ggbond.classtime.ui.screen.main.MainScreen
+import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 
 /**
  * 应用导航图（支持共享元素转场 + 底部Tab导航）
@@ -18,6 +19,8 @@ import com.wind.ggbond.classtime.ui.screen.main.MainScreen
 fun NavGraph(
     navController: NavHostController,
     sharedTransitionScope: SharedTransitionScope,
+    backgroundThemeManager: BackgroundThemeManager,
+    courseColors: List<String> = emptyList(),
     startDestination: String = BottomNavItem.Schedule.route
 ) {
     NavHost(
@@ -36,7 +39,9 @@ fun NavGraph(
             route = BottomNavItem.Schedule.route
         ) {
             MainScreen(
-                navController = navController
+                navController = navController,
+                backgroundThemeManager = backgroundThemeManager,
+                courseColors = courseColors
             )
         }
 
@@ -73,7 +78,9 @@ fun NavGraph(
             val refresh = backStackEntry.arguments?.getBoolean("refresh") ?: false
             MainScreen(
                 navController = navController,
-                forceRefresh = refresh
+                backgroundThemeManager = backgroundThemeManager,
+                forceRefresh = refresh,
+                courseColors = courseColors
             )
         }
         
@@ -168,11 +175,6 @@ fun NavGraph(
             com.wind.ggbond.classtime.ui.screen.course.CourseInfoListScreen(
                 navController = navController
             )
-        }
-        
-        // 设置
-        composable(Screen.Settings.route) {
-            com.wind.ggbond.classtime.ui.screen.settings.SettingsScreen(navController)
         }
         
         // 学期管理
@@ -305,54 +307,51 @@ fun NavGraph(
 /**
  * 默认进入动画 - 一镜到底的淡入+上滑
  */
+private const val ANIM_ENTER = 300
+private const val ANIM_EXIT = 200
+private const val ANIM_POP_ENTER = 250
+private const val ANIM_POP_EXIT = 250
+private const val ANIM_SLIDE = 350
+
 private fun defaultEnterTransition(): EnterTransition {
     return fadeIn(
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
+        animationSpec = tween(ANIM_ENTER, easing = FastOutSlowInEasing)
     ) + slideInVertically(
         initialOffsetY = { it / 20 },
-        animationSpec = tween(400, easing = FastOutSlowInEasing)
+        animationSpec = tween(ANIM_SLIDE, easing = FastOutSlowInEasing)
     ) + scaleIn(
         initialScale = 0.95f,
-        animationSpec = tween(300, easing = FastOutSlowInEasing)
+        animationSpec = tween(ANIM_ENTER, easing = FastOutSlowInEasing)
     )
 }
 
-/**
- * 默认退出动画 - 淡出+轻微缩放
- */
 private fun defaultExitTransition(): ExitTransition {
     return fadeOut(
-        animationSpec = tween(200, easing = FastOutLinearInEasing)
+        animationSpec = tween(ANIM_EXIT, easing = FastOutLinearInEasing)
     ) + scaleOut(
         targetScale = 0.96f,
-        animationSpec = tween(200, easing = FastOutLinearInEasing)
+        animationSpec = tween(ANIM_EXIT, easing = FastOutLinearInEasing)
     )
 }
 
-/**
- * 返回进入动画 - 恢复原页面
- */
 private fun defaultPopEnterTransition(): EnterTransition {
     return fadeIn(
-        animationSpec = tween(300, easing = LinearOutSlowInEasing)
+        animationSpec = tween(ANIM_POP_ENTER, easing = LinearOutSlowInEasing)
     ) + scaleIn(
         initialScale = 0.96f,
-        animationSpec = tween(300, easing = LinearOutSlowInEasing)
+        animationSpec = tween(ANIM_POP_ENTER, easing = LinearOutSlowInEasing)
     )
 }
 
-/**
- * 返回退出动画 - 下滑退出
- */
 private fun defaultPopExitTransition(): ExitTransition {
     return fadeOut(
-        animationSpec = tween(250, easing = FastOutLinearInEasing)
+        animationSpec = tween(ANIM_POP_EXIT, easing = FastOutLinearInEasing)
     ) + slideOutVertically(
         targetOffsetY = { it / 20 },
-        animationSpec = tween(350, easing = FastOutLinearInEasing)
+        animationSpec = tween(ANIM_SLIDE, easing = FastOutLinearInEasing)
     ) + scaleOut(
         targetScale = 0.95f,
-        animationSpec = tween(250, easing = FastOutLinearInEasing)
+        animationSpec = tween(ANIM_POP_EXIT, easing = FastOutLinearInEasing)
     )
 }
 

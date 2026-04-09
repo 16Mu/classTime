@@ -1,9 +1,9 @@
 package com.wind.ggbond.classtime.service.helper
 
-import android.util.Log
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.Schedule
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.DateUtils
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -32,7 +32,7 @@ class ReminderSchedulingHelper @Inject constructor() {
 
             val classTime = classTimes.find { it.sectionNumber == course.startSection }
                 ?: run {
-                    Log.w(TAG, "未找到节次 ${course.startSection} 的时间配置")
+                    AppLogger.w(TAG, "未找到节次 ${course.startSection} 的时间配置")
                     return null
                 }
 
@@ -45,7 +45,7 @@ class ReminderSchedulingHelper @Inject constructor() {
 
             reminderDateTime
         } catch (e: Exception) {
-            Log.e(TAG, "计算提醒时间失败: ${e.message}", e)
+            AppLogger.e(TAG, "计算提醒时间失败: ${e.message}", e)
             null
         }
     }
@@ -68,7 +68,7 @@ class ReminderSchedulingHelper @Inject constructor() {
             val courseDateTime = LocalDateTime.of(courseDate, classTime.startTime)
             courseDateTime.minusMinutes(course.reminderMinutes.toLong())
         } catch (e: Exception) {
-            Log.e(TAG, "计算调课提醒时间失败", e)
+            AppLogger.e(TAG, "计算调课提醒时间失败", e)
             null
         }
     }
@@ -130,7 +130,7 @@ class ReminderSchedulingHelper @Inject constructor() {
 
             currentCourseEndTime.minusMinutes(1)
         } catch (e: Exception) {
-            Log.e(TAG, "计算下节课提醒时间失败", e)
+            AppLogger.e(TAG, "计算下节课提醒时间失败", e)
             null
         }
     }

@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
 @HiltViewModel
@@ -85,7 +86,7 @@ class ImportScheduleViewModel @Inject constructor(
                 // 使用统一的检查方法
                 _scheduleState.value = checkScheduleState(schedule)
             } catch (e: Exception) {
-                android.util.Log.w("ImportSchedule", "检查课表状态失败: ${e.message}")
+                AppLogger.w("ImportSchedule", "检查课表状态失败: ${e.message}")
                 _scheduleState.value = ScheduleSelectionState.NeedCreate
             }
         }
@@ -111,11 +112,11 @@ class ImportScheduleViewModel @Inject constructor(
                 val scheduleId = scheduleRepository.insertSchedule(schedule)
                 // 设置为当前课表
                 scheduleRepository.setCurrentSchedule(scheduleId)
-                android.util.Log.d("ImportSchedule", "创建课表成功: $name, ID: $scheduleId")
+                AppLogger.d("ImportSchedule", "创建课表成功: $name, ID: $scheduleId")
                 // 更新状态为就绪
                 _scheduleState.value = ScheduleSelectionState.Ready
             } catch (e: Exception) {
-                android.util.Log.e("ImportSchedule", "创建课表失败", e)
+                AppLogger.e("ImportSchedule", "创建课表失败", e)
                 _importState.value = ImportState.Error("创建课表失败：${e.message}")
             }
         }
@@ -126,7 +127,7 @@ class ImportScheduleViewModel @Inject constructor(
      */
     fun confirmUseExpiredSchedule() {
         _scheduleState.value = ScheduleSelectionState.Ready
-        android.util.Log.d("ImportSchedule", "用户选择继续使用过期课表")
+        AppLogger.d("ImportSchedule", "用户选择继续使用过期课表")
     }
     
     /**
@@ -135,7 +136,7 @@ class ImportScheduleViewModel @Inject constructor(
      */
     fun switchToCreateNewSchedule() {
         _scheduleState.value = ScheduleSelectionState.NeedCreate
-        android.util.Log.d("ImportSchedule", "用户选择创建新课表")
+        AppLogger.d("ImportSchedule", "用户选择创建新课表")
     }
     
     fun previewCourses(courses: List<ParsedCourse>, schoolId: String = "") {
@@ -144,64 +145,64 @@ class ImportScheduleViewModel @Inject constructor(
         _importState.value = ImportState.Preview
     }
     
-    fun confirmImport() {
+    fun confirmImport(overrideMorningSections: Int? = null, overrideAfternoonSections: Int? = null) {
         viewModelScope.launch {
             try {
                 _importState.value = ImportState.Loading
                 
-                android.util.Log.d("ImportSchedule", "=== 开始导入流程 ===")
-                android.util.Log.d("ImportSchedule", "待导入课程数量: ${_parsedCourses.value.size}")
+                AppLogger.d("ImportSchedule", "=== 开始导入流程 ===")
+                AppLogger.d("ImportSchedule", "待导入课程数量: ${_parsedCourses.value.size}")
                 
-                // 检查是否有课程数据
                 if (_parsedCourses.value.isEmpty()) {
-                    android.util.Log.e("ImportSchedule", "✗ 没有课程数据可导入")
+                    AppLogger.e("ImportSchedule", "✗ 没有课程数据可导入")
                     _importState.value = ImportState.Error("没有课程数据可导入")
                     return@launch
                 }
                 
-                // 检查是否有当前课表（包含学期时间信息）
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 
                 if (currentSchedule == null) {
-                    android.util.Log.e("ImportSchedule", "✗ 没有课表，需要设置")
+                    AppLogger.e("ImportSchedule", "✗ 没有课表，需要设置")
                     _importState.value = ImportState.NeedScheduleSetup
                     return@launch
                 }
                 
-                android.util.Log.d("ImportSchedule", "✓ 找到当前课表: ${currentSchedule.name} (ID: ${currentSchedule.id})")
+                AppLogger.d("ImportSchedule", "✓ 找到当前课表: ${currentSchedule.name} (ID: ${currentSchedule.id})")
                 
-                // ⭐ 检查课程节次数是否与当前设置匹配
                 val maxSection = _parsedCourses.value.maxOfOrNull { it.startSection + it.sectionCount - 1 } ?: 8
-                val preferences = classTimeDataStore.data.first()
-                val morningSections = preferences[MORNING_SECTIONS_KEY] ?: DataStoreManager.ClassTimeKeys.DEFAULT_MORNING_SECTIONS
-                val afternoonSections = preferences[AFTERNOON_SECTIONS_KEY] ?: DataStoreManager.ClassTimeKeys.DEFAULT_AFTERNOON_SECTIONS
+                val morningSections = overrideMorningSections
+                    ?: classTimeDataStore.data.first()[MORNING_SECTIONS_KEY]
+                    ?: DataStoreManager.ClassTimeKeys.DEFAULT_MORNING_SECTIONS
+                val afternoonSections = overrideAfternoonSections
+                    ?: classTimeDataStore.data.first()[AFTERNOON_SECTIONS_KEY]
+                    ?: DataStoreManager.ClassTimeKeys.DEFAULT_AFTERNOON_SECTIONS
                 val currentTotalSections = morningSections + afternoonSections
                 
-                android.util.Log.d("ImportSchedule", "========== 节次数检查 ==========")
-                android.util.Log.d("ImportSchedule", "课程总数: ${_parsedCourses.value.size}")
+                AppLogger.d("ImportSchedule", "========== 节次数检查 ==========")
+                AppLogger.d("ImportSchedule", "课程总数: ${_parsedCourses.value.size}")
                 
                 // 输出每门课程的节次信息
                 _parsedCourses.value.take(5).forEach { course ->
                     val endSection = course.startSection + course.sectionCount - 1
-                    android.util.Log.d("ImportSchedule", "  ${course.courseName}: 第${course.startSection}-${endSection}节 (周${course.dayOfWeek})")
+                    AppLogger.d("ImportSchedule", "  ${course.courseName}: 第${course.startSection}-${endSection}节 (周${course.dayOfWeek})")
                 }
                 if (_parsedCourses.value.size > 5) {
-                    android.util.Log.d("ImportSchedule", "  ... 还有 ${_parsedCourses.value.size - 5} 门课程")
+                    AppLogger.d("ImportSchedule", "  ... 还有 ${_parsedCourses.value.size - 5} 门课程")
                 }
                 
-                android.util.Log.d("ImportSchedule", "检测到最大节次: $maxSection")
-                android.util.Log.d("ImportSchedule", "当前设置总节次: $currentTotalSections (上午$morningSections + 下午$afternoonSections)")
+                AppLogger.d("ImportSchedule", "检测到最大节次: $maxSection")
+                AppLogger.d("ImportSchedule", "当前设置总节次: $currentTotalSections (上午$morningSections + 下午$afternoonSections)")
                 
                 // 如果节次数不匹配，提示用户设置
                 if (maxSection != currentTotalSections) {
-                    android.util.Log.w("ImportSchedule", "✗ 节次数不匹配！需要用户重新设置")
-                    android.util.Log.w("ImportSchedule", "  系统将弹出对话框，让用户设置为 $maxSection 节课")
+                    AppLogger.w("ImportSchedule", "✗ 节次数不匹配！需要用户重新设置")
+                    AppLogger.w("ImportSchedule", "  系统将弹出对话框，让用户设置为 $maxSection 节课")
                     _importState.value = ImportState.NeedSectionSetup(maxSection)
                     return@launch
                 }
                 
-                android.util.Log.d("ImportSchedule", "✓ 节次数匹配，继续导入流程")
-                android.util.Log.d("ImportSchedule", "===============================")
+                AppLogger.d("ImportSchedule", "✓ 节次数匹配，继续导入流程")
+                AppLogger.d("ImportSchedule", "===============================")
                 
                 // 查询已存在的课表数量，用于生成新课表名称
                 val existingSchedules = scheduleRepository.getAllSchedulesList()
@@ -214,7 +215,7 @@ class ImportScheduleViewModel @Inject constructor(
                     "我的课表(${scheduleCount + 1})"
                 }
                 
-                android.util.Log.d("ImportSchedule", "生成课表名称: $scheduleName")
+                AppLogger.d("ImportSchedule", "生成课表名称: $scheduleName")
                 
                 // 创建新课表
                 val newSchedule = Schedule(
@@ -226,67 +227,66 @@ class ImportScheduleViewModel @Inject constructor(
                     isCurrent = false // 先设置为非当前，插入后再统一设置
                 )
                 
-                android.util.Log.d("ImportSchedule", "课表关联学校: $currentSchoolId")
+                AppLogger.d("ImportSchedule", "课表关联学校: $currentSchoolId")
                 
                 val scheduleId = scheduleRepository.insertSchedule(newSchedule)
-                android.util.Log.d("ImportSchedule", "✓ 创建课表成功，ID: $scheduleId")
+                AppLogger.d("ImportSchedule", "✓ 创建课表成功，ID: $scheduleId")
                 
                 // ✅ 保存Cookie到SecureCookieManager（如果有的话）
                 if (currentSchoolId.isNotEmpty()) {
                     try {
-                        android.util.Log.d("ImportSchedule", "========== 开始保存Cookie ==========")
+                        AppLogger.d("ImportSchedule", "========== 开始保存Cookie ==========")
                         val cookieManager = CookieManager.getInstance()
                         val school = schoolRepository.getSchoolById(currentSchoolId)
                         
                         if (school != null) {
-                            android.util.Log.d("ImportSchedule", "学校信息:")
-                            android.util.Log.d("ImportSchedule", "  学校ID: $currentSchoolId")
-                            android.util.Log.d("ImportSchedule", "  学校名称: ${school.name}")
-                            android.util.Log.d("ImportSchedule", "  登录URL: ${school.loginUrl}")
-                            android.util.Log.d("ImportSchedule", "  课表URL: ${school.scheduleUrl}")
+                            AppLogger.d("ImportSchedule", "学校信息:")
+                            AppLogger.d("ImportSchedule", "  学校ID: $currentSchoolId")
+                            AppLogger.d("ImportSchedule", "  学校名称: ${school.name}")
+                            AppLogger.d("ImportSchedule", "  登录URL: ${school.loginUrl}")
+                            AppLogger.d("ImportSchedule", "  课表URL: ${school.scheduleUrl}")
                             
                             // 尝试从多个URL获取cookie
                             var cookies = cookieManager.getCookie(school.loginUrl)
-                            android.util.Log.d("ImportSchedule", "从登录URL获取Cookie: ${if (cookies.isNullOrEmpty()) "无" else "有(${cookies.length}字符)"}")
+                            AppLogger.d("ImportSchedule", "从登录URL获取Cookie: ${if (cookies.isNullOrEmpty()) "无" else "有(${cookies.length}字符)"}")
                             
                             if (cookies.isNullOrEmpty()) {
                                 cookies = cookieManager.getCookie(school.scheduleUrl)
-                                android.util.Log.d("ImportSchedule", "从课表URL获取Cookie: ${if (cookies.isNullOrEmpty()) "无" else "有(${cookies.length}字符)"}")
+                                AppLogger.d("ImportSchedule", "从课表URL获取Cookie: ${if (cookies.isNullOrEmpty()) "无" else "有(${cookies.length}字符)"}")
                             }
                             
                             if (!cookies.isNullOrEmpty()) {
                                 // 保存cookie时使用学校ID作为key
                                 secureCookieManager.saveCookies(currentSchoolId, cookies)
-                                android.util.Log.d("ImportSchedule", "✓ 已保存Cookie到加密存储")
-                                android.util.Log.d("ImportSchedule", "  保存的Key: $currentSchoolId")
-                                android.util.Log.d("ImportSchedule", "  Cookie长度: ${cookies.length}")
-                                android.util.Log.d("ImportSchedule", "  Cookie前50字符: ${cookies.take(50)}...")
+                                AppLogger.d("ImportSchedule", "✓ 已保存Cookie到加密存储")
+                                AppLogger.d("ImportSchedule", "  保存的Key: $currentSchoolId")
+                                AppLogger.d("ImportSchedule", "  Cookie长度: ${cookies.length}")
                                 
                                 // 验证保存是否成功
                                 val savedCookies = secureCookieManager.getCookies(currentSchoolId)
                                 if (savedCookies != null) {
-                                    android.util.Log.d("ImportSchedule", "✓ 验证成功：Cookie已正确保存")
+                                    AppLogger.d("ImportSchedule", "✓ 验证成功：Cookie已正确保存")
                                 } else {
-                                    android.util.Log.e("ImportSchedule", "✗ 验证失败：无法读取刚保存的Cookie")
+                                    AppLogger.e("ImportSchedule", "✗ 验证失败：无法读取刚保存的Cookie")
                                 }
                             } else {
-                                android.util.Log.w("ImportSchedule", "⚠️ 未找到Cookie（可能未登录或已过期）")
-                                android.util.Log.w("ImportSchedule", "  登录URL: ${school.loginUrl}")
-                                android.util.Log.w("ImportSchedule", "  课表URL: ${school.scheduleUrl}")
+                                AppLogger.w("ImportSchedule", "⚠️ 未找到Cookie（可能未登录或已过期）")
+                                AppLogger.w("ImportSchedule", "  登录URL: ${school.loginUrl}")
+                                AppLogger.w("ImportSchedule", "  课表URL: ${school.scheduleUrl}")
                             }
                         } else {
-                            android.util.Log.e("ImportSchedule", "✗ 未找到学校信息: $currentSchoolId")
+                            AppLogger.e("ImportSchedule", "✗ 未找到学校信息: $currentSchoolId")
                         }
-                        android.util.Log.d("ImportSchedule", "========================================")
+                        AppLogger.d("ImportSchedule", "========================================")
                     } catch (e: Exception) {
-                        android.util.Log.e("ImportSchedule", "✗ 保存Cookie失败", e)
+                        AppLogger.e("ImportSchedule", "✗ 保存Cookie失败", e)
                         // 不影响导入流程，继续执行
                     }
                 }
                 
                 // 🔧 修复：确保只有这个课表是当前课表（先清除其他课表的当前状态）
                 scheduleRepository.setCurrentSchedule(scheduleId)
-                android.util.Log.d("ImportSchedule", "✓ 已设置为当前课表")
+                AppLogger.d("ImportSchedule", "✓ 已设置为当前课表")
                 
                 // 转换为Course实体并插入
                 // 🎨 智能分配颜色：为不同课程分配不同颜色
@@ -315,21 +315,22 @@ class ImportScheduleViewModel @Inject constructor(
                         },
                         color = colorMapping[parsed.courseName] ?: CourseColorPalette.getColorByIndex(0),
                         scheduleId = scheduleId,
-                        credit = parsed.credit,  // 学分
-                        reminderEnabled = false  // ✅ 导入时默认关闭提醒，等待全局设置控制
+                        credit = parsed.credit,
+                        courseCode = parsed.courseCode,
+                        reminderEnabled = false
                     )
                 }
                 
-                android.util.Log.d("ImportSchedule", "准备插入 ${courses.size} 门课程")
+                AppLogger.d("ImportSchedule", "准备插入 ${courses.size} 门课程")
                 courses.forEachIndexed { index, course ->
-                    android.util.Log.d("ImportSchedule", "  课程 ${index + 1}: ${course.courseName}")
-                    android.util.Log.d("ImportSchedule", "    - 教师: '${course.teacher}', 教室: '${course.classroom}'")
-                    android.util.Log.d("ImportSchedule", "    - 周${course.dayOfWeek} 第${course.startSection}节(共${course.sectionCount}节) - 学分${course.credit}")
-                    android.util.Log.d("ImportSchedule", "    - 周次: ${course.weekExpression} -> ${course.weeks.take(5).joinToString(",")}${if(course.weeks.size > 5) "..." else ""}")
+                    AppLogger.d("ImportSchedule", "  课程 ${index + 1}: ${course.courseName}")
+                    AppLogger.d("ImportSchedule", "    - 教师: '${course.teacher}', 教室: '${course.classroom}'")
+                    AppLogger.d("ImportSchedule", "    - 周${course.dayOfWeek} 第${course.startSection}节(共${course.sectionCount}节) - 学分${course.credit}")
+                    AppLogger.d("ImportSchedule", "    - 周次: ${course.weekExpression} -> ${course.weeks.take(5).joinToString(",")}${if(course.weeks.size > 5) "..." else ""}")
                 }
                 
                 val courseIds = courseRepository.insertCourses(courses)
-                android.util.Log.d("ImportSchedule", "✓ 插入课程成功，数量: ${courseIds.size}")
+                AppLogger.d("ImportSchedule", "✓ 插入课程成功，数量: ${courseIds.size}")
                 
                 // ✅ 检查全局提醒设置，如果开启了则批量为所有课程开启提醒并创建通知任务
                 try {
@@ -342,26 +343,26 @@ class ImportScheduleViewModel @Inject constructor(
                         // ✅ 使用统一的批量开启方法（确保与设置页面逻辑一致）
                         val updatedCount = courseRepository.enableAllCoursesReminder(scheduleId, defaultMinutes)
                         
-                        android.util.Log.d("ImportSchedule", "✅ 已为 $updatedCount 门课程开启提醒")
+                        AppLogger.d("ImportSchedule", "✅ 已为 $updatedCount 门课程开启提醒")
                         
                         // ✅ 批量创建提醒任务
                         reminderScheduler.scheduleAllCourseReminders(scheduleId)
                         
-                        android.util.Log.d("ImportSchedule", "✅ 已创建所有课程的通知任务")
+                        AppLogger.d("ImportSchedule", "✅ 已创建所有课程的通知任务")
                     } else {
-                        android.util.Log.d("ImportSchedule", "全局提醒未开启，跳过提醒设置")
+                        AppLogger.d("ImportSchedule", "全局提醒未开启，跳过提醒设置")
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("ImportSchedule", "开启新导入课程的提醒失败", e)
+                    AppLogger.e("ImportSchedule", "开启新导入课程的提醒失败", e)
                 }
                 
-                android.util.Log.d("ImportSchedule", "=== 导入完成 ===")
+                AppLogger.d("ImportSchedule", "=== 导入完成 ===")
                 
                 _importState.value = ImportState.Success
             } catch (e: Exception) {
-                android.util.Log.e("ImportSchedule", "✗ 导入失败", e)
-                android.util.Log.e("ImportSchedule", "错误详情: ${e.message}")
-                android.util.Log.e("ImportSchedule", "错误堆栈: ${e.stackTraceToString()}")
+                AppLogger.e("ImportSchedule", "✗ 导入失败", e)
+                AppLogger.e("ImportSchedule", "错误详情: ${e.message}")
+                AppLogger.e("ImportSchedule", "错误堆栈: ${e.stackTraceToString()}")
                 _importState.value = ImportState.Error(e.message ?: "导入失败")
             }
         }
@@ -373,22 +374,16 @@ class ImportScheduleViewModel @Inject constructor(
     fun updateSectionCountsAndRetry(morningSections: Int, afternoonSections: Int) {
         viewModelScope.launch {
             try {
-                android.util.Log.d("ImportSchedule", "更新节次数: 上午${morningSections}节, 下午${afternoonSections}节")
+                AppLogger.d("ImportSchedule", "更新节次数: 上午${morningSections}节, 下午${afternoonSections}节")
                 
-                // 更新DataStore中的设置
                 classTimeDataStore.edit { preferences ->
                     preferences[MORNING_SECTIONS_KEY] = morningSections
                     preferences[AFTERNOON_SECTIONS_KEY] = afternoonSections
                 }
                 
-                // 重新生成课程时间表
-                // 这个逻辑应该由ClassTimeConfigViewModel处理，这里只需更新设置即可
-                // confirmImport会读取最新的设置
-                
-                // 重新尝试导入
-                confirmImport()
+                confirmImport(overrideMorningSections = morningSections, overrideAfternoonSections = afternoonSections)
             } catch (e: Exception) {
-                android.util.Log.e("ImportSchedule", "更新节次数失败", e)
+                AppLogger.e("ImportSchedule", "更新节次数失败", e)
                 _importState.value = ImportState.Error("更新节次数失败：${e.message}")
             }
         }
@@ -402,8 +397,8 @@ class ImportScheduleViewModel @Inject constructor(
             try {
                 _importState.value = ImportState.Loading
                 
-                android.util.Log.d("ImportSchedule", "准备创建课表: $semesterName, 开始: $startDate, 周数: $totalWeeks")
-                android.util.Log.d("ImportSchedule", "当前待导入课程数量: ${_parsedCourses.value.size}")
+                AppLogger.d("ImportSchedule", "准备创建课表: $semesterName, 开始: $startDate, 周数: $totalWeeks")
+                AppLogger.d("ImportSchedule", "当前待导入课程数量: ${_parsedCourses.value.size}")
                 
                 // 创建新课表（包含学期时间信息）并设置为当前
                 val endDate = startDate.plusWeeks(totalWeeks.toLong())
@@ -416,12 +411,12 @@ class ImportScheduleViewModel @Inject constructor(
                 )
                 val scheduleId = scheduleRepository.insertSchedule(schedule)
                 scheduleRepository.setCurrentSchedule(scheduleId)
-                android.util.Log.d("ImportSchedule", "✓ 创建课表成功，ID: $scheduleId, 已设置为当前课表")
+                AppLogger.d("ImportSchedule", "✓ 创建课表成功，ID: $scheduleId, 已设置为当前课表")
                 
                 // 重新调用导入逻辑
                 confirmImport()
             } catch (e: Exception) {
-                android.util.Log.e("ImportSchedule", "✗ 创建课表失败", e)
+                AppLogger.e("ImportSchedule", "✗ 创建课表失败", e)
                 _importState.value = ImportState.Error("创建课表失败: ${e.message}")
             }
         }
@@ -480,7 +475,7 @@ class ImportScheduleViewModel @Inject constructor(
                 } else {
                     _parsedCourses.value = courses
                     _importState.value = ImportState.Preview
-                    android.util.Log.d("ImportSchedule", "✅ 成功解析 ${courses.size} 门课程")
+                    AppLogger.d("ImportSchedule", "✅ 成功解析 ${courses.size} 门课程")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -544,7 +539,8 @@ class ImportScheduleViewModel @Inject constructor(
                         sectionCount = course.sectionCount,
                         weekExpression = course.weekExpression,
                         weeks = course.weeks,
-                        credit = course.credit
+                        credit = course.credit,
+                        courseCode = course.courseCode
                     )
                 }
             } else {
@@ -554,7 +550,7 @@ class ImportScheduleViewModel @Inject constructor(
                     gson.fromJson<List<ParsedCourse>>(jsonContent, type) ?: emptyList()
                 } catch (e: Exception) {
                     // 如果都失败了，返回空列表
-                    android.util.Log.e("ImportSchedule", "无法解析JSON为任何已知格式", e)
+                    AppLogger.e("ImportSchedule", "无法解析JSON为任何已知格式", e)
                     emptyList()
                 }
             }
@@ -567,10 +563,10 @@ class ImportScheduleViewModel @Inject constructor(
                 course.sectionCount > 0 &&
                 course.weeks.isNotEmpty()
             }.also { validCourses ->
-                android.util.Log.d("ImportSchedule", "JSON 解析结果：总数 ${courses.size}，有效 ${validCourses.size}")
+                AppLogger.d("ImportSchedule", "JSON 解析结果：总数 ${courses.size}，有效 ${validCourses.size}")
             }
         } catch (e: Exception) {
-            android.util.Log.e("ImportSchedule", "JSON 解析失败", e)
+            AppLogger.e("ImportSchedule", "JSON 解析失败", e)
             emptyList()
         }
     }

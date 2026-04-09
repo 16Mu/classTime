@@ -69,9 +69,9 @@ class UpdateViewModel @Inject constructor(
             
             updateChecker.checkUpdate(application).fold(
                 onSuccess = { versionInfo ->
+                    saveLastCheckTime(now)
                     if (versionInfo != null && versionInfo.needUpdate(_currentVersion.value)) {
                         _updateState.value = UpdateState.UpdateAvailable(versionInfo)
-                        saveLastCheckTime(now)
                     } else {
                         _updateState.value = UpdateState.NoUpdate
                     }
@@ -85,6 +85,14 @@ class UpdateViewModel @Inject constructor(
 
     fun fetchAnnouncements() {
         viewModelScope.launch {
+            val currentVersion = _currentVersion.value
+            val lastReadVersion = getLastReadAnnouncementVersion()
+            
+            if (currentVersion == lastReadVersion) {
+                AppLogger.d(TAG, "当前版本 $currentVersion 的公告已读，跳过")
+                return@launch
+            }
+            
             announcementChecker.fetchAnnouncements(application).fold(
                 onSuccess = { list ->
                     if (list.isNotEmpty()) {
@@ -95,6 +103,12 @@ class UpdateViewModel @Inject constructor(
                     AppLogger.w(TAG, "获取公告失败: ${e.message}")
                 }
             )
+        }
+    }
+    
+    fun markAnnouncementAsRead() {
+        viewModelScope.launch {
+            saveLastReadAnnouncementVersion(_currentVersion.value)
         }
     }
     
@@ -132,6 +146,29 @@ class UpdateViewModel @Inject constructor(
                 .first()
         } catch (e: Exception) {
             0L
+        }
+    }
+    
+    private suspend fun getLastReadAnnouncementVersion(): String {
+        return try {
+            val dataStore = DataStoreManager.getSettingsDataStore(application)
+            dataStore.data
+                .map { it[DataStoreManager.SettingsKeys.LAST_READ_ANNOUNCEMENT_VERSION_KEY] ?: "" }
+                .first()
+        } catch (e: Exception) {
+            ""
+        }
+    }
+    
+    private suspend fun saveLastReadAnnouncementVersion(version: String) {
+        try {
+            val dataStore = DataStoreManager.getSettingsDataStore(application)
+            dataStore.edit { prefs ->
+                prefs[DataStoreManager.SettingsKeys.LAST_READ_ANNOUNCEMENT_VERSION_KEY] = version
+            }
+            AppLogger.d(TAG, "已记录公告已读版本: $version")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "保存公告已读版本失败: ${e.message}")
         }
     }
     

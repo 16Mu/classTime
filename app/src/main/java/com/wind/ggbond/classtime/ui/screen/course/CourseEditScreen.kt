@@ -125,7 +125,7 @@ fun CourseEditScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             viewModel.saveCourse()
                         },
-                        enabled = saveState !is SaveState.Saving,
+                        enabled = saveState !is SaveState.Saving && courseName.isNotBlank(),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         )

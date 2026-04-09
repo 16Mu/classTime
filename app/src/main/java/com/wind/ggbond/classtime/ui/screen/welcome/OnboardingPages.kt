@@ -99,7 +99,7 @@ fun WelcomePage(
         ) {
             Text(
                 text = "时课",
-                fontSize = 42.sp,
+                style = MaterialTheme.typography.displayLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = textColor,
                 letterSpacing = 2.sp
@@ -118,7 +118,7 @@ fun WelcomePage(
         ) {
             Text(
                 text = "你的智能课表助手",
-                fontSize = 17.sp,
+                style = MaterialTheme.typography.titleMedium,
                 color = textColor.copy(alpha = 0.55f),
                 fontWeight = FontWeight.Medium
             )
@@ -151,7 +151,7 @@ private fun OnboardingTag(
     textColor: Color
 ) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         color = surfaceColor.copy(alpha = 0.5f)
     ) {
         Row(
@@ -162,7 +162,7 @@ private fun OnboardingTag(
             Icon(icon, null, Modifier.size(13.dp), tint = textColor.copy(alpha = 0.6f))
             Text(
                 text = text,
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelSmall,
                 color = textColor.copy(alpha = 0.6f),
                 maxLines = 1,
                 softWrap = false
@@ -207,14 +207,14 @@ fun HighlightsPage(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "为你而设计",
-                    fontSize = 28.sp,
+                    style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = textColor
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = "简单高效的课表管理",
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = textColor.copy(alpha = 0.5f)
                 )
             }
@@ -299,14 +299,14 @@ private fun FeatureCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = textColor
                 )
                 Spacer(Modifier.height(3.dp))
                 Text(
                     text = description,
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = textColor.copy(alpha = 0.6f),
                     lineHeight = 18.sp
                 )
@@ -371,14 +371,14 @@ fun GetStartedPage(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "准备好了吗",
-                        fontSize = 28.sp,
+                        style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = textColor
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
                         text = "几步即可开始使用",
-                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = textColor.copy(alpha = 0.5f)
                     )
                 }
@@ -434,7 +434,7 @@ fun GetStartedPage(
                 ) {
                     Text(
                         text = disclaimerContent,
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.labelSmall,
                         color = textColor.copy(alpha = 0.4f),
                         lineHeight = 15.sp,
                         modifier = Modifier
@@ -456,7 +456,7 @@ fun GetStartedPage(
                     )
                     Text(
                         text = "我已阅读并同意使用条款",
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = textColor.copy(alpha = 0.7f)
                     )
                 }
@@ -492,7 +492,7 @@ private fun StepItem(
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "$stepNumber",
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = primaryColor
                 )
@@ -505,13 +505,13 @@ private fun StepItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = textColor
             )
             Text(
                 text = description,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 color = textColor.copy(alpha = 0.5f),
                 lineHeight = 17.sp
             )
