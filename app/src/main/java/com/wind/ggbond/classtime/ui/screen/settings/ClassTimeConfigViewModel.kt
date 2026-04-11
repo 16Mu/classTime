@@ -35,10 +35,15 @@ class ClassTimeConfigViewModel @Inject constructor(
         private val CLASS_DURATION_KEY = DataStoreManager.ClassTimeKeys.CLASS_DURATION_KEY
         private val MORNING_SECTIONS_KEY = DataStoreManager.ClassTimeKeys.MORNING_SECTIONS_KEY
         private val AFTERNOON_SECTIONS_KEY = DataStoreManager.ClassTimeKeys.AFTERNOON_SECTIONS_KEY
+        private val DISPLAY_MODE_KEY = DataStoreManager.ClassTimeKeys.DISPLAY_MODE_KEY
         private const val DEFAULT_BREAK_DURATION = DataStoreManager.ClassTimeKeys.DEFAULT_BREAK_DURATION
         private const val DEFAULT_CLASS_DURATION = DataStoreManager.ClassTimeKeys.DEFAULT_CLASS_DURATION
         private const val DEFAULT_MORNING_SECTIONS = DataStoreManager.ClassTimeKeys.DEFAULT_MORNING_SECTIONS
         private const val DEFAULT_AFTERNOON_SECTIONS = DataStoreManager.ClassTimeKeys.DEFAULT_AFTERNOON_SECTIONS
+        private const val DEFAULT_DISPLAY_MODE_ADAPTIVE = DataStoreManager.ClassTimeKeys.DEFAULT_DISPLAY_MODE_ADAPTIVE
+
+        const val DISPLAY_MODE_ADAPTIVE = true
+        const val DISPLAY_MODE_FIXED_SCROLL = false
     }
     
     private val classTimeDataStore = DataStoreManager.getClassTimeDataStore(context)
@@ -79,6 +84,9 @@ class ClassTimeConfigViewModel @Inject constructor(
     private val _showAfternoonSectionsDialog = MutableStateFlow(false)
     val showAfternoonSectionsDialog: StateFlow<Boolean> = _showAfternoonSectionsDialog.asStateFlow()
     
+    private val _displayMode = MutableStateFlow(DEFAULT_DISPLAY_MODE_ADAPTIVE)
+    val displayMode: StateFlow<Boolean> = _displayMode.asStateFlow()
+    
     // 当前课表状态
     private val _currentSchedule = MutableStateFlow<Schedule?>(null)
     val currentSchedule: StateFlow<Schedule?> = _currentSchedule.asStateFlow()
@@ -93,6 +101,7 @@ class ClassTimeConfigViewModel @Inject constructor(
         loadBreakDuration()
         loadClassDuration()
         loadSectionCounts()
+        loadDisplayMode()
     }
     
     /**
@@ -126,6 +135,30 @@ class ClassTimeConfigViewModel @Inject constructor(
             val preferences = classTimeDataStore.data.first()
             _morningSections.value = preferences[MORNING_SECTIONS_KEY] ?: DEFAULT_MORNING_SECTIONS
             _afternoonSections.value = preferences[AFTERNOON_SECTIONS_KEY] ?: DEFAULT_AFTERNOON_SECTIONS
+        }
+    }
+    
+    private fun loadDisplayMode() {
+        viewModelScope.launch {
+            val preferences = classTimeDataStore.data.first()
+            _displayMode.value = preferences[DISPLAY_MODE_KEY] ?: DEFAULT_DISPLAY_MODE_ADAPTIVE
+        }
+    }
+    
+    fun updateDisplayMode(mode: Boolean) {
+        viewModelScope.launch {
+            classTimeDataStore.edit { preferences ->
+                preferences[DISPLAY_MODE_KEY] = mode
+            }
+            _displayMode.value = mode
+        }
+    }
+    
+    fun autoSelectDisplayMode() {
+        val totalSections = _morningSections.value + _afternoonSections.value
+        val recommended = if (totalSections <= 12) DISPLAY_MODE_ADAPTIVE else DISPLAY_MODE_FIXED_SCROLL
+        if (_displayMode.value != recommended) {
+            updateDisplayMode(recommended)
         }
     }
     
@@ -276,8 +309,8 @@ class ClassTimeConfigViewModel @Inject constructor(
                 preferences[MORNING_SECTIONS_KEY] = sections
             }
             _morningSections.value = sections
-            // 重新生成课程时间表
             regenerateClassTimes()
+            autoSelectDisplayMode()
         }
     }
     
@@ -287,8 +320,8 @@ class ClassTimeConfigViewModel @Inject constructor(
                 preferences[AFTERNOON_SECTIONS_KEY] = sections
             }
             _afternoonSections.value = sections
-            // 重新生成课程时间表
             regenerateClassTimes()
+            autoSelectDisplayMode()
         }
     }
     

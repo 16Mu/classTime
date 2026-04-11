@@ -63,15 +63,36 @@ class MainViewModel @Inject constructor(
     private val _glassEffectEnabled = MutableStateFlow(true)
     val glassEffectEnabled: StateFlow<Boolean> = _glassEffectEnabled.asStateFlow()
 
+    private val _desktopModeEnabled = MutableStateFlow(false)
+    val desktopModeEnabled: StateFlow<Boolean> = _desktopModeEnabled.asStateFlow()
+
+    private val _monetEnabled = MutableStateFlow(false)
+    val monetEnabled: StateFlow<Boolean> = _monetEnabled.asStateFlow()
+
     init {
         AppLogger.d(TAG, "MainViewModel 初始化")
 
-        // 观察 DataStore 中的全局毛玻璃效果设置
         viewModelScope.launch {
             settingsRepository.observeGlassEffectEnabled()
                 .distinctUntilChanged()
                 .collect { value ->
                     _glassEffectEnabled.value = value
+                }
+        }
+
+        viewModelScope.launch {
+            settingsRepository.observeDesktopModeEnabled()
+                .distinctUntilChanged()
+                .collect { value ->
+                    _desktopModeEnabled.value = value
+                }
+        }
+
+        viewModelScope.launch {
+            settingsRepository.observeMonetCourseColorsEnabled()
+                .distinctUntilChanged()
+                .collect { value ->
+                    _monetEnabled.value = value
                 }
         }
         

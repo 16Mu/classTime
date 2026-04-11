@@ -68,6 +68,10 @@
     <!-- 桌面小组件 - 周概览 -->
     <string name="week_overview_widget_name">周概览</string>
     <string name="week_overview_widget_description">周概览样式的小组件，显示本周课程</string>
+    
+    <!-- 桌面小组件 - 周网格视图 -->
+    <string name="week_grid_view_widget_name">周网格视图</string>
+    <string name="week_grid_view_widget_description">网格样式的小组件，以表格形式展示本周课程</string>
 
     <!-- 桌面小组件 - 智能课表(今日/明日切换) -->
     <string name="tomorrow_course_widget_name">智能课表</string>
@@ -88,4 +92,6 @@
     <string name="desc_edit">编辑</string>
     <string name="desc_delete_outline">删除</string>
     <string name="MAX_BACKGROUNDS_COUNT">最多支持10套背景方案</string>
+    <string name="desktop_mode_title">桌面模式（Beta）</string>
+    <string name="desktop_mode_subtitle">让壁纸像手机桌面一样清晰可见</string>
 </resources>

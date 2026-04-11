@@ -34,10 +34,10 @@ class MediaFileManagerTest {
     @Before
     fun setup() {
         mockkObject(AppLogger)
-        every { AppLogger.d(any(), any()) } returns Unit
-        every { AppLogger.e(any(), any()) } returns Unit
-        every { AppLogger.w(any(), any()) } returns Unit
-        every { AppLogger.i(any(), any()) } returns Unit
+        every { AppLogger.d(any<String>(), any<String>()) } returns Unit
+        every { AppLogger.e(any<String>(), any<String>()) } returns Unit
+        every { AppLogger.w(any<String>(), any<String>()) } returns Unit
+        every { AppLogger.i(any<String>(), any<String>()) } returns Unit
         filesDir = tempFolder.newFolder("app_files")
         context = mockk<Context>(relaxed = true)
         every { context.filesDir } returns filesDir

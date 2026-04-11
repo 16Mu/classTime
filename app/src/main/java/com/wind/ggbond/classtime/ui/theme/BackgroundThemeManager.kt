@@ -286,6 +286,19 @@ class BackgroundThemeManager @Inject constructor(
             preferences[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY] ?: DEFAULT_USE_DYNAMIC_THEME
         }
     }
+
+    fun isDesktopModeEnabled(): Flow<Boolean> {
+        return dataStore.data.map { preferences ->
+            preferences[DataStoreManager.SettingsKeys.DESKTOP_MODE_ENABLED_KEY]
+                ?: DataStoreManager.SettingsKeys.DEFAULT_DESKTOP_MODE_ENABLED
+        }
+    }
+
+    suspend fun setDesktopModeEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[DataStoreManager.SettingsKeys.DESKTOP_MODE_ENABLED_KEY] = enabled
+        }
+    }
     
     suspend fun setBackground(uri: String, seedColor: Int) {
         val scheme = BackgroundScheme(

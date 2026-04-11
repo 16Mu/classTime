@@ -3,6 +3,7 @@ package com.wind.ggbond.classtime.ui.screen.main.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -38,6 +39,7 @@ import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.secondaryContentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.WallpaperAwareSurface
 import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
+import com.wind.ggbond.classtime.ui.theme.DesktopTransparencyLevel
 
 /**
  * 周视图组件
@@ -256,12 +258,11 @@ fun CourseCard(
         }
     }.let { if (it == Color.Unspecified) MaterialTheme.colorScheme.primaryContainer else it }
     
-    // 根据状态调整颜色 - 与表格模式保持一致
     val displayColor = remember(baseColor, isPast, isOngoing) {
         when {
-            isPast -> baseColor.copy(alpha = 0.6f)  // 过去课程适中透明度
-            isOngoing -> baseColor  // 正在上课的课程保持原色
-            else -> baseColor.copy(alpha = 0.9f)  // 未来课程接近原色
+            isPast -> baseColor.copy(alpha = 0.6f)
+            isOngoing -> baseColor
+            else -> baseColor.copy(alpha = 0.9f)
         }
     }
     
@@ -270,7 +271,10 @@ fun CourseCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .wallpaperAwareBackground(displayColor)
+            .wallpaperAwareBackground(
+                displayColor,
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
             .then(
                 if (isOngoing) {
                     Modifier.border(
@@ -402,7 +406,7 @@ fun CourseCard(
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .wallpaperAwareBackground(MaterialTheme.colorScheme.primary)
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                     Text(
                         text = "正在上课",

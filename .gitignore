@@ -172,3 +172,19 @@ temp_aishedule/
 !gradlew.bat
 !settings.gradle.kts
 !build.gradle.kts
+
+# 设计参考文件
+stitch/
+skills/
+
+# 指令文件
+*.md
+!README.md
+!CHANGELOG.md
+
+# 临时 HTML 文件
+1111.html
+
+# 构建输出目录
+app/debug/
+app/release/

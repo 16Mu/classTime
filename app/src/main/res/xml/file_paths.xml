@@ -3,15 +3,14 @@
     <!-- 外部文件目录 -->
     <external-files-path name="exports" path="exports/" />
     <external-files-path name="files" path="." />
-    
+
     <!-- 缓存目录 -->
     <external-cache-path name="cache" path="." />
     <cache-path name="internal_cache" path="." />
-    
+
     <!-- 内部文件目录 -->
     <files-path name="internal_files" path="." />
+
+    <!-- 公共下载目录 - 用于导出文件分享 -->
+    <external-path name="download_exports" path="Download/classTimeOutput/" />
 </paths>
-
-
-
-

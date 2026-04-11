@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime.ui.components
 
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
@@ -32,6 +34,7 @@ fun VideoBackgroundPlayer(
     dimAmount: Float = 0f,
     isPlaying: Boolean = true,
     volume: Float = 0f,
+    blurRadius: Float = 0f,
     onPlayerReady: (() -> Unit)? = null,
     onPlayerError: ((Exception) -> Unit)? = null
 ) {
@@ -96,7 +99,18 @@ fun VideoBackgroundPlayer(
         }
     }
 
-    Box(modifier = modifier) {
+    val blurRenderEffect = if (blurRadius > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        android.graphics.RenderEffect
+            .createBlurEffect(blurRadius, blurRadius, android.graphics.Shader.TileMode.CLAMP)
+    } else null
+
+    Box(modifier = modifier.then(
+        if (blurRenderEffect != null) {
+            Modifier.graphicsLayer { renderEffect = blurRenderEffect }
+        } else {
+            Modifier
+        }
+    )) {
         exoPlayer?.let { player ->
             AndroidView(
                 factory = { ctx ->

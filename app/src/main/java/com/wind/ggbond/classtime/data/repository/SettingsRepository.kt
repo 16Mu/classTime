@@ -108,4 +108,10 @@ interface SettingsRepository {
     suspend fun getCourseColorSaturation(): Int
     suspend fun setCourseColorSaturation(saturation: Int)
     fun observeCourseColorSaturation(): Flow<Int>
+
+    // ==================== 桌面模式 ====================
+
+    suspend fun isDesktopModeEnabled(): Boolean
+    suspend fun setDesktopModeEnabled(enabled: Boolean)
+    fun observeDesktopModeEnabled(): Flow<Boolean>
 }

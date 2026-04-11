@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.wind.ggbond.classtime.data.local.entity.Exam
 import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
+import com.wind.ggbond.classtime.ui.theme.DesktopTransparencyLevel
 
 @Composable
 fun ExamCardCell(
@@ -27,7 +28,10 @@ fun ExamCardCell(
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(8.dp))
-            .wallpaperAwareBackground(MaterialTheme.colorScheme.errorContainer)
+            .wallpaperAwareBackground(
+                MaterialTheme.colorScheme.errorContainer,
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
             .clickable { onExamClick(exam) }
     ) {
         Column(

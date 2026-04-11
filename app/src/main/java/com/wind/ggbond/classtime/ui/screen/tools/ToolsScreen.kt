@@ -26,6 +26,12 @@ import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
 import com.wind.ggbond.classtime.widget.WidgetPinHelper
 import com.wind.ggbond.classtime.widget.WidgetPinHelper.WidgetType
+import com.wind.ggbond.classtime.widget.WidgetPinHelper.PinResult
+import com.wind.ggbond.classtime.util.AppLogger
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +42,44 @@ fun ToolsScreen(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    var fallbackGuide by remember { mutableStateOf<PinResult.FallbackNeeded?>(null) }
+    var pendingWidgetType by remember { mutableStateOf<WidgetType?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        AppLogger.i("ToolsScreen", "REQUEST_BIND_WIDGETS result: granted=$isGranted")
+        if (isGranted) {
+            pendingWidgetType?.let { widgetType ->
+                val result = WidgetPinHelper.requestPinWidget(context, widgetType)
+                if (result is PinResult.FallbackNeeded) fallbackGuide = result
+            }
+        } else {
+            Toast.makeText(context, "需要小组件权限才能添加，请手动添加", Toast.LENGTH_LONG).show()
+            fallbackGuide = PinResult.FallbackNeeded(
+                WidgetType.TODAY_COURSE,
+                "请手动添加小组件",
+                WidgetPinHelper.getManualGuideSteps()
+            )
+        }
+        pendingWidgetType = null
+    }
+
+    fun handleWidgetPin(widgetType: WidgetType) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        val result = WidgetPinHelper.requestPinWidget(context, widgetType)
+        when (result) {
+            is PinResult.FallbackNeeded -> fallbackGuide = result
+            is PinResult.Failed -> {
+                if (result.reason == "NEED_PERMISSION" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    pendingWidgetType = widgetType
+                    permissionLauncher.launch("android.permission.REQUEST_BIND_WIDGETS")
+                }
+            }
+            is PinResult.Success -> {}
+        }
+    }
 
     LaunchedEffect(Unit) {
         settingsViewModel.messageEvent.collect { message ->
@@ -164,20 +208,14 @@ fun ToolsScreen(
                         title = "今日课程",
                         subtitle = "4×2 课程列表",
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            WidgetPinHelper.requestPinWidget(context, WidgetType.TODAY_COURSE)
-                        }
+                        onClick = { handleWidgetPin(WidgetType.TODAY_COURSE) }
                     )
                     ToolsCompactCard(
                         icon = Icons.Outlined.Schedule,
                         title = "下节课倒计时",
                         subtitle = "3×2 倒计时",
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            WidgetPinHelper.requestPinWidget(context, WidgetType.NEXT_CLASS)
-                        }
+                        onClick = { handleWidgetPin(WidgetType.NEXT_CLASS) }
                     )
                 }
             }
@@ -192,20 +230,14 @@ fun ToolsScreen(
                         title = "紧凑列表",
                         subtitle = "省空间样式",
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            WidgetPinHelper.requestPinWidget(context, WidgetType.COMPACT_LIST)
-                        }
+                        onClick = { handleWidgetPin(WidgetType.COMPACT_LIST) }
                     )
                     ToolsCompactCard(
                         icon = Icons.Outlined.DateRange,
                         title = "周概览",
                         subtitle = "一周总览",
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            WidgetPinHelper.requestPinWidget(context, WidgetType.WEEK_OVERVIEW)
-                        }
+                        onClick = { handleWidgetPin(WidgetType.WEEK_OVERVIEW) }
                     )
                 }
             }
@@ -215,10 +247,7 @@ fun ToolsScreen(
                     icon = Icons.Outlined.Dashboard,
                     title = "大尺寸课程表",
                     subtitle = "4×4 大屏展示更多课程细节，支持滚动浏览",
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        WidgetPinHelper.requestPinWidget(context, WidgetType.LARGE_TODAY_COURSE)
-                    }
+                    onClick = { handleWidgetPin(WidgetType.LARGE_TODAY_COURSE) }
                 )
             }
 
@@ -227,10 +256,7 @@ fun ToolsScreen(
                     icon = Icons.Outlined.AutoAwesome,
                     title = "智能课表",
                     subtitle = "3×2 智能切换，今日课程结束后自动展示明日课程",
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        WidgetPinHelper.requestPinWidget(context, WidgetType.TOMORROW_COURSE)
-                    }
+                    onClick = { handleWidgetPin(WidgetType.TOMORROW_COURSE) }
                 )
             }
         }
@@ -261,6 +287,45 @@ fun ToolsScreen(
         com.wind.ggbond.classtime.ui.screen.settings.ImportDialog(
             onDismiss = { settingsViewModel.hideImportDialog() },
             onImport = { uri -> settingsViewModel.importSchedule(uri) }
+        )
+    }
+
+    fallbackGuide?.let { guide ->
+        AlertDialog(
+            onDismissRequest = { fallbackGuide = null },
+            title = {
+                Text(
+                    text = guide.guideTitle,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "「${guide.widgetType.displayName}」无法自动添加，请按以下步骤手动添加：",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    guide.guideSteps.forEach { step ->
+                        Row(
+                            modifier = Modifier.padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Text(
+                                text = step,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { fallbackGuide = null }) {
+                    Text("我知道了")
+                }
+            }
         )
     }
 }

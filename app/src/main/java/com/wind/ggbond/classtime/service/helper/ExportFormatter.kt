@@ -43,6 +43,8 @@ class ExportFormatter @Inject constructor() {
         classTimes: List<ClassTime>
     ): String {
         val sb = StringBuilder()
+        val now = LocalDateTime.now()
+        val exportTime = now.format(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'"))
 
         sb.appendLine("BEGIN:VCALENDAR")
         sb.appendLine("VERSION:2.0")
@@ -51,12 +53,15 @@ class ExportFormatter @Inject constructor() {
         sb.appendLine("METHOD:PUBLISH")
         sb.appendLine("X-WR-CALNAME:${schedule.name}")
         sb.appendLine("X-WR-TIMEZONE:Asia/Shanghai")
+        sb.appendLine("X-EXPORT-VERSION:${ExportMeta.CURRENT_EXPORT_VERSION}")
+        sb.appendLine("X-APP-VERSION:${ExportMeta.CURRENT_APP_VERSION}")
+        sb.appendLine("X-EXPORT-TIME:${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}")
 
         courses.forEach { course ->
             val classTime = classTimes.find { it.sectionNumber == course.startSection }
             if (classTime != null) {
-                val endClassTime = classTimes.find { 
-                    it.sectionNumber == course.startSection + course.sectionCount - 1 
+                val endClassTime = classTimes.find {
+                    it.sectionNumber == course.startSection + course.sectionCount - 1
                 }
 
                 course.weeks.forEach { weekNumber ->
@@ -65,13 +70,13 @@ class ExportFormatter @Inject constructor() {
 
                     val startDateTime = LocalDateTime.of(courseDate, classTime.startTime)
                     val endDateTime = LocalDateTime.of(
-                        courseDate, 
+                        courseDate,
                         endClassTime?.endTime ?: classTime.endTime
                     )
 
                     sb.appendLine("BEGIN:VEVENT")
                     sb.appendLine("UID:${course.id}-$weekNumber@courseschedule.app")
-                    sb.appendLine("DTSTAMP:${formatIcsDateTime(LocalDateTime.now())}")
+                    sb.appendLine("DTSTAMP:${formatIcsDateTime(now)}")
                     sb.appendLine("DTSTART:${formatIcsDateTime(startDateTime)}")
                     sb.appendLine("DTEND:${formatIcsDateTime(endDateTime)}")
                     sb.appendLine("SUMMARY:${course.courseName}")
@@ -119,11 +124,13 @@ class ExportFormatter @Inject constructor() {
         )
 
         val courseNames = courses.map { it.courseName }.distinct()
-        val courseColorMap = courseNames.mapIndexed { index, name -> 
-            name to courseColorList[index % courseColorList.size] 
+        val courseColorMap = courseNames.mapIndexed { index, name ->
+            name to courseColorList[index % courseColorList.size]
         }.toMap()
 
         val maxSection = courses.maxOfOrNull { it.startSection + it.sectionCount - 1 } ?: 12
+        val now = LocalDateTime.now()
+        val exportTimeStr = now.format(DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"))
 
         return buildString {
             appendLine("<!DOCTYPE html>")
@@ -131,6 +138,9 @@ class ExportFormatter @Inject constructor() {
             appendLine("<head>")
             appendLine("    <meta charset='UTF-8'>")
             appendLine("    <meta name='viewport' content='width=device-width, initial-scale=1.0'>")
+            appendLine("    <meta name='generator' content='课程表 App v${ExportMeta.CURRENT_APP_VERSION}'>")
+            appendLine("    <meta name='export-version' content='${ExportMeta.CURRENT_EXPORT_VERSION}'>")
+            appendLine("    <meta name='export-time' content='${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}'>")
             appendLine("    <title>${schedule?.name ?: "我的课程表"}</title>")
             appendLine("    <style>")
             appendLine(buildHtmlStyles())
@@ -190,15 +200,15 @@ class ExportFormatter @Inject constructor() {
                 appendLine("                </div>")
 
                 for (day in 1..7) {
-                    val coursesStartingAtSlot = courses.filter { 
-                        it.dayOfWeek == day && 
-                        section == it.startSection 
+                    val coursesStartingAtSlot = courses.filter {
+                        it.dayOfWeek == day &&
+                        section == it.startSection
                     }
 
-                    val isOccupiedByPrevious = courses.any { 
-                        it.dayOfWeek == day && 
-                        section > it.startSection && 
-                        section < it.startSection + it.sectionCount 
+                    val isOccupiedByPrevious = courses.any {
+                        it.dayOfWeek == day &&
+                        section > it.startSection &&
+                        section < it.startSection + it.sectionCount
                     }
 
                     if (coursesStartingAtSlot.isNotEmpty()) {
@@ -307,7 +317,8 @@ class ExportFormatter @Inject constructor() {
             appendLine("        </section>")
 
             appendLine("        <footer class='footer'>")
-            appendLine("            <p>导出时间：${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm"))}</p>")
+            appendLine("            <p>导出时间：$exportTimeStr</p>")
+            appendLine("            <p>应用版本：v${ExportMeta.CURRENT_APP_VERSION} | 导出格式版本：${ExportMeta.CURRENT_EXPORT_VERSION}</p>")
             appendLine("            <p class='app-name'>由 课程表 App 导出</p>")
             appendLine("        </footer>")
 
@@ -706,6 +717,9 @@ class ExportFormatter @Inject constructor() {
         schedule: Schedule?,
         classTimes: List<ClassTime>
     ): String {
+        val now = LocalDateTime.now()
+        val exportTimeStr = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+
         return buildString {
             appendLine("╔══════════════════════════════════════════════════════════════╗")
             appendLine("║                                                              ║")
@@ -713,7 +727,7 @@ class ExportFormatter @Inject constructor() {
             appendLine("║                                                              ║")
             appendLine("╚══════════════════════════════════════════════════════════════╝")
             appendLine()
-            
+
             appendLine("┌──────────────────────────────────────────────────────────────┐")
             appendLine("│  基本信息                                                    │")
             appendLine("├──────────────────────────────────────────────────────────────┤")
@@ -723,20 +737,22 @@ class ExportFormatter @Inject constructor() {
                 appendLine("│  总  周  数：${it.totalWeeks}周".padEnd(61) + "│")
             }
             appendLine("│  课程数量：${courses.size}门".padEnd(61) + "│")
-            appendLine("│  导出时间：${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}".padEnd(61) + "│")
+            appendLine("│  导出时间：$exportTimeStr".padEnd(61) + "│")
+            appendLine("│  应用版本：v${ExportMeta.CURRENT_APP_VERSION}".padEnd(61) + "│")
+            appendLine("│  格式版本：${ExportMeta.CURRENT_EXPORT_VERSION}".padEnd(61) + "│")
             appendLine("└──────────────────────────────────────────────────────────────┘")
             appendLine()
-            
+
             for (day in 1..7) {
                 val dayCourses = courses.filter { it.dayOfWeek == day }
                     .sortedBy { it.startSection }
-                
+
                 if (dayCourses.isNotEmpty()) {
                     appendLine("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓")
                     appendLine("┃  ${getDayName(day)}                                                        ┃")
                     appendLine("┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛")
                     appendLine()
-                    
+
                     dayCourses.forEach { course ->
                         val classTime = classTimes.find { it.sectionNumber == course.startSection }
                         val endClassTime = classTimes.find { it.sectionNumber == course.startSection + course.sectionCount - 1 }
@@ -745,7 +761,7 @@ class ExportFormatter @Inject constructor() {
                         } else {
                             "第${course.startSection}-${course.startSection + course.sectionCount - 1}节"
                         }
-                        
+
                         appendLine("    ┌────────────────────────────────────────────────────────┐")
                         appendLine("    │  ${course.courseName.take(50).padEnd(54)}│")
                         appendLine("    ├────────────────────────────────────────────────────────┤")
@@ -770,10 +786,10 @@ class ExportFormatter @Inject constructor() {
                     }
                 }
             }
-            
+
             appendLine()
             appendLine("════════════════════════════════════════════════════════════════")
-            appendLine("                      由 课程表 App 导出")
+            appendLine("                      由 课程表 App v${ExportMeta.CURRENT_APP_VERSION} 导出")
             appendLine("════════════════════════════════════════════════════════════════")
         }
     }
@@ -783,16 +799,24 @@ class ExportFormatter @Inject constructor() {
         schedule: Schedule?,
         classTimes: List<ClassTime>
     ): String {
+        val now = LocalDateTime.now()
+
         return buildString {
             append("\uFEFF")
-            
+
+            appendLine("\"# 课程表导出数据\"")
+            appendLine("\"# 应用版本\",\"v${ExportMeta.CURRENT_APP_VERSION}\"")
+            appendLine("\"# 导出格式版本\",\"${ExportMeta.CURRENT_EXPORT_VERSION}\"")
+            appendLine("\"# 导出时间\",\"${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\"")
+            appendLine()
+
             appendLine("序号,课程名称,教师,教室,星期,节次,上课时间,周次,学分,颜色,提醒,备注")
-            
+
             courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startSection }))
                 .forEachIndexed { index, course ->
                     val dayName = getDayName(course.dayOfWeek)
                     val sections = "第${course.startSection}-${course.startSection + course.sectionCount - 1}节"
-                    
+
                     val classTime = classTimes.find { it.sectionNumber == course.startSection }
                     val endClassTime = classTimes.find { it.sectionNumber == course.startSection + course.sectionCount - 1 }
                     val timeStr = if (classTime != null && endClassTime != null) {
@@ -800,9 +824,9 @@ class ExportFormatter @Inject constructor() {
                     } else {
                         ""
                     }
-                    
+
                     val reminderStr = if (course.reminderEnabled) "提前${course.reminderMinutes}分钟" else "关闭"
-                    
+
                     appendLine(
                         listOf(
                             (index + 1).toString(),
@@ -820,7 +844,7 @@ class ExportFormatter @Inject constructor() {
                         ).joinToString(",") { "\"${it.replace("\"", "\"\"")}\"" }
                     )
                 }
-            
+
             appendLine()
             appendLine("\"# 统计信息\"")
             appendLine("\"课表名称\",\"${schedule?.name ?: ""}\"")
@@ -828,7 +852,7 @@ class ExportFormatter @Inject constructor() {
             appendLine("\"总周数\",\"${schedule?.totalWeeks ?: 0}周\"")
             appendLine("\"课程总数\",\"${courses.size}门\"")
             appendLine("\"总学分\",\"${courses.sumOf { it.credit.toDouble() }}\"")
-            appendLine("\"导出时间\",\"${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\"")
+            appendLine("\"导出时间\",\"${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\"")
         }
     }
 }

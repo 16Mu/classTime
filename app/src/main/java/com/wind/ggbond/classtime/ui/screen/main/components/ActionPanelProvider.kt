@@ -31,6 +31,7 @@ import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
+import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
 import androidx.compose.ui.draw.blur
 
 /**
@@ -59,10 +60,16 @@ fun ActionPanelProvider(
 ) {
     val haptic = LocalHapticFeedback.current
     val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
+    val isGlassEffectActive = isWallpaperEnabled && glassEffectEnabled
+    val isDesktopModeEnabled = LocalDesktopModeEnabled.current
 
     Scaffold(
         modifier = modifier,
-        containerColor = if (isWallpaperEnabled) Color.Transparent else MaterialTheme.colorScheme.background,
+        containerColor = when {
+            isDesktopModeEnabled && isWallpaperEnabled -> Color.Transparent
+            isGlassEffectActive -> Color.Transparent
+            else -> MaterialTheme.colorScheme.background
+        },
         floatingActionButton = {
             val fabInteractionSource = remember { MutableInteractionSource() }
             val fabPressed by fabInteractionSource.collectIsPressedAsState()
@@ -89,14 +96,18 @@ fun ActionPanelProvider(
                         scaleY = fabScale
                     }
                     .background(
-                        color = if (glassEffectEnabled) MaterialTheme.colorScheme.surface.copy(alpha = 0.92f) else MaterialTheme.colorScheme.surface,
+                        color = when {
+                            isDesktopModeEnabled && isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                            glassEffectEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
+                            else -> MaterialTheme.colorScheme.surface
+                        },
                         shape = RoundedCornerShape(16.dp)
                     )
                     .then(
-                        if (glassEffectEnabled) {
+                        if (glassEffectEnabled || (isDesktopModeEnabled && isWallpaperEnabled)) {
                             Modifier.border(
                                 width = 0.8.dp,
-                                color = Color.White.copy(alpha = 0.35f),
+                                color = Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(16.dp)
                             )
                         } else {
@@ -121,6 +132,13 @@ fun ActionPanelProvider(
             ) {
                 TopAppBar(
                     windowInsets = WindowInsets(0, 0, 0, 0),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = when {
+                            isDesktopModeEnabled && isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+                            isGlassEffectActive -> Color.Transparent
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+                    ),
                     title = {
                         Column(
                             modifier = Modifier

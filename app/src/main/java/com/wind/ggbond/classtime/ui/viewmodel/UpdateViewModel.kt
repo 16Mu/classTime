@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.datastore.preferences.core.edit
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
+import com.wind.ggbond.classtime.service.ApkDownloadManager
 import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.AnnouncementChecker
 import com.wind.ggbond.classtime.util.AnnouncementInfo
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import androidx.lifecycle.asFlow
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -40,6 +43,13 @@ class UpdateViewModel @Inject constructor(
         data class Error(val message: String) : UpdateState()
     }
     
+    sealed class DownloadState {
+        object Idle : DownloadState()
+        data class Downloading(val progress: Int) : DownloadState()
+        data class Success(val file: File) : DownloadState()
+        data class Error(val message: String) : DownloadState()
+    }
+    
     private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
     
@@ -48,6 +58,14 @@ class UpdateViewModel @Inject constructor(
 
     private val _announcements = MutableStateFlow<List<AnnouncementInfo>?>(null)
     val announcements: StateFlow<List<AnnouncementInfo>?> = _announcements.asStateFlow()
+
+    private val _hasUpdate = MutableStateFlow(false)
+    val hasUpdate: StateFlow<Boolean> = _hasUpdate.asStateFlow()
+
+    private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+
+    private var cachedVersionInfo: VersionInfo? = null
     
     private var lastCheckTime: Long = 0
     
@@ -72,8 +90,12 @@ class UpdateViewModel @Inject constructor(
                     saveLastCheckTime(now)
                     if (versionInfo != null && versionInfo.needUpdate(_currentVersion.value)) {
                         _updateState.value = UpdateState.UpdateAvailable(versionInfo)
+                        _hasUpdate.value = true
+                        cachedVersionInfo = versionInfo
                     } else {
                         _updateState.value = UpdateState.NoUpdate
+                        _hasUpdate.value = false
+                        cachedVersionInfo = null
                     }
                 },
                 onFailure = { e ->
@@ -81,6 +103,61 @@ class UpdateViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    fun silentCheckUpdate() {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+
+            if (now - lastCheckTime < 60_000L) return@launch
+
+            lastCheckTime = now
+
+            updateChecker.checkUpdate(application).fold(
+                onSuccess = { versionInfo ->
+                    saveLastCheckTime(now)
+                    if (versionInfo != null && versionInfo.needUpdate(_currentVersion.value)) {
+                        _hasUpdate.value = true
+                        cachedVersionInfo = versionInfo
+                        AppLogger.d(TAG, "静默检查发现新版本: ${versionInfo.latestVersion}")
+                    } else {
+                        _hasUpdate.value = false
+                        cachedVersionInfo = null
+                    }
+                },
+                onFailure = { e ->
+                    AppLogger.w(TAG, "静默检查更新失败: ${e.message}")
+                }
+            )
+        }
+    }
+
+    fun showCachedUpdate() {
+        cachedVersionInfo?.let {
+            _updateState.value = UpdateState.UpdateAvailable(it)
+        }
+    }
+
+    fun downloadApk(url: String) {
+        ApkDownloadManager.downloadApk(application, url)
+    }
+
+    fun observeDownloadState() {
+        viewModelScope.launch {
+            ApkDownloadManager.downloadState.asFlow().collect { state ->
+                _downloadState.value = when (state) {
+                    is ApkDownloadManager.DownloadState.Idle -> DownloadState.Idle
+                    is ApkDownloadManager.DownloadState.Downloading -> DownloadState.Downloading(state.progress)
+                    is ApkDownloadManager.DownloadState.Success -> DownloadState.Success(state.file)
+                    is ApkDownloadManager.DownloadState.Error -> DownloadState.Error(state.message)
+                }
+            }
+        }
+    }
+
+    fun resetDownloadState() {
+        _downloadState.value = DownloadState.Idle
+        ApkDownloadManager.resetState()
     }
 
     fun fetchAnnouncements() {

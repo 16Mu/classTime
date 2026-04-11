@@ -85,5 +85,13 @@ sealed class Screen(val route: String) {
         fun createRoute(permissionType: String) = "permission_tutorial/$permissionType"
     }
     object BackgroundSettings : Screen("background_settings")
+    object CourseColorSettings : Screen("course_color_settings")
+    object ThemeColorSelection : Screen("theme_color_selection")
+    object RandomColorScheme : Screen("random_color_scheme")
+    object ManualColorAdjustment : Screen("manual_color_adjustment")
+    object CourseColorPicker : Screen("course_color_picker/{courseName}") {
+        fun createRoute(courseName: String): String =
+            "course_color_picker/${java.net.URLEncoder.encode(courseName, "UTF-8")}"
+    }
 }
 

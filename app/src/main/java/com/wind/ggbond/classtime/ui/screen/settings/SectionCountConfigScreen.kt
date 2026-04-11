@@ -30,6 +30,10 @@ fun SectionCountConfigScreen(
     val afternoonSectionCount by viewModel.afternoonSections.collectAsState()
     val showMorningSectionsDialog by viewModel.showMorningSectionsDialog.collectAsState()
     val showAfternoonSectionsDialog by viewModel.showAfternoonSectionsDialog.collectAsState()
+    val displayMode by viewModel.displayMode.collectAsState()
+    
+    val totalSections = morningSectionCount + afternoonSectionCount
+    val recommendedMode = totalSections <= 12
     
     Scaffold(
         topBar = {
@@ -208,6 +212,98 @@ fun SectionCountConfigScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                }
+            }
+            
+            // 显示模式设置卡片
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "课程表显示模式",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "选择课程表的显示方式，影响节次高度和滚动行为",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = displayMode == ClassTimeConfigViewModel.DISPLAY_MODE_ADAPTIVE,
+                                onClick = { viewModel.updateDisplayMode(ClassTimeConfigViewModel.DISPLAY_MODE_ADAPTIVE) },
+                                label = { Text("自适应一屏") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = displayMode == ClassTimeConfigViewModel.DISPLAY_MODE_FIXED_SCROLL,
+                                onClick = { viewModel.updateDisplayMode(ClassTimeConfigViewModel.DISPLAY_MODE_FIXED_SCROLL) },
+                                label = { Text("固定高度滚动") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        
+                        Text(
+                            text = if (displayMode == ClassTimeConfigViewModel.DISPLAY_MODE_ADAPTIVE) {
+                                "所有节次均分屏幕高度，在一页内完整显示"
+                            } else {
+                                "格子高度固定，超出屏幕时可以滚动查看"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        
+                        if (displayMode != recommendedMode) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "💡 智能推荐",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Text(
+                                            text = if (recommendedMode) "当前${totalSections}节，推荐自适应一屏" else "当前${totalSections}节，推荐固定高度滚动",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = { viewModel.updateDisplayMode(recommendedMode) }
+                                    ) {
+                                        Text("应用推荐")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

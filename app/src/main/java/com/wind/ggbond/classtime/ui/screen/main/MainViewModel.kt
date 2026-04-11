@@ -4,6 +4,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
 import com.wind.ggbond.classtime.data.local.entity.Schedule
@@ -16,6 +19,7 @@ import com.wind.ggbond.classtime.domain.usecase.CourseUseCase
 import com.wind.ggbond.classtime.domain.usecase.ExamUseCase
 import com.wind.ggbond.classtime.util.DateUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -32,6 +36,7 @@ data class WeekCoursesData(
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val courseUseCase: CourseUseCase,
     private val adjustmentUseCase: AdjustmentUseCase,
     private val examUseCase: ExamUseCase,
@@ -109,6 +114,11 @@ class MainViewModel @Inject constructor(
             initialValue = emptyList()
         )
     
+    private val classTimeDataStore = DataStoreManager.getClassTimeDataStore(context)
+    
+    private val _displayMode = MutableStateFlow(DataStoreManager.ClassTimeKeys.DEFAULT_DISPLAY_MODE_ADAPTIVE)
+    val displayMode: StateFlow<Boolean> = _displayMode.asStateFlow()
+    
     private val _viewMode = MutableStateFlow(0)
     val viewMode: StateFlow<Int> = _viewMode.asStateFlow()
     
@@ -142,6 +152,7 @@ class MainViewModel @Inject constructor(
     
     init {
         loadCurrentSchedule()
+        loadDisplayMode()
         
         viewModelScope.launch {
             _currentSchedule.first { it != null }
@@ -184,6 +195,15 @@ class MainViewModel @Inject constructor(
                     
                     loadCourses(it.id)
                 }
+            }
+        }
+    }
+    
+    private fun loadDisplayMode() {
+        viewModelScope.launch {
+            classTimeDataStore.data.collect { preferences ->
+                _displayMode.value = preferences[DataStoreManager.ClassTimeKeys.DISPLAY_MODE_KEY]
+                    ?: DataStoreManager.ClassTimeKeys.DEFAULT_DISPLAY_MODE_ADAPTIVE
             }
         }
     }

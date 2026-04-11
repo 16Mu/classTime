@@ -39,6 +39,7 @@ import com.wind.ggbond.classtime.ui.theme.CourseColors
 import com.wind.ggbond.classtime.ui.theme.contentColorForBackground
 import com.wind.ggbond.classtime.ui.theme.topGradientOverlayAlpha
 import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
+import com.wind.ggbond.classtime.ui.theme.DesktopTransparencyLevel
 import com.wind.ggbond.classtime.util.DateUtils
 import com.wind.ggbond.classtime.util.WeekParser
 import kotlinx.coroutines.launch
@@ -560,7 +561,10 @@ private fun CourseHeaderCard(
             .padding(horizontal = 24.dp)
             .height(140.dp)
             .clip(MaterialTheme.shapes.large)
-            .wallpaperAwareBackground(parseDisplayColor(displayColor))
+            .wallpaperAwareBackground(
+                parseDisplayColor(displayColor),
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
     ) {
         val bg = parseDisplayColor(displayColor)
         val contentColor = contentColorForBackground(bg)

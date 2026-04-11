@@ -38,12 +38,16 @@ import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import com.wind.ggbond.classtime.ui.theme.BackgroundType
 import com.wind.ggbond.classtime.ui.theme.CourseScheduleTheme
+import com.wind.ggbond.classtime.ui.theme.LocalGlassEffectEnabled
 import com.wind.ggbond.classtime.ui.theme.LocalWallpaperAlpha
 import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
+import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
 import com.wind.ggbond.classtime.ui.theme.OverlayConfig
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.wind.ggbond.classtime.ui.screen.welcome.UnifiedOnboardingScreen
 import com.wind.ggbond.classtime.ui.viewmodel.MainViewModel
+import com.wind.ggbond.classtime.ui.viewmodel.UpdateViewModel
+import java.util.Calendar
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -60,9 +64,15 @@ fun MainContent(
     val activeScheme by backgroundThemeManager.getActiveBackgroundScheme().collectAsState(initial = null)
     val blurRadius by backgroundThemeManager.getBlurRadius().collectAsState(initial = 0)
     val dimAmount by backgroundThemeManager.getDimAmount().collectAsState(initial = 40)
+    val isDesktopModeEnabled by backgroundThemeManager.isDesktopModeEnabled().collectAsState(initial = false)
     val darkTheme = isSystemInDarkTheme()
-    val courseColors by remember(darkTheme) {
-        backgroundThemeManager.observeCourseColors(isDarkMode = darkTheme)
+    val monetEnabled by mainViewModel.monetEnabled.collectAsState()
+    val courseColors by remember(darkTheme, monetEnabled) {
+        if (monetEnabled) {
+            backgroundThemeManager.observeCourseColors(isDarkMode = darkTheme)
+        } else {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        }
     }.collectAsState(initial = emptyList())
     val smartOverlayConfig by remember(activeScheme) {
         val uri = activeScheme?.uri?.let { Uri.parse(it) }
@@ -71,6 +81,10 @@ fun MainContent(
 
     val wallpaperEnabled = isDynamicThemeEnabled && activeScheme != null
     val wallpaperAlpha = if (wallpaperEnabled) 0.85f else 1.0f
+    val glassEffectEnabled by mainViewModel.glassEffectEnabled.collectAsState()
+
+    val effectiveBlurRadius = blurRadius
+    val effectiveDimAmount = dimAmount
 
     val dynamicColorScheme = if (isDynamicThemeEnabled) {
         if (darkTheme) backgroundThemeManager.generateDarkColorScheme(seedColor)
@@ -85,7 +99,9 @@ fun MainContent(
     ) {
         CompositionLocalProvider(
             LocalWallpaperEnabled provides wallpaperEnabled,
-            LocalWallpaperAlpha provides wallpaperAlpha
+            LocalWallpaperAlpha provides wallpaperAlpha,
+            LocalGlassEffectEnabled provides glassEffectEnabled,
+            LocalDesktopModeEnabled provides isDesktopModeEnabled
         ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (wallpaperEnabled) {
@@ -93,7 +109,7 @@ fun MainContent(
                     val blurModifier = Modifier
                         .fillMaxSize()
                         .then(
-                            if (blurRadius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(blurRadius.dp / 10f)
+                            if (effectiveBlurRadius > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Modifier.blur(effectiveBlurRadius.dp / 10f)
                             else Modifier
                         )
                     val overlayColor = smartOverlayConfig.overlayColor
@@ -101,7 +117,7 @@ fun MainContent(
                         .fillMaxSize()
                         .background(
                             Color(overlayColor).copy(
-                                alpha = dimAmount / 100f
+                                alpha = effectiveDimAmount / 100f
                             )
                         )
 
@@ -131,7 +147,7 @@ fun MainContent(
                                 videoUri = Uri.parse(scheme.uri),
                                 isPlaying = true,
                                 dimAmount = 0f,
-                                modifier = blurModifier
+                                modifier = Modifier.fillMaxSize()
                             )
                             Box(modifier = overlayModifier)
                         }
@@ -177,10 +193,24 @@ private fun SuccessContent(
     backgroundThemeManager: BackgroundThemeManager,
     intent: Intent?,
     mainViewModel: MainViewModel,
-    courseColors: List<String> = emptyList()
+    courseColors: List<String> = emptyList(),
+    updateViewModel: UpdateViewModel = hiltViewModel()
 ) {
     // 从 ViewModel 获取引导状态（通过 Repository 访问）
     val uiState by mainViewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        val now = Calendar.getInstance()
+        val hour = now.get(Calendar.HOUR_OF_DAY)
+        val minute = now.get(Calendar.MINUTE)
+        val checkPoints = listOf(8, 12, 16, 18)
+        val shouldCheck = checkPoints.any { checkHour ->
+            hour == checkHour && minute < 30
+        }
+        if (shouldCheck) {
+            updateViewModel.silentCheckUpdate()
+        }
+    }
 
     // 处理引导页状态
     when (val state = uiState) {
@@ -227,9 +257,15 @@ private fun SuccessContent(
         val bottomBarBlurEnabled by mainViewModel.glassEffectEnabled.collectAsState()
 
         val wallpaperEnabled = LocalWallpaperEnabled.current
+        val isDesktopModeEnabled = LocalDesktopModeEnabled.current
+        val isGlassEffectActive = wallpaperEnabled && bottomBarBlurEnabled
 
         Scaffold(
-            containerColor = if (wallpaperEnabled) Color.Transparent else MaterialTheme.colorScheme.background,
+            containerColor = when {
+                isDesktopModeEnabled && wallpaperEnabled -> Color.Transparent
+                isGlassEffectActive -> Color.Transparent
+                else -> MaterialTheme.colorScheme.background
+            },
             bottomBar = {
                 if (showBottomBar) {
                     BottomNavigationBar(

@@ -24,11 +24,11 @@ import androidx.core.view.WindowCompat
  */
 val LocalWallpaperEnabled = staticCompositionLocalOf { false }
 
-/**
- * 全局壁纸透明度 CompositionLocal (0.0f - 1.0f)
- * 默认 1.0f（不透明），启用壁纸时建议 0.85f
- */
 val LocalWallpaperAlpha = staticCompositionLocalOf { 1.0f }
+
+val LocalGlassEffectEnabled = staticCompositionLocalOf { true }
+
+val LocalDesktopModeEnabled = staticCompositionLocalOf { false }
 
 /**
  * Light Color Scheme - 温暖米白主题

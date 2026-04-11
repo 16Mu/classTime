@@ -42,6 +42,7 @@ fun MainScreen(
     val actualWeekNumber by viewModel.actualWeekNumber.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
     val classTimes by viewModel.classTimes.collectAsState()
+    val displayMode by viewModel.displayMode.collectAsState()
     val compactModeEnabled by settingsViewModel.compactModeEnabled.collectAsState()
     val showWeekendEnabled by settingsViewModel.showWeekendEnabled.collectAsState()
     val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
@@ -105,6 +106,7 @@ fun MainScreen(
                 coroutineScope = coroutineScope, isDataReady = isDataReady,
                 onCourseSelected = { selectedCourseId = it }, onAdjustmentRequest = { adjustmentCourseId = it },
                 isWallpaperEnabled = isWallpaperEnabled, courseColors = courseColors,
+                displayMode = displayMode,
                 modifier = Modifier.padding(paddingValues))
         }
         SnackbarHost(hostState = snackbarHostState)

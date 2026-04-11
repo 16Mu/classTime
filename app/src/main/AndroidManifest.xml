@@ -38,6 +38,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />
+    
+    <!-- 安装APK权限 (Android 8.0+) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".CourseScheduleApp"
@@ -221,6 +224,21 @@
                 android:resource="@xml/week_overview_widget_info" />
         </receiver>
 
+        <!-- 周网格视图桌面小组件 -->
+        <receiver
+            android:name=".widget.WeekGridViewWidgetReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/week_grid_view_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.wind.ggbond.classtime.ACTION_REFRESH_WEEK_GRID_VIEW_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/week_grid_view_widget_info" />
+        </receiver>
+
         <!-- 智能课表(今日/明日切换)桌面小组件 -->
         <receiver
             android:name=".widget.TomorrowCourseWidgetReceiver"
@@ -240,7 +258,11 @@
         <receiver
             android:name=".widget.WidgetPinCallbackReceiver"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

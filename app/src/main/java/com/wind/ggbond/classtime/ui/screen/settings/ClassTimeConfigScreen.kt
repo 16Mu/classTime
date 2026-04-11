@@ -57,6 +57,8 @@ fun ClassTimeConfigScreen(
     val classDuration by viewModel.classDuration.collectAsState()
     val showBreakDurationDialog by viewModel.showBreakDurationDialog.collectAsState()
     val showClassDurationDialog by viewModel.showClassDurationDialog.collectAsState()
+    val showMorningSectionsDialog by viewModel.showMorningSectionsDialog.collectAsState()
+    val showAfternoonSectionsDialog by viewModel.showAfternoonSectionsDialog.collectAsState()
     val morningSectionCount by viewModel.morningSections.collectAsState()
     val afternoonSectionCount by viewModel.afternoonSections.collectAsState()
     val currentSchedule by viewModel.currentSchedule.collectAsState()
@@ -269,6 +271,100 @@ fun ClassTimeConfigScreen(
                                 )
                             }
                         }
+                        
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    viewModel.showMorningSectionsDialog()
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "上午节次数",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "设置上午的课程节数",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "${morningSectionCount}节",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { 
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    viewModel.showAfternoonSectionsDialog()
+                                }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "下午节次数",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "设置下午的课程节数",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "${afternoonSectionCount}节",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -389,6 +485,32 @@ fun ClassTimeConfigScreen(
             onConfirm = { minutes ->
                 viewModel.updateBreakDuration(minutes)
                 viewModel.hideBreakDurationDialog()
+            }
+        )
+    }
+    
+    // 上午节次数编辑对话框
+    if (showMorningSectionsDialog) {
+        SectionCountDialog(
+            title = "设置上午节次数",
+            currentSections = morningSectionCount,
+            onDismiss = { viewModel.hideMorningSectionsDialog() },
+            onConfirm = { sections ->
+                viewModel.updateMorningSections(sections)
+                viewModel.hideMorningSectionsDialog()
+            }
+        )
+    }
+    
+    // 下午节次数编辑对话框
+    if (showAfternoonSectionsDialog) {
+        SectionCountDialog(
+            title = "设置下午节次数",
+            currentSections = afternoonSectionCount,
+            onDismiss = { viewModel.hideAfternoonSectionsDialog() },
+            onConfirm = { sections ->
+                viewModel.updateAfternoonSections(sections)
+                viewModel.hideAfternoonSectionsDialog()
             }
         )
     }

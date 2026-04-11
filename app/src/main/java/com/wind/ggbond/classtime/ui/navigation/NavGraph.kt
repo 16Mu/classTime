@@ -301,6 +301,42 @@ fun NavGraph(
         composable(Screen.BackgroundSettings.route) {
             com.wind.ggbond.classtime.ui.screen.settings.BackgroundSettingsScreen(navController)
         }
+        
+        // 课程颜色设置（二级页面）
+        composable(Screen.CourseColorSettings.route) {
+            com.wind.ggbond.classtime.ui.screen.coursecolor.CourseColorSettingsScreen(navController)
+        }
+        
+        // 主题色调选择（三级页面）
+        composable(Screen.ThemeColorSelection.route) {
+            com.wind.ggbond.classtime.ui.screen.coursecolor.ThemeColorSelectionScreen(navController)
+        }
+        
+        // 随机配色方案（三级页面）
+        composable(Screen.RandomColorScheme.route) {
+            com.wind.ggbond.classtime.ui.screen.coursecolor.RandomColorSchemeScreen(navController)
+        }
+        
+        // 手动调整颜色（三级页面）
+        composable(Screen.ManualColorAdjustment.route) {
+            com.wind.ggbond.classtime.ui.screen.coursecolor.ManualColorAdjustmentScreen(navController)
+        }
+        
+        // 单个课程颜色选择（四级页面）
+        composable(
+            route = Screen.CourseColorPicker.route,
+            arguments = listOf(navArgument("courseName") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val courseName = try {
+                java.net.URLDecoder.decode(backStackEntry.arguments?.getString("courseName") ?: "", "UTF-8")
+            } catch (_: Exception) {
+                backStackEntry.arguments?.getString("courseName") ?: ""
+            }
+            com.wind.ggbond.classtime.ui.screen.coursecolor.CourseColorPickerScreen(
+                navController = navController,
+                courseName = courseName
+            )
+        }
     }
 }
 

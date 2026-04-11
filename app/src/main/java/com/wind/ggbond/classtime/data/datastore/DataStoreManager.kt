@@ -41,12 +41,14 @@ object DataStoreManager {
         val CLASS_DURATION_KEY = intPreferencesKey("class_duration_minutes")
         val MORNING_SECTIONS_KEY = intPreferencesKey("morning_sections")
         val AFTERNOON_SECTIONS_KEY = intPreferencesKey("afternoon_sections")
+        val DISPLAY_MODE_KEY = booleanPreferencesKey("display_mode_adaptive")
         
         // 默认值
         const val DEFAULT_BREAK_DURATION = 10 // 默认课间10分钟
         const val DEFAULT_CLASS_DURATION = 40 // 默认课程40分钟
         const val DEFAULT_MORNING_SECTIONS = 4 // 默认上午4节
         const val DEFAULT_AFTERNOON_SECTIONS = 8 // 默认下午8节
+        const val DEFAULT_DISPLAY_MODE_ADAPTIVE = true // 默认自适应一屏
     }
     
     // ==================== 应用设置相关的 Key ====================
@@ -105,8 +107,11 @@ object DataStoreManager {
         // ==================== 莫奈课程颜色相关配置 ====================
         /** 是否启用莫奈课程颜色（默认关闭） */
         val MONET_COURSE_COLORS_ENABLED_KEY = booleanPreferencesKey("monet_course_colors_enabled")
-        /** 课程颜色饱和度等级 (0=柔和, 1=标准, 2=鲜艳) */
         val COURSE_COLOR_SATURATION_KEY = intPreferencesKey("course_color_saturation")
+
+        // ==================== 桌面模式相关配置 ====================
+        /** 是否启用桌面模式（默认关闭） */
+        val DESKTOP_MODE_ENABLED_KEY = booleanPreferencesKey("desktop_mode_enabled")
 
         // 默认值
         const val DEFAULT_AUTO_UPDATE_ENABLED = true  // 默认开启自动更新
@@ -128,6 +133,9 @@ object DataStoreManager {
         // 莫尼课程颜色默认值
         const val DEFAULT_MONET_COURSE_COLORS_ENABLED = false  // 默认关闭
         const val DEFAULT_COURSE_COLOR_SATURATION = 1  // 默认标准模式
+
+        // 桌面模式默认值
+        const val DEFAULT_DESKTOP_MODE_ENABLED = false  // 默认关闭
     }
 }
 

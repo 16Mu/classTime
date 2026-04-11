@@ -148,4 +148,10 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun getCourseColorSaturation(): Int = getInt(K.COURSE_COLOR_SATURATION_KEY, K.DEFAULT_COURSE_COLOR_SATURATION)
     override suspend fun setCourseColorSaturation(saturation: Int) = setInt(K.COURSE_COLOR_SATURATION_KEY, saturation)
     override fun observeCourseColorSaturation(): Flow<Int> = observeInt(K.COURSE_COLOR_SATURATION_KEY, K.DEFAULT_COURSE_COLOR_SATURATION)
+
+    // ==================== 桌面模式 ====================
+
+    override suspend fun isDesktopModeEnabled(): Boolean = getBool(K.DESKTOP_MODE_ENABLED_KEY, K.DEFAULT_DESKTOP_MODE_ENABLED)
+    override suspend fun setDesktopModeEnabled(enabled: Boolean) = setBool(K.DESKTOP_MODE_ENABLED_KEY, enabled)
+    override fun observeDesktopModeEnabled(): Flow<Boolean> = observeBool(K.DESKTOP_MODE_ENABLED_KEY, K.DEFAULT_DESKTOP_MODE_ENABLED)
 }

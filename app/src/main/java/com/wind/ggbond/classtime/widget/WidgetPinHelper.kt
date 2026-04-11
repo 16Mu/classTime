@@ -5,10 +5,20 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.wind.ggbond.classtime.util.AppLogger
 
 object WidgetPinHelper {
+
+    private const val TAG = "WidgetPinHelper"
+    const val REQUEST_CODE_WIDGET_PERMISSION = 10086
 
     enum class WidgetType {
         TODAY_COURSE,
@@ -26,6 +36,16 @@ object WidgetPinHelper {
                 WEEK_OVERVIEW -> "周概览"
                 LARGE_TODAY_COURSE -> "大尺寸课程表"
                 TOMORROW_COURSE -> "智能课表"
+            }
+
+        val serialName: String
+            get() = when (this) {
+                TODAY_COURSE -> "today_course"
+                NEXT_CLASS -> "next_class"
+                COMPACT_LIST -> "compact_list"
+                WEEK_OVERVIEW -> "week_overview"
+                LARGE_TODAY_COURSE -> "large_today_course"
+                TOMORROW_COURSE -> "tomorrow_course"
             }
     }
 
@@ -50,7 +70,7 @@ object WidgetPinHelper {
 
     private fun isKnownProblematicOEM(): Boolean {
         val m = manufacturer
-        return m.contains("vivo") || m.contains("iqoo")
+        return m.contains("vivo") || m.contains("iqoo") || m.contains("oneplus") || m.contains("oplus")
     }
 
     private fun isXiaomiDevice(): Boolean {
@@ -63,6 +83,11 @@ object WidgetPinHelper {
         return m.contains("huawei") || m.contains("honor")
     }
 
+    private fun isOnePlusDevice(): Boolean {
+        val m = manufacturer
+        return m.contains("oneplus") || m.contains("oplus")
+    }
+
     fun isRequestPinAppWidgetSupported(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return false
@@ -71,18 +96,44 @@ object WidgetPinHelper {
         return appWidgetManager.isRequestPinAppWidgetSupported
     }
 
+    fun hasWidgetBindPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                context,
+                "android.permission.REQUEST_BIND_WIDGETS"
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
     fun requestPinWidget(context: Context, widgetType: WidgetType): PinResult {
+        AppLogger.i(TAG, "=== requestPinWidget START === type=$widgetType, manufacturer=${Build.MANUFACTURER}, model=${Build.MODEL}, sdk=${Build.VERSION.SDK_INT}")
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            AppLogger.w(TAG, "API < 26, not supported. sdk=${Build.VERSION.SDK_INT}")
             Toast.makeText(context, "系统版本过低，不支持自动添加小组件", Toast.LENGTH_LONG).show()
             return PinResult.FallbackNeeded(widgetType, "请手动添加小组件", getManualGuideSteps())
         }
 
-        if (!isRequestPinAppWidgetSupported(context)) {
-            Toast.makeText(context, "当前设备不支持自动添加，请手动添加", Toast.LENGTH_LONG).show()
-            return PinResult.FallbackNeeded(widgetType, "请手动添加小组件", getManualGuideSteps())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val hasPermission = hasWidgetBindPermission(context)
+            AppLogger.i(TAG, "REQUEST_BIND_WIDGETS permission granted=$hasPermission")
+            if (!hasPermission) {
+                AppLogger.w(TAG, "Missing REQUEST_BIND_WIDGETS permission, need to request first")
+                return PinResult.Failed(widgetType, "NEED_PERMISSION")
+            }
         }
 
         val appWidgetManager = AppWidgetManager.getInstance(context)
+        val isPinSupported = appWidgetManager.isRequestPinAppWidgetSupported
+        AppLogger.i(TAG, "isRequestPinAppWidgetSupported=$isPinSupported, manufacturer=${Build.MANUFACTURER}")
+
+        if (!isPinSupported) {
+            AppLogger.w(TAG, "requestPinAppWidget not supported by launcher")
+            Toast.makeText(context, "当前设备不支持自动添加，请手动添加", Toast.LENGTH_LONG).show()
+            return PinResult.FallbackNeeded(widgetType, "请手动添加小组件", getManualGuideSteps())
+        }
 
         val providerComponent = when (widgetType) {
             WidgetType.TODAY_COURSE -> ComponentName(context, TodayCourseWidgetReceiver::class.java)
@@ -93,12 +144,12 @@ object WidgetPinHelper {
             WidgetType.TOMORROW_COURSE -> ComponentName(context, TomorrowCourseWidgetReceiver::class.java)
         }
 
-        if (isKnownProblematicOEM()) {
-            Toast.makeText(context, "检测到 ${Build.MANUFACTURER} 设备，建议手动添加小组件以获得最佳体验", Toast.LENGTH_LONG).show()
-            return PinResult.FallbackNeeded(widgetType, "${Build.MANUFACTURER} 设备手动添加指南", getOEMGuideSteps())
+        val callbackIntent = Intent(context, WidgetPinCallbackReceiver::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
+            putExtra(WidgetPinCallbackReceiver.EXTRA_WIDGET_TYPE, widgetType.serialName)
         }
+        AppLogger.i(TAG, "callbackIntent created: action=${callbackIntent.action}, widgetType=${widgetType.serialName}")
 
-        val callbackIntent = Intent(context, WidgetPinCallbackReceiver::class.java)
         val successCallback = PendingIntent.getBroadcast(
             context,
             widgetType.ordinal,
@@ -107,25 +158,31 @@ object WidgetPinHelper {
         )
 
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val result = appWidgetManager.requestPinAppWidget(providerComponent, null, successCallback)
-                if (result) {
-                    if (isXiaomiDevice()) {
-                        Toast.makeText(context, "小组件已请求添加，请在桌面查看", Toast.LENGTH_SHORT).show()
-                    } else if (isHuaweiDevice()) {
-                        Toast.makeText(context, "请确认弹窗后将小组件拖入桌面", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "请确认添加小组件", Toast.LENGTH_SHORT).show()
-                    }
-                    PinResult.Success(widgetType)
+            val result = appWidgetManager.requestPinAppWidget(providerComponent, null, successCallback)
+            AppLogger.i(TAG, "requestPinAppWidget result=$result for ${widgetType.serialName}")
+
+            if (result) {
+                val beforeIds = getWidgetIds(appWidgetManager, providerComponent)
+                AppLogger.i(TAG, "Widget IDs before pin: ${beforeIds.contentToString()}")
+
+                if (isXiaomiDevice()) {
+                    Toast.makeText(context, "小组件已请求添加，请在桌面查看", Toast.LENGTH_SHORT).show()
+                } else if (isHuaweiDevice()) {
+                    Toast.makeText(context, "请确认弹窗后将小组件拖入桌面", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "添加请求未成功，请尝试手动添加", Toast.LENGTH_LONG).show()
-                    PinResult.FallbackNeeded(widgetType, "自动添加未成功，请手动添加", getManualGuideSteps())
+                    Toast.makeText(context, "请确认添加小组件", Toast.LENGTH_SHORT).show()
                 }
+
+                scheduleDelayedPinCheck(context, appWidgetManager, providerComponent, widgetType, beforeIds)
+
+                PinResult.Success(widgetType)
             } else {
-                PinResult.Failed(widgetType, "系统版本不满足要求")
+                AppLogger.w(TAG, "requestPinAppWidget returned false, launcher rejected request")
+                Toast.makeText(context, "添加请求未成功，请尝试手动添加", Toast.LENGTH_LONG).show()
+                PinResult.FallbackNeeded(widgetType, "自动添加未成功，请手动添加", getManualGuideSteps())
             }
         } catch (e: SecurityException) {
+            AppLogger.e(TAG, "SecurityException in requestPinAppWidget: ${e.message}")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 Toast.makeText(context, "缺少小组件权限，请手动添加", Toast.LENGTH_LONG).show()
             } else {
@@ -133,9 +190,50 @@ object WidgetPinHelper {
             }
             PinResult.FallbackNeeded(widgetType, "权限不足，请手动添加", getManualGuideSteps())
         } catch (e: Exception) {
+            AppLogger.e(TAG, "Exception in requestPinAppWidget: ${e.message}", e)
             Toast.makeText(context, "添加小组件失败: ${e.message}", Toast.LENGTH_LONG).show()
             PinResult.FallbackNeeded(widgetType, "添加失败，请手动添加", getManualGuideSteps())
         }
+    }
+
+    private fun getWidgetIds(appWidgetManager: AppWidgetManager, providerComponent: ComponentName): IntArray {
+        return try {
+            appWidgetManager.getAppWidgetIds(providerComponent)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to get widget IDs: ${e.message}")
+            IntArray(0)
+        }
+    }
+
+    private fun scheduleDelayedPinCheck(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        providerComponent: ComponentName,
+        widgetType: WidgetType,
+        beforeIds: IntArray
+    ) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val afterIds = getWidgetIds(appWidgetManager, providerComponent)
+                AppLogger.i(TAG, "Delayed check: beforeIds=${beforeIds.contentToString()}, afterIds=${afterIds.contentToString()}")
+
+                val newIds = afterIds.filter { id -> id !in beforeIds }
+                if (newIds.isNotEmpty()) {
+                    AppLogger.i(TAG, "Widget pin confirmed! New widget IDs: $newIds")
+                } else {
+                    AppLogger.w(TAG, "No new widget ID detected after 2s for ${widgetType.serialName}, system dialog may not have appeared")
+                    if (isXiaomiDevice() || isHuaweiDevice()) {
+                        Toast.makeText(
+                            context,
+                            "未检测到小组件添加，请尝试手动添加：长按桌面空白处 → 小组件",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Delayed pin check failed: ${e.message}")
+            }
+        }, 2000)
     }
 
     fun getManualGuideSteps(): List<String> {
@@ -153,6 +251,14 @@ object WidgetPinHelper {
                 "3. 找到「课表时间」应用",
                 "4. 选择喜欢的小组件样式并点击添加",
                 "5. 如提示空间不足，请先清理桌面或翻页"
+            )
+            isOnePlusDevice() -> listOf(
+                "1. 在桌面任意空白处长按",
+                "2. 点击「小组件」或「Widgets」",
+                "3. 找到「课表时间」应用",
+                "4. 选择喜欢的小组件样式",
+                "5. 长按拖动到桌面合适位置",
+                "提示：一加设备可能不支持一键添加功能"
             )
             manufacturer.contains("samsung") -> listOf(
                 "1. 在桌面任意空白处长按",
@@ -181,6 +287,19 @@ object WidgetPinHelper {
                 "5. 提示：vivo/iQOO 设备暂不支持一键添加"
             )
             else -> getManualGuideSteps()
+        }
+    }
+
+    private fun openWidgetPermissionSettings(context: Context) {
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            AppLogger.i(TAG, "Opened app settings for widget permission")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to open settings: ${e.message}")
         }
     }
 

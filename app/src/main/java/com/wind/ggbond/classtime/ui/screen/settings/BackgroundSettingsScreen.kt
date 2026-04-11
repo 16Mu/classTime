@@ -54,6 +54,7 @@ fun BackgroundSettingsScreen(
     
     // 莫奈取色状态
     val monetEnabled by settingsViewModel.monetEnabled.collectAsState()
+    val desktopModeEnabled by settingsViewModel.desktopModeEnabled.collectAsState()
     val courseColorSaturation by settingsViewModel.courseColorSaturation.collectAsState()
     val previewColors by settingsViewModel.observeCourseColors(
         saturationLevel = when (courseColorSaturation) {
@@ -390,7 +391,51 @@ fun BackgroundSettingsScreen(
                             
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                            // 主题色（从壁纸提取的主色调）
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Apps,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = if (settingsViewModel.desktopModeEnabled.collectAsState().value) MaterialTheme.colorScheme.primary
+                                          else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "桌面模式（Beta）",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontSize = 13.sp,
+                                        color = if (settingsViewModel.desktopModeEnabled.collectAsState().value) MaterialTheme.colorScheme.primary
+                                              else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "让壁纸像手机桌面一样清晰可见",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                }
+                                Switch(
+                                    checked = settingsViewModel.desktopModeEnabled.collectAsState().value,
+                                    onCheckedChange = { settingsViewModel.updateDesktopModeEnabled(it) },
+                                    modifier = Modifier.height(28.dp),
+                                    thumbContent = {
+                                        if (settingsViewModel.desktopModeEnabled.collectAsState().value) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(12.dp),
+                                                tint = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        } else null
+                                    }
+                                )
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically

@@ -64,6 +64,7 @@ fun WeekViewContainer(
     onAdjustmentRequest: (Long) -> Unit,
     isWallpaperEnabled: Boolean = false,
     courseColors: List<String> = emptyList(),
+    displayMode: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -192,7 +193,8 @@ fun WeekViewContainer(
                                 viewModel.isAdjustedCourse(courseId, week, day, section)
                             },
                             courseColorMap = courseColorMap,
-                            isWallpaperEnabled = isWallpaperEnabled
+                            isWallpaperEnabled = isWallpaperEnabled,
+                            displayMode = displayMode
                         )
                     }
                     1 -> {

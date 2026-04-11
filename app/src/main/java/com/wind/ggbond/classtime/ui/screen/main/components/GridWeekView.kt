@@ -3,6 +3,8 @@ package com.wind.ggbond.classtime.ui.screen.main.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,9 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.wind.ggbond.classtime.ui.theme.LocalGlassEffectEnabled
 import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
+import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
 import com.wind.ggbond.classtime.ui.theme.WallpaperAwareSurface
 import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
+import com.wind.ggbond.classtime.ui.theme.DesktopTransparencyLevel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -136,7 +141,8 @@ fun GridWeekView(
     currentWeekNumber: Int = weekNumber,
     getAdjustmentInfo: ((Long, Int, Int, Int) -> com.wind.ggbond.classtime.data.local.entity.CourseAdjustment?)? = null,
     courseColorMap: Map<String, String> = emptyMap(),
-    isWallpaperEnabled: Boolean = false
+    isWallpaperEnabled: Boolean = false,
+    displayMode: Boolean = true
 ) {
     // ✅ 生产环境移除调试日志
     
@@ -152,11 +158,12 @@ fun GridWeekView(
     val dayColumnCenterXMap = remember { mutableStateMapOf<Int, Float>() }
     
     // ✅ 优化：使用derivedStateOf缓存计算结果，只在依赖变化时重新计算
-    val maxSection by remember(coursesMap) {
+    val maxSection by remember(coursesMap, classTimes) {
         derivedStateOf {
         val maxCourseSection = coursesMap.values.flatten()
             .maxOfOrNull { it.startSection + it.sectionCount - 1 } ?: 0
-        maxOf(12, maxCourseSection)  // 至少显示12节
+        val configuredSections = classTimes.size.coerceAtLeast(0)
+        maxOf(configuredSections, maxCourseSection)
         }
     }
     
@@ -311,7 +318,8 @@ fun GridWeekView(
                 .fillMaxWidth()
                 .height(48.dp)
                 .wallpaperAwareBackground(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT
                 )
                 .border(
                     width = 0.5.dp,
@@ -348,7 +356,10 @@ fun GridWeekView(
                     modifier = Modifier
                         .width(40.dp)  // 固定宽度，与节次列一致
                         .height(48.dp)
-                        .wallpaperAwareBackground(sectionBackground),
+                        .wallpaperAwareBackground(
+                            sectionBackground,
+                            desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -408,18 +419,31 @@ fun GridWeekView(
         }
 
         
-        // 课程表网格（自适应高度，无滚动）
+        // 课程表网格
+        val fixedHeightPerSection = 50.dp
+        val gridScrollState = rememberScrollState()
+        
         Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .weight(1f)
+                .then(
+                    if (displayMode) Modifier
+                    else Modifier.verticalScroll(gridScrollState)
+                )
         ) {
             // 左侧节次列（固定宽度40dp，紧凑设计）
             BoxWithConstraints(
                 modifier = Modifier
                     .width(40.dp)
-                    .fillMaxHeight()
-                    .wallpaperAwareBackground(sectionBackground)
+                    .then(
+                        if (displayMode) Modifier.fillMaxHeight()
+                        else Modifier.height(fixedHeightPerSection * maxSection)
+                    )
+                    .wallpaperAwareBackground(
+                        sectionBackground,
+                        desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT
+                    )
                     .padding(end = 2.dp)
             ) {
                 val totalHeight = maxHeight
@@ -476,7 +500,10 @@ fun GridWeekView(
             // 右侧课程网格：使用 BoxWithConstraints + compactProgress 连续插值每一列的宽度和每节的高度
             BoxWithConstraints(
                 modifier = Modifier
-                    .fillMaxHeight()
+                    .then(
+                        if (displayMode) Modifier.fillMaxHeight()
+                        else Modifier.height(fixedHeightPerSection * maxSection)
+                    )
                     .weight(1f)
             ) {
                 // 水平方向：列宽插值（与顶部星期标题保持一致）
@@ -568,9 +595,9 @@ fun GridWeekView(
                                 .fillMaxHeight()
                                 .padding(horizontal = 0.5.dp)  // 最小列间距
                                 .wallpaperAwareBackground(
-                                    // 整列添加今日高亮背景（无边框）
                                     if (isToday) todayHighlight.copy(alpha = 0.12f)
-                                    else Color.Transparent
+                                    else Color.Transparent,
+                                    desktopLevel = DesktopTransparencyLevel.FULLY_TRANSPARENT
                                 )
                                 .then(
                                     if (index < dayCount - 1) {
@@ -693,6 +720,7 @@ fun GridWeekView(
             WallpaperAwareSurface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT,
                 modifier = Modifier
                     .padding(horizontal = 48.dp)
                     .padding(top = 80.dp)  // 在网格区域上部 1/3 处
@@ -852,9 +880,9 @@ fun WeekDayHeaderAdaptive(
             .fillMaxWidth()
             .height(48.dp)  // 增加高度以容纳两行
             .wallpaperAwareBackground(
-                // 今日使用更明显的背景色（无边框）
                 if (isToday) todayHighlight.copy(alpha = 0.5f)
-                else sectionBackground
+                else sectionBackground,
+                desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -965,7 +993,10 @@ fun SectionCellAdaptive(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .wallpaperAwareBackground(backgroundColor)
+            .wallpaperAwareBackground(
+                backgroundColor,
+                desktopLevel = DesktopTransparencyLevel.SEMI_TRANSPARENT
+            )
             .padding(horizontal = 2.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1050,7 +1081,8 @@ fun CourseCellAdaptive(
     // ✅ 使用全局壁纸感知 Surface，自动适配透明度
     WallpaperAwareSurface(
         modifier = modifier.fillMaxWidth(),
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        desktopLevel = DesktopTransparencyLevel.FULLY_TRANSPARENT
     ) {
         Box(
             modifier = Modifier
@@ -1392,7 +1424,10 @@ fun CourseCell(
         modifier = Modifier
             .width(110.dp)
             .height(90.dp)
-            .wallpaperAwareBackground(MaterialTheme.colorScheme.surface)
+            .wallpaperAwareBackground(
+                MaterialTheme.colorScheme.surface,
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
     ) {
         if (courses.isNotEmpty()) {
             val course = courses.first() // 如果有冲突，显示第一个
@@ -1481,7 +1516,8 @@ fun CourseCell(
                                 Color(android.graphics.Color.parseColor(course.color)).copy(alpha = 0.5f)
                             } catch (e: Exception) {
                                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                            }
+                            },
+                            desktopLevel = DesktopTransparencyLevel.OPAQUE
                         )
                         .clickable { onClick(course) }
                 )
@@ -1596,8 +1632,12 @@ fun CourseCardCell(
     var cellCenterX by remember { mutableStateOf(0f) }
 
     val isWallpaperEnabledForCard = LocalWallpaperEnabled.current
+    val glassEffectEnabledForCard = LocalGlassEffectEnabled.current
+    val desktopModeEnabledForCard = LocalDesktopModeEnabled.current
 
-    val wallpaperAlphaMultiplier = if (isWallpaperEnabledForCard) 0.7f else 1f
+    val wallpaperAlphaMultiplier = if (desktopModeEnabledForCard && isWallpaperEnabledForCard) 1f
+                                   else if (isWallpaperEnabledForCard && glassEffectEnabledForCard) 0.7f
+                                   else 1f
 
     val displayColor by remember {
         derivedStateOf {
@@ -1613,10 +1653,16 @@ fun CourseCardCell(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .wallpaperAwareBackground(MaterialTheme.colorScheme.surface)
+            .wallpaperAwareBackground(
+                MaterialTheme.colorScheme.surface,
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
             .padding(horizontal = 1.dp, vertical = 1.dp)
             .clip(RoundedCornerShape(6.dp))
-            .wallpaperAwareBackground(displayColor)
+            .wallpaperAwareBackground(
+                displayColor,
+                desktopLevel = DesktopTransparencyLevel.OPAQUE
+            )
             .then(
                 // 正在上课时添加纯色边框
                 if (isOngoing) {
@@ -1698,7 +1744,7 @@ fun CourseCardCell(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .wallpaperAwareBackground(MaterialTheme.colorScheme.primary)
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
@@ -1791,7 +1837,8 @@ fun CourseCardCell(
                                             !shouldShowThisWeek -> textColor.copy(alpha = 0.03f)
                                             isPast -> textColor.copy(alpha = 0.08f)
                                             else -> textColor.copy(alpha = 0.12f)
-                                        }
+                                        },
+                                        desktopLevel = DesktopTransparencyLevel.OPAQUE
                                     )
                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                             )
@@ -1914,7 +1961,8 @@ fun CourseCardCell(
                                             !shouldShowThisWeek -> textColor.copy(alpha = 0.03f)
                                             isPast -> textColor.copy(alpha = 0.08f)
                                             else -> textColor.copy(alpha = 0.12f)
-                                        }
+                                        },
+                                        desktopLevel = DesktopTransparencyLevel.OPAQUE
                                     )
                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                             )
@@ -1989,22 +2037,22 @@ fun EmptyCell(
 
     WallpaperAwareSurface(
         modifier = modifier.fillMaxWidth(),
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        desktopLevel = DesktopTransparencyLevel.FULLY_TRANSPARENT
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // ✅ 获取空白格子的精确顶部 Y / 中心 X 坐标（相对于根布局）
                 .onGloballyPositioned { coordinates ->
                     val bounds = coordinates.boundsInRoot()
                     cellPositionY = bounds.top
                     cellCenterX = bounds.center.x
                 }
                 .then(
-                    // 今天的空白格子使用纯色淡背景（紧凑模式下不显示）
                     if (isToday && !isCompact) {
                         Modifier.wallpaperAwareBackground(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.04f)
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.04f),
+                            desktopLevel = DesktopTransparencyLevel.FULLY_TRANSPARENT
                         )
                     } else {
                         Modifier

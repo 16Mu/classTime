@@ -1,6 +1,8 @@
 // [Monet] 已排查：该文件不涉及课程颜色渲染，无需适配
 package com.wind.ggbond.classtime.ui.screen.profile
 
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,8 +30,18 @@ import com.wind.ggbond.classtime.ui.viewmodel.UpdateViewModel
 import com.wind.ggbond.classtime.ui.components.UpdateDialog
 import com.wind.ggbond.classtime.ui.components.UpdateCheckLoadingDialog
 import android.content.Intent
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.wind.ggbond.classtime.service.ApkDownloadManager
 import com.wind.ggbond.classtime.util.AppLogger
 import android.net.Uri
+import java.io.File
+
+private fun formatVersionName(raw: String): String {
+    val cleaned = raw.removePrefix("v")
+    return "v$cleaned"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +61,24 @@ fun ProfileScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val pendingInstallFile = remember { mutableStateOf<File?>(null) }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        pendingInstallFile.value?.let { file ->
+            if (ApkDownloadManager.canRequestInstall(context)) {
+                ApkDownloadManager.installApk(context, file)
+            } else {
+                AppLogger.w("ProfileScreen", "用户未授予安装权限")
+            }
+            pendingInstallFile.value = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        updateViewModel.observeDownloadState()
+    }
 
     LaunchedEffect(Unit) {
         settingsViewModel.messageEvent.collect { message ->
@@ -87,7 +117,7 @@ fun ProfileScreen(
             item { ProfileSwitchItem(Icons.Default.Weekend, "显示周末", if (showWeekendEnabled) "周一到周日" else "周一到周五", showWeekendEnabled, hapticToggle { settingsViewModel.updateShowWeekendEnabled(it) }) }
             item { ProfileSwitchItem(Icons.Default.BlurOn, "半透明效果", if (glassEffectEnabled) "已开启，底部栏和按钮使用半透明背景" else "已关闭，所有组件使用不透明背景", glassEffectEnabled, hapticToggle { settingsViewModel.updateGlassEffectEnabled(it) }) }
             item { ProfileNavigateItem(Icons.Default.Wallpaper, "背景与主题", "自定义背景图片、视频和动态配色", hapticClick { navController.navigate(Screen.BackgroundSettings.route) }) }
-            item { ProfileNavigateItem(Icons.Default.Palette, "更新课程颜色", "为所有课程应用新的配色方案", hapticClick { settingsViewModel.updateAllCoursesColor() }) }
+            item { ProfileNavigateItem(Icons.Default.Palette, "课程颜色设置", "主题色调、随机配色、手动选色", hapticClick { navController.navigate(Screen.CourseColorSettings.route) }) }
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
 
             // === 提醒设置 ===
@@ -97,7 +127,17 @@ fun ProfileScreen(
 
             // === 关于 ===
             item { ProfileSectionTitle("关于") }
-            item { ProfileNavigateItem(Icons.Default.Info, "应用版本", "v${com.wind.ggbond.classtime.BuildConfig.VERSION_NAME}", hapticClick { updateViewModel.checkUpdate(force = true); Unit }) }
+            item { ProfileNavigateItem(Icons.Default.Info, "应用版本", formatVersionName(com.wind.ggbond.classtime.BuildConfig.VERSION_NAME), { }) }
+            item {
+                val hasUpdate by updateViewModel.hasUpdate.collectAsState()
+                ProfileNavigateItem(
+                    Icons.Default.SystemUpdate,
+                    "检查更新",
+                    if (hasUpdate) "发现新版本，点击查看" else "当前已是最新版本",
+                    hapticClick { updateViewModel.checkUpdate(force = true); Unit },
+                    showBadge = hasUpdate
+                )
+            }
             item { ProfileNavigateItem(Icons.Default.WarningAmber, stringResource(id = R.string.disclaimer_title), stringResource(id = R.string.disclaimer_subtitle), { settingsViewModel.showDisclaimerDialog() }) }
             item { ProfileNavigateItem(Icons.Default.Person, "联系开发者", "反馈问题或建议", { settingsViewModel.copyToClipboard("微信: Z2X00404, QQ: 2326000841", "联系方式") }) }
 
@@ -153,6 +193,15 @@ fun ProfileScreen(
         )
     }
 
+    LaunchedEffect(updateState) {
+        if (updateState is UpdateViewModel.UpdateState.NoUpdate) {
+            snackbarHostState.showSnackbar("当前已是最新版本")
+            updateViewModel.resetState()
+        }
+    }
+
+    val downloadState by updateViewModel.downloadState.collectAsState()
+
     when (val state = updateState) {
         is UpdateViewModel.UpdateState.Checking -> UpdateCheckLoadingDialog("正在检查更新...")
         is UpdateViewModel.UpdateState.UpdateAvailable -> UpdateDialog(
@@ -162,7 +211,18 @@ fun ProfileScreen(
                 updateViewModel.dismissUpdate()
                 try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
                 catch (e: Exception) { AppLogger.e("ProfileScreen", "打开下载链接失败", e) }
-            }
+            },
+            downloadState = downloadState,
+            onDownloadApk = { url -> updateViewModel.downloadApk(url) },
+            onInstall = { file ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ApkDownloadManager.canRequestInstall(context)) {
+                    pendingInstallFile.value = file
+                    installPermissionLauncher.launch(ApkDownloadManager.getInstallPermissionIntent(context))
+                } else {
+                    ApkDownloadManager.installApk(context, file)
+                }
+            },
+            onResetDownload = { updateViewModel.resetDownloadState() }
         )
         is UpdateViewModel.UpdateState.Error -> AlertDialog(
             onDismissRequest = { updateViewModel.resetState() },
@@ -224,15 +284,26 @@ private fun ProfileSectionTitle(text: String, isFirst: Boolean = false) {
 }
 
 @Composable
-private fun ProfileNavigateItem(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun ProfileNavigateItem(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit, showBadge: Boolean = false) {
     Surface(Modifier.fillMaxWidth().clickable(onClick = onClick), color = Color.Transparent) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ProfileIconBox(icon, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.primary)
+            BadgedBox(
+                badge = {
+                    if (showBadge) {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(8.dp)
+                        )
+                    }
+                }
+            ) {
+                ProfileIconBox(icon, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.primary)
+            }
             Spacer(Modifier.width(12.dp))
-            ProfileTextContent(title, subtitle, MaterialTheme.colorScheme.onSurface)
+            ProfileTextContent(title, subtitle, if (showBadge) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
             Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
         }
     }

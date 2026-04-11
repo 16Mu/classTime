@@ -88,6 +88,7 @@ class SettingsViewModel @Inject constructor(
     val showClearDataDialog = settingFlow(false); val compactModeEnabled = settingFlow(false)
     val headsUpNotificationEnabled = settingFlow(true); val showWeekendEnabled = settingFlow(true)
     val glassEffectEnabled = settingFlow(true); val monetEnabled = settingFlow(false)
+    val desktopModeEnabled = settingFlow(false)
     val courseColorSaturation = settingFlow(1)
     val backgroundStatus = settingFlow(BackgroundPermissionHelper.checkBackgroundStatus(context))
     val keepAliveEnabled = settingFlow(KeepAliveService.isRunning(context))
@@ -117,6 +118,7 @@ class SettingsViewModel @Inject constructor(
         observeSetting(settingsRepository::observeMonetCourseColorsEnabled, monetEnabled)
         observeSetting(settingsRepository::observeCourseColorSaturation, courseColorSaturation)
         observeSetting(settingsRepository::observeGlassEffectEnabled, glassEffectEnabled)
+        observeSetting(settingsRepository::observeDesktopModeEnabled, desktopModeEnabled)
     }
 
     private fun <T> observeSetting(observer: () -> kotlinx.coroutines.flow.Flow<T>, flow: MutableStateFlow<T>) {
@@ -137,6 +139,7 @@ class SettingsViewModel @Inject constructor(
             onboardingCompleted.value = settingsRepository.isOnboardingCompleted()
             showWeekendEnabled.value = settingsRepository.isShowWeekendEnabled()
             glassEffectEnabled.value = settingsRepository.isGlassEffectEnabled()
+            desktopModeEnabled.value = settingsRepository.isDesktopModeEnabled()
             monetEnabled.value = settingsRepository.isMonetCourseColorsEnabled()
             courseColorSaturation.value = settingsRepository.getCourseColorSaturation()
         }
@@ -234,6 +237,7 @@ class SettingsViewModel @Inject constructor(
     fun updateShowWeekendEnabled(enabled: Boolean) { settingUpdate(showWeekendEnabled, enabled) { settingsRepository.setShowWeekendEnabled(it) } }
     fun updateGlassEffectEnabled(enabled: Boolean) { settingUpdate(glassEffectEnabled, enabled) { settingsRepository.setGlassEffectEnabled(it) } }
     fun updateMonetEnabled(enabled: Boolean) { settingUpdate(monetEnabled, enabled) { settingsRepository.setMonetCourseColorsEnabled(it) } }
+    fun updateDesktopModeEnabled(enabled: Boolean) { settingUpdate(desktopModeEnabled, enabled) { settingsRepository.setDesktopModeEnabled(it) } }
     fun updateCourseColorSaturation(saturation: Int) { settingUpdate(courseColorSaturation, saturation.coerceIn(0, 2)) { settingsRepository.setCourseColorSaturation(it) } }
 
     private fun hasNotificationPermission(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

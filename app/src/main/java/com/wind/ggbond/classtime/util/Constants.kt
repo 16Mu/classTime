@@ -86,11 +86,23 @@ object Constants {
      */
     object Database {
         const val DATABASE_NAME = "course_schedule.db"
-        const val DATABASE_VERSION = 14
-        
-        // 备份
+        const val DATABASE_VERSION = 16
+
         const val AUTO_BACKUP_ENABLED = true
         const val BACKUP_RETENTION_DAYS = 7
+    }
+
+    object Export {
+        const val BASE_DIR_NAME = "classTimeOutput"
+        const val CSV_SUBDIR = "csv"
+        const val HTML_SUBDIR = "html"
+        const val JSON_SUBDIR = "json"
+        const val ICS_SUBDIR = "ics"
+        const val TXT_SUBDIR = "txt"
+        const val CURRENT_EXPORT_VERSION = "3.0"
+        const val LEGACY_EXPORT_VERSION_2_0 = "2.0"
+        const val LEGACY_EXPORT_VERSION_1_0 = "1.0"
+        const val MAX_BACKWARD_COMPAT_VERSIONS = 3
     }
     
     /**

@@ -5,10 +5,12 @@ import com.wind.ggbond.classtime.widget.data.NextClassDataProvider
 import com.wind.ggbond.classtime.widget.data.TodayCourseDataProvider
 import com.wind.ggbond.classtime.widget.data.TomorrowCourseDataProvider
 import com.wind.ggbond.classtime.widget.data.WeekOverviewDataProvider
+import com.wind.ggbond.classtime.widget.data.WeekGridDataProvider
 import com.wind.ggbond.classtime.widget.data.WidgetDisplayData
 import com.wind.ggbond.classtime.widget.data.NextClassDisplayData
 import com.wind.ggbond.classtime.widget.data.TomorrowCourseDisplayData
 import com.wind.ggbond.classtime.widget.data.WeekOverviewData
+import com.wind.ggbond.classtime.widget.data.WeekGridData
 
 object WidgetDataProvider {
 
@@ -26,5 +28,9 @@ object WidgetDataProvider {
 
     suspend fun getSmartCourses(context: Context): TomorrowCourseDisplayData {
         return TomorrowCourseDataProvider(context).getSmartCourses()
+    }
+
+    suspend fun getWeekGridView(context: Context): WeekGridData {
+        return WeekGridDataProvider(context).getWeekGrid()
     }
 }

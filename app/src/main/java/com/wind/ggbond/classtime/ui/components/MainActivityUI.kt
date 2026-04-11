@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
+import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
 
 @Composable
 fun LoadingScreen() {
@@ -58,9 +59,13 @@ fun BottomNavigationBar(
     blurEnabled: Boolean = true
 ) {
     val isWallpaperEnabled = LocalWallpaperEnabled.current
+    val isDesktopModeEnabled = LocalDesktopModeEnabled.current
+    val isGlassEffectActive = isWallpaperEnabled && blurEnabled
 
     val containerColor = when {
-        isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+        isDesktopModeEnabled && isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+        isGlassEffectActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
+        isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
         blurEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
         else -> MaterialTheme.colorScheme.surface
     }
@@ -70,14 +75,25 @@ fun BottomNavigationBar(
             .height(60.dp)
             .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             .then(
-                if (blurEnabled || isWallpaperEnabled) {
+                if (isDesktopModeEnabled && isWallpaperEnabled) {
+                    Modifier
+                        .background(
+                            color = containerColor,
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                        )
+                        .border(
+                            width = 0.5.dp,
+                            color = Color.White.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                        )
+                } else if (isGlassEffectActive || blurEnabled || isWallpaperEnabled) {
                     Modifier
                         .background(
                             color = containerColor,
                             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                         )
                         .then(
-                            if (isWallpaperEnabled) {
+                            if (isGlassEffectActive) {
                                 Modifier.border(
                                     width = 0.5.dp,
                                     color = Color.White.copy(alpha = 0.15f),
