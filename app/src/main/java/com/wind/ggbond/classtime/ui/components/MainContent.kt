@@ -147,6 +147,7 @@ fun MainContent(
                                 videoUri = Uri.parse(scheme.uri),
                                 isPlaying = true,
                                 dimAmount = 0f,
+                                blurRadius = if (effectiveBlurRadius > 0) effectiveBlurRadius / 10f else 0f,
                                 modifier = Modifier.fillMaxSize()
                             )
                             Box(modifier = overlayModifier)

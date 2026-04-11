@@ -99,18 +99,9 @@ fun VideoBackgroundPlayer(
         }
     }
 
-    val blurRenderEffect = if (blurRadius > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        android.graphics.RenderEffect
-            .createBlurEffect(blurRadius, blurRadius, android.graphics.Shader.TileMode.CLAMP)
-    } else null
+    val currentBlurRadius by rememberUpdatedState(blurRadius)
 
-    Box(modifier = modifier.then(
-        if (blurRenderEffect != null) {
-            Modifier.graphicsLayer { renderEffect = blurRenderEffect }
-        } else {
-            Modifier
-        }
-    )) {
+    Box(modifier = modifier) {
         exoPlayer?.let { player ->
             AndroidView(
                 factory = { ctx ->
@@ -118,11 +109,31 @@ fun VideoBackgroundPlayer(
                         useController = false
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                        if (currentBlurRadius > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            setRenderEffect(
+                                android.graphics.RenderEffect.createBlurEffect(
+                                    currentBlurRadius, currentBlurRadius,
+                                    android.graphics.Shader.TileMode.CLAMP
+                                )
+                            )
+                        }
                     }
                 },
                 update = { view ->
                     view.player = player
                     playerViewRef = view
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (currentBlurRadius > 0f) {
+                            view.setRenderEffect(
+                                android.graphics.RenderEffect.createBlurEffect(
+                                    currentBlurRadius, currentBlurRadius,
+                                    android.graphics.Shader.TileMode.CLAMP
+                                )
+                            )
+                        } else {
+                            view.setRenderEffect(null)
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -143,6 +154,7 @@ fun VideoBackgroundWithLoader(
     videoUri: Uri,
     modifier: Modifier = Modifier,
     dimAmount: Float = 0f,
+    blurRadius: Float = 0f,
     isPlaying: Boolean = true,
     content: @Composable () -> Unit = {}
 ) {
@@ -155,6 +167,7 @@ fun VideoBackgroundWithLoader(
                 videoUri = videoUri,
                 modifier = Modifier.matchParentSize(),
                 dimAmount = dimAmount,
+                blurRadius = blurRadius,
                 isPlaying = isPlaying,
                 onPlayerReady = { isVideoReady = true },
                 onPlayerError = { hasError = true }

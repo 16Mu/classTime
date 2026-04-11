@@ -27,6 +27,7 @@ import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
 import com.wind.ggbond.classtime.ui.theme.WallpaperAwareSurface
 import com.wind.ggbond.classtime.ui.theme.wallpaperAwareBackground
 import com.wind.ggbond.classtime.ui.theme.DesktopTransparencyLevel
+import com.wind.ggbond.classtime.ui.theme.WallpaperTransparencyLevel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -1635,8 +1636,7 @@ fun CourseCardCell(
     val glassEffectEnabledForCard = LocalGlassEffectEnabled.current
     val desktopModeEnabledForCard = LocalDesktopModeEnabled.current
 
-    val wallpaperAlphaMultiplier = if (desktopModeEnabledForCard && isWallpaperEnabledForCard) 1f
-                                   else if (isWallpaperEnabledForCard && glassEffectEnabledForCard) 0.7f
+    val wallpaperAlphaMultiplier = if (isWallpaperEnabledForCard) 1f
                                    else 1f
 
     val displayColor by remember {
@@ -1653,12 +1653,14 @@ fun CourseCardCell(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
             .wallpaperAwareBackground(
                 MaterialTheme.colorScheme.surface,
-                desktopLevel = DesktopTransparencyLevel.OPAQUE
+                level = WallpaperTransparencyLevel.FULL_TRANSPARENT,
+                desktopLevel = DesktopTransparencyLevel.FULLY_TRANSPARENT
             )
             .padding(horizontal = 1.dp, vertical = 1.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(5.dp))
             .wallpaperAwareBackground(
                 displayColor,
                 desktopLevel = DesktopTransparencyLevel.OPAQUE

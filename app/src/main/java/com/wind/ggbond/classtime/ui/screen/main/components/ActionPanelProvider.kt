@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,7 @@ import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.screen.settings.SettingsViewModel
 import com.wind.ggbond.classtime.ui.theme.LocalDesktopModeEnabled
+import com.wind.ggbond.classtime.ui.theme.LocalWallpaperEnabled
 import androidx.compose.ui.draw.blur
 
 /**
@@ -62,12 +64,21 @@ fun ActionPanelProvider(
     val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
     val isGlassEffectActive = isWallpaperEnabled && glassEffectEnabled
     val isDesktopModeEnabled = LocalDesktopModeEnabled.current
+    val wallpaperActive = LocalWallpaperEnabled.current
+
+    val topBarContainerColor = when {
+        isDesktopModeEnabled && wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
+        isGlassEffectActive -> Color.Transparent
+        wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.surface
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = when {
-            isDesktopModeEnabled && isWallpaperEnabled -> Color.Transparent
+            isDesktopModeEnabled && wallpaperActive -> Color.Transparent
             isGlassEffectActive -> Color.Transparent
+            wallpaperActive -> Color.Transparent
             else -> MaterialTheme.colorScheme.background
         },
         floatingActionButton = {
@@ -130,14 +141,25 @@ fun ActionPanelProvider(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
+                if (wallpaperActive) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(32.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                }
                 TopAppBar(
                     windowInsets = WindowInsets(0, 0, 0, 0),
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = when {
-                            isDesktopModeEnabled && isWallpaperEnabled -> MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
-                            isGlassEffectActive -> Color.Transparent
-                            else -> MaterialTheme.colorScheme.surface
-                        }
+                        containerColor = topBarContainerColor
                     ),
                     title = {
                         Column(

@@ -14,7 +14,7 @@ android {
         applicationId = "com.wind.ggbond.classtime"
         minSdk = 26
         targetSdk = 34
-        versionCode = 36
+        versionCode = 37
         versionName = "v1.2.2-[GGBond]-[Wind]-[Release]"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

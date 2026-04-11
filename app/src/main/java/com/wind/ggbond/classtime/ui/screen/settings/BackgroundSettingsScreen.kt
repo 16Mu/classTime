@@ -33,6 +33,8 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
+import com.wind.ggbond.classtime.ui.theme.BackgroundType
+import com.wind.ggbond.classtime.ui.components.VideoBackgroundWithLoader
 import com.wind.ggbond.classtime.util.MonetColorPalette
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -185,6 +187,15 @@ fun BackgroundSettingsScreen(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .background(Color.Black.copy(alpha = uiState.dimAmount / 100f))
+                                    )
+                                }
+                                com.wind.ggbond.classtime.ui.theme.BackgroundType.VIDEO -> {
+                                    VideoBackgroundWithLoader(
+                                        videoUri = Uri.parse(activeScheme.uri),
+                                        isPlaying = true,
+                                        dimAmount = uiState.dimAmount / 100f,
+                                        blurRadius = if (uiState.blurRadius > 0) uiState.blurRadius / 10f else 0f,
+                                        modifier = Modifier.fillMaxSize()
                                     )
                                 }
                                 else -> {}

@@ -11,8 +11,8 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 34,
-      "versionName": "v1.2.0-[GGBond]-[Wind]-[Release]",
+      "versionCode": 36,
+      "versionName": "v1.2.2-[GGBond]-[Wind]-[Release]",
       "outputFile": "app-release.apk"
     }
   ],

@@ -188,3 +188,24 @@ skills/
 # 构建输出目录
 app/debug/
 app/release/
+
+# 临时脚本和工具
+*.js
+!gradlew
+!gradlew.bat
+
+# 工具和参考目录
+pua-*/
+tools/
+
+# 公告和贡献指南
+ANNOUNCEMENT.md
+CONTRIBUTING.md
+
+# 错误和日志文件
+hilt_error.txt
+resume_request.txt
+test_*.bat
+test_*.sh
+test_output.txt
+日志.log

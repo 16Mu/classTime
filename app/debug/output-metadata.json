@@ -11,8 +11,8 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 34,
-      "versionName": "v1.2.0-[GGBond]-[Wind]-[Release]-debug",
+      "versionCode": 36,
+      "versionName": "v1.2.2-[GGBond]-[Wind]-[Release]-debug",
       "outputFile": "app-debug.apk"
     }
   ],
