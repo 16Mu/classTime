@@ -23,6 +23,7 @@ build/
 
 # 本地配置文件 (包含敏感信息)
 local.properties
+key.properties
 
 # Proguard 混淆文件
 proguard/

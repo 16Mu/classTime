@@ -11,6 +11,9 @@ class HNLGDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "hnlgdx"
     override val schoolName = "河南理工大学"
     override val systemType = "shuwei"
+
+    override val aliases = listOf("河南理工大学", "河理工")
+    override val supportedUrls = listOf("adms.hpu.edu.cn")
     companion object { private const val TAG = "HNLGDXExtractor" }
     
     override fun isSchedulePage(html: String, url: String): Boolean =

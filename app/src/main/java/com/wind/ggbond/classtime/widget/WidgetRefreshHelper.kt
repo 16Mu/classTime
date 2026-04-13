@@ -3,6 +3,7 @@ package com.wind.ggbond.classtime.widget
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import com.wind.ggbond.classtime.service.contract.IWidgetRefresher
 import com.wind.ggbond.classtime.util.AppLogger
 import androidx.glance.appwidget.updateAll
@@ -13,6 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
@@ -20,6 +22,7 @@ import java.util.concurrent.TimeUnit
 object WidgetRefreshHelper : IWidgetRefresher {
 
     private const val TAG = "WidgetRefreshHelper"
+    private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** 周期刷新任务的唯一标识 */
     private const val PERIODIC_REFRESH_WORK_NAME = "widget_periodic_refresh"
@@ -34,13 +37,13 @@ object WidgetRefreshHelper : IWidgetRefresher {
      * @param context 应用上下文
      */
     override fun refreshAllWidgets(context: Context) {
-        CoroutineScope(Dispatchers.IO).launch {
+        widgetScope.launch {
             try {
-                // 刷新今日课程 Widget (Glance)
                 TodayCourseWidget().updateAll(context)
-                // 刷新下节课倒计时 Widget (Glance)
                 NextClassWidget().updateAll(context)
-                // 刷新 4x4 大尺寸小组件 (RemoteViews)
+                TomorrowCourseWidget().updateAll(context)
+                WeekOverviewWidget().updateAll(context)
+                WeekGridViewWidget().updateAll(context)
                 LargeTodayCourseWidgetProvider.refreshAllWidgets(context)
                 AppLogger.d(TAG, "所有 Widget 已刷新")
             } catch (e: Exception) {
@@ -69,7 +72,16 @@ object WidgetRefreshHelper : IWidgetRefresher {
         val tomorrowCourseIds = appWidgetManager.getAppWidgetIds(
             ComponentName(context, TomorrowCourseWidgetReceiver::class.java)
         )
-        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty() || largeWidgetIds.isNotEmpty() || tomorrowCourseIds.isNotEmpty()
+        val weekGridViewIds = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, WeekGridViewWidgetReceiver::class.java)
+        )
+        val weekOverviewIds = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, WeekOverviewWidgetReceiver::class.java)
+        )
+        val compactListIds = appWidgetManager.getAppWidgetIds(
+            ComponentName(context, CompactListViewWidgetReceiver::class.java)
+        )
+        return todayCourseIds.isNotEmpty() || nextClassIds.isNotEmpty() || largeWidgetIds.isNotEmpty() || tomorrowCourseIds.isNotEmpty() || weekGridViewIds.isNotEmpty() || weekOverviewIds.isNotEmpty() || compactListIds.isNotEmpty()
     }
 
     /**
@@ -111,6 +123,14 @@ object WidgetRefreshHelper : IWidgetRefresher {
         WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_REFRESH_WORK_NAME)
         AppLogger.d(TAG, "周期刷新任务已停止")
     }
+
+    fun notifyDataChanged(context: Context) {
+        val broadcastIntent = Intent(WidgetDataChangeReceiver.ACTION_COURSE_DATA_CHANGED).apply {
+            setPackage(context.packageName)
+        }
+        context.sendBroadcast(broadcastIntent, WidgetDataChangeReceiver.PERMISSION_SEND_DATA_CHANGE)
+        AppLogger.d(TAG, "已发送数据变更广播并触发小组件刷新")
+    }
 }
 
 /**
@@ -134,6 +154,9 @@ class WidgetRefreshWorker(
             withContext(Dispatchers.IO) {
                 TodayCourseWidget().updateAll(applicationContext)
                 NextClassWidget().updateAll(applicationContext)
+                TomorrowCourseWidget().updateAll(applicationContext)
+                WeekOverviewWidget().updateAll(applicationContext)
+                WeekGridViewWidget().updateAll(applicationContext)
                 LargeTodayCourseWidgetProvider.refreshAllWidgets(applicationContext)
             }
             AppLogger.d("WidgetRefreshWorker", "Widget 周期刷新完成")

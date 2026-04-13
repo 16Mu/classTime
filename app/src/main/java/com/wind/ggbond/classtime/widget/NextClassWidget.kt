@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -24,7 +26,6 @@ import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -71,12 +72,20 @@ class NextClassWidget : GlanceAppWidget() {
  */
 @Composable
 private fun NextClassContent(data: NextClassDisplayData) {
+    val courseIdKey = ActionParameters.Key<Long>("courseId")
+    val clickAction = if (data.hasNextClass && data.courseId > 0) {
+        val actionParams = actionParametersOf(courseIdKey to data.courseId)
+        actionStartActivity<MainActivity>(actionParams)
+    } else {
+        actionStartActivity<MainActivity>()
+    }
+
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(dayNightColorProvider(day = WidgetColors.cardBgDay, night = WidgetColors.cardBgNight))
             .cornerRadius(16.dp)
-            .clickable(actionStartActivity<MainActivity>())
+            .clickable(clickAction)
             .padding(14.dp)
     ) {
         if (data.hasNextClass) {
@@ -96,9 +105,9 @@ private fun NextClassContent(data: NextClassDisplayData) {
 private fun NextClassInfo(data: NextClassDisplayData) {
     // 解析课程颜色
     val courseColor = try {
-        Color(android.graphics.Color.parseColor(data.color))
+        parseCourseColor(data.color)
     } catch (e: Exception) {
-        Color(0xFF5C6BC0)
+        WidgetColors.courseFallbackDay
     }
 
     // 顶部状态行：状态标签 + 周次信息

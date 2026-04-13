@@ -65,6 +65,12 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="classtime" android:host="course" />
+            </intent-filter>
         </activity>
         
         <!-- 悬浮窗更新Activity -->
@@ -261,6 +267,16 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 课表数据变更接收器 -->
+        <receiver
+            android:name=".widget.WidgetDataChangeReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.wind.ggbond.classtime.ACTION_COURSE_DATA_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

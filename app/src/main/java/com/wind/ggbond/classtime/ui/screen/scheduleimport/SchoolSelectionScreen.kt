@@ -167,6 +167,7 @@ fun SchoolSelectionScreen(
                             items(schools) { school ->
                                 SchoolItem(
                                     school = school,
+                                    recommendation = viewModel.getImportRecommendation(school),
                                     onClick = {
                                         viewModel.selectSchool(school)
                                         navController.navigate("smart_webview_import/${school.id}")
@@ -198,6 +199,7 @@ fun SchoolSelectionScreen(
                                     val school = group.schools[index]
                                     SchoolItem(
                                         school = school,
+                                        recommendation = viewModel.getImportRecommendation(school),
                                         onClick = {
                                             viewModel.selectSchool(school)
                                             navController.navigate("smart_webview_import/${school.id}")
@@ -555,8 +557,10 @@ fun EmptyState(
 @Composable
 fun SchoolItem(
     school: SchoolEntity,
+    recommendation: ImportRecommendation,
     onClick: () -> Unit
 ) {
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -572,7 +576,6 @@ fun SchoolItem(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 学校图标（更紧凑）
             Surface(
                 modifier = Modifier.size(40.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -592,15 +595,33 @@ fun SchoolItem(
             
             Spacer(modifier = Modifier.width(12.dp))
             
-            // 学校信息
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = school.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = school.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (recommendation.method == ImportMethod.WEBVIEW_AUTO) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                "推荐",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically

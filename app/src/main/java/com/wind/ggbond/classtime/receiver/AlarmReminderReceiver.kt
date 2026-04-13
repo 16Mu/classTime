@@ -23,6 +23,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import com.wind.ggbond.classtime.util.AppLogger
 import kotlinx.coroutines.launch
 
@@ -51,6 +52,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
     const val EXTRA_IS_SAME_COURSE_CLASSROOM = "isSameCourseClassroom"
     const val EXTRA_IS_CLASS_END = "isClassEnd"
         private const val TAG = "AlarmReminderReceiver"
+        private val alarmScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         
         /**
          * 生成唯一的通知ID
@@ -97,7 +99,7 @@ class AlarmReminderReceiver : BroadcastReceiver() {
         // 使用 goAsync() 延长 BroadcastReceiver 生命周期，防止协程未完成时进程被杀
         val pendingResult = goAsync()
         
-        CoroutineScope(Dispatchers.IO).launch {
+        alarmScope.launch {
             try {
                 // 手动获取 CourseRepository
                 val courseRepository = getCourseRepository(context)

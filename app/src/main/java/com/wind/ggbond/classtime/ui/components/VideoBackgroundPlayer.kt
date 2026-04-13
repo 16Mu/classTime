@@ -46,8 +46,10 @@ fun VideoBackgroundPlayer(
 
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var currentListener by remember { mutableStateOf<Player.Listener?>(null) }
 
     LaunchedEffect(videoUri) {
+        currentListener?.let { exoPlayer?.removeListener(it) }
         exoPlayer?.release()
         exoPlayer = null
 
@@ -59,6 +61,7 @@ fun VideoBackgroundPlayer(
                 currentOnPlayerError?.invoke(Exception(error.message))
             }
         }
+        currentListener = listener
 
         val player = ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(videoUri))
@@ -92,10 +95,12 @@ fun VideoBackgroundPlayer(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            currentListener?.let { exoPlayer?.removeListener(it) }
             playerViewRef?.player = null
             playerViewRef = null
             exoPlayer?.release()
             exoPlayer = null
+            currentListener = null
         }
     }
 
@@ -117,11 +122,10 @@ fun VideoBackgroundPlayer(
                                 )
                             )
                         }
-                    }
+                    }.also { playerViewRef = it }
                 },
                 update = { view ->
                     view.player = player
-                    playerViewRef = view
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         if (currentBlurRadius > 0f) {
                             view.setRenderEffect(

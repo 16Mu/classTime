@@ -21,16 +21,6 @@ class AutoLoginManager @Inject constructor(
         private const val TAG = "AutoLoginManager"
     }
 
-    @Deprecated(
-        "请使用 Hilt 注入方式获取实例",
-        ReplaceWith("inject AutoLoginManager")
-    )
-    constructor(context: Context) : this(
-        context,
-        LoginService(context),
-        LoginNotificationHelper(context)
-    )
-
     fun isAutoLoginEnabled(): Boolean {
         return loginService.isAutoLoginEnabled()
     }

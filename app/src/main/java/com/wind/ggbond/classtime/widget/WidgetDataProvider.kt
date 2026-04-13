@@ -14,23 +14,66 @@ import com.wind.ggbond.classtime.widget.data.WeekGridData
 
 object WidgetDataProvider {
 
+    private val lock = Any()
+
+    @Volatile
+    private var todayProvider: TodayCourseDataProvider? = null
+    @Volatile
+    private var nextClassProvider: NextClassDataProvider? = null
+    @Volatile
+    private var weekOverviewProvider: WeekOverviewDataProvider? = null
+    @Volatile
+    private var tomorrowProvider: TomorrowCourseDataProvider? = null
+    @Volatile
+    private var weekGridProvider: WeekGridDataProvider? = null
+
     suspend fun getTodayCourses(context: Context): WidgetDisplayData {
-        return TodayCourseDataProvider(context).getTodayCourses()
+        val appContext = context.applicationContext
+        val provider = todayProvider ?: synchronized(lock) {
+            todayProvider ?: TodayCourseDataProvider(appContext).also { todayProvider = it }
+        }
+        return provider.getTodayCourses()
     }
 
     suspend fun getNextClass(context: Context): NextClassDisplayData {
-        return NextClassDataProvider(context).getNextClass()
+        val appContext = context.applicationContext
+        val provider = nextClassProvider ?: synchronized(lock) {
+            nextClassProvider ?: NextClassDataProvider(appContext).also { nextClassProvider = it }
+        }
+        return provider.getNextClass()
     }
 
     suspend fun getWeekOverview(context: Context): WeekOverviewData {
-        return WeekOverviewDataProvider(context).getWeekOverview()
+        val appContext = context.applicationContext
+        val provider = weekOverviewProvider ?: synchronized(lock) {
+            weekOverviewProvider ?: WeekOverviewDataProvider(appContext).also { weekOverviewProvider = it }
+        }
+        return provider.getWeekOverview()
     }
 
     suspend fun getSmartCourses(context: Context): TomorrowCourseDisplayData {
-        return TomorrowCourseDataProvider(context).getSmartCourses()
+        val appContext = context.applicationContext
+        val provider = tomorrowProvider ?: synchronized(lock) {
+            tomorrowProvider ?: TomorrowCourseDataProvider(appContext).also { tomorrowProvider = it }
+        }
+        return provider.getSmartCourses()
     }
 
     suspend fun getWeekGridView(context: Context): WeekGridData {
-        return WeekGridDataProvider(context).getWeekGrid()
+        val appContext = context.applicationContext
+        val provider = weekGridProvider ?: synchronized(lock) {
+            weekGridProvider ?: WeekGridDataProvider(appContext).also { weekGridProvider = it }
+        }
+        return provider.getWeekGrid()
+    }
+
+    fun clearAllProviders() {
+        synchronized(lock) {
+            todayProvider = null
+            nextClassProvider = null
+            weekOverviewProvider = null
+            tomorrowProvider = null
+            weekGridProvider = null
+        }
     }
 }

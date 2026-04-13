@@ -240,4 +240,220 @@ class DateUtilsTest {
         assertEquals("周三的中文名称为周三", "周三", DateUtils.getDayOfWeekName(3))
         assertEquals("周三的简称为三", "三", DateUtils.getDayOfWeekShortName(3))
     }
+
+    @Test
+    fun `calculateWeekNumber - 闰年2月29日学期开始应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.FEBRUARY, 29)
+        val week2 = LocalDate.of(2024, Month.MARCH, 7)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, week2)
+
+        assertEquals("闰年2月29日开始的学期第2周应返回2", 2, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 非闰年3月1日学期开始应正确计算`() {
+        val semesterStart = LocalDate.of(2023, Month.MARCH, 1)
+        val week3 = LocalDate.of(2023, Month.MARCH, 15)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, week3)
+
+        assertEquals("非闰年3月1日开始的学期第3周应返回3", 3, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 闰年跨2月学期周次连续性`() {
+        val semesterStart = LocalDate.of(2024, Month.FEBRUARY, 26)
+        val beforeLeapDay = LocalDate.of(2024, Month.FEBRUARY, 28)
+        val afterLeapDay = LocalDate.of(2024, Month.FEBRUARY, 29)
+        val marchFirst = LocalDate.of(2024, Month.MARCH, 1)
+
+        val weekBefore = DateUtils.calculateWeekNumber(semesterStart, beforeLeapDay)
+        val weekLeap = DateUtils.calculateWeekNumber(semesterStart, afterLeapDay)
+        val weekMarch = DateUtils.calculateWeekNumber(semesterStart, marchFirst)
+
+        assertEquals("闰日前应为第1周", 1, weekBefore)
+        assertEquals("闰日应为第1周", 1, weekLeap)
+        assertEquals("3月1日应为第1周", 1, weekMarch)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期从2024年跨到2025年应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val newYearDay = LocalDate.of(2025, Month.JANUARY, 1)
+        val expectedWeek = ChronoUnit.DAYS.between(semesterStart, newYearDay) / 7 + 1
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, newYearDay)
+
+        assertEquals(expectedWeek.toInt(), weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期从2023年跨到2024闰年应正确计算`() {
+        val semesterStart = LocalDate.of(2023, Month.SEPTEMBER, 4)
+        val feb29_2024 = LocalDate.of(2024, Month.FEBRUARY, 29)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, feb29_2024)
+
+        assertTrue("跨入闰年的学期周次应在合理范围", weekNumber in 20..30)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期跨越两个闰年应正确计算`() {
+        val semesterStart = LocalDate.of(2023, Month.SEPTEMBER, 4)
+        val farDate = LocalDate.of(2025, Month.MARCH, 1)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, farDate)
+
+        assertTrue("跨越两个闰年的学期周次应被限制在MAX_WEEK_NUMBER", weekNumber <= Constants.Semester.MAX_WEEK_NUMBER)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期开始于12月31日跨年应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.DECEMBER, 31)
+        val nextJan7 = LocalDate.of(2025, Month.JANUARY, 7)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, nextJan7)
+
+        assertEquals("跨年学期第2周应返回2", 2, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - LocalDate最小值不应崩溃`() {
+        val semesterStart = LocalDate.of(2000, Month.JANUARY, 1)
+        val currentDate = LocalDate.of(2000, Month.JANUARY, 8)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, currentDate)
+
+        assertEquals("极早日期应正常计算", 2, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期开始和当前日期相同应返回1`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, semesterStart)
+
+        assertEquals("相同日期应返回第1周", 1, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期第30周边界应返回30`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val week30 = semesterStart.plusWeeks(29)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, week30)
+
+        assertEquals("第30周应返回30", 30, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 超过30周应被限制在MAX_WEEK_NUMBER`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val week35 = semesterStart.plusWeeks(34)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, week35)
+
+        assertEquals("超过30周应被限制在MAX_WEEK_NUMBER", Constants.Semester.MAX_WEEK_NUMBER, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期开始于周六应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 7)
+        val nextMonday = LocalDate.of(2024, Month.SEPTEMBER, 9)
+
+        val week1 = DateUtils.calculateWeekNumber(semesterStart, semesterStart)
+        val week2 = DateUtils.calculateWeekNumber(semesterStart, nextMonday)
+
+        assertEquals("周六开始第1周应为1", 1, week1)
+        assertEquals("下周一应为第2周", 2, week2)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期开始于周日应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 1)
+        val nextMonday = LocalDate.of(2024, Month.SEPTEMBER, 2)
+
+        val week1 = DateUtils.calculateWeekNumber(semesterStart, semesterStart)
+        val week2 = DateUtils.calculateWeekNumber(semesterStart, nextMonday)
+
+        assertEquals("周日开始第1周应为1", 1, week1)
+        assertEquals("下周一应为第2周", 2, week2)
+    }
+
+    @Test
+    fun `getMondayOfWeek - 学期从周三开始第1周周一应在学期开始前`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 4)
+
+        val monday = DateUtils.getMondayOfWeek(semesterStart, 1)
+
+        assertEquals("第1周周一应为9月2日", LocalDate.of(2024, Month.SEPTEMBER, 2), monday)
+    }
+
+    @Test
+    fun `getMondayOfWeek - 学期从周五开始第1周周一应在学期开始前`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 6)
+
+        val monday = DateUtils.getMondayOfWeek(semesterStart, 1)
+
+        assertEquals("第1周周一应为9月2日", LocalDate.of(2024, Month.SEPTEMBER, 2), monday)
+    }
+
+    @Test
+    fun `getMondayOfWeek - 跨年第20周周一应正确计算`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val expected = semesterStart.minusDays(0).plusWeeks(19)
+
+        val monday = DateUtils.getMondayOfWeek(semesterStart, 20)
+
+        assertEquals(expected, monday)
+    }
+
+    @Test
+    fun `getDayOfWeekName - 极大值应返回空字符串`() {
+        val result = DateUtils.getDayOfWeekName(Int.MAX_VALUE)
+
+        assertEquals("极大值应返回空字符串", "", result)
+    }
+
+    @Test
+    fun `getDayOfWeekName - 极小值应返回空字符串`() {
+        val result = DateUtils.getDayOfWeekName(Int.MIN_VALUE)
+
+        assertEquals("极小值应返回空字符串", "", result)
+    }
+
+    @Test
+    fun `getDayOfWeekShortName - 极大值应返回空字符串`() {
+        val result = DateUtils.getDayOfWeekShortName(Int.MAX_VALUE)
+
+        assertEquals("极大值应返回空字符串", "", result)
+    }
+
+    @Test
+    fun `getDayOfWeekShortName - 极小值应返回空字符串`() {
+        val result = DateUtils.getDayOfWeekShortName(Int.MIN_VALUE)
+
+        assertEquals("极小值应返回空字符串", "", result)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期恰好7天应返回第2周`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val day7 = semesterStart.plusDays(7)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, day7)
+
+        assertEquals("第7天应返回第2周", 2, weekNumber)
+    }
+
+    @Test
+    fun `calculateWeekNumber - 学期第6天应返回第1周`() {
+        val semesterStart = LocalDate.of(2024, Month.SEPTEMBER, 2)
+        val day6 = semesterStart.plusDays(6)
+
+        val weekNumber = DateUtils.calculateWeekNumber(semesterStart, day6)
+
+        assertEquals("第6天应返回第1周", 1, weekNumber)
+    }
 }

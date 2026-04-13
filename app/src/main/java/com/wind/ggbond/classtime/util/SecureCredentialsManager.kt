@@ -2,8 +2,6 @@ package com.wind.ggbond.classtime.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 
 /**
  * 安全凭据管理器
@@ -27,28 +25,7 @@ class SecureCredentialsManager(
     }
     
     // 加密存储，初始化失败时为null（不回退到明文，避免安全降级）
-    private val encryptedPrefs: SharedPreferences?
-    
-    init {
-        // 创建或获取主密钥
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        
-        // 创建加密的SharedPreferences
-        encryptedPrefs = try {
-            EncryptedSharedPreferences.create(
-                context,
-                ENCRYPTED_PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "加密存储初始化失败，凭据功能不可用", e)
-            null  // 不回退到明文存储，标记为不可用
-        }
-    }
+    private val encryptedPrefs: SharedPreferences? = EncryptedPrefsFactory.create(context, ENCRYPTED_PREFS_NAME, TAG)
     
     /**
      * 保存账号密码
@@ -67,8 +44,6 @@ class SecureCredentialsManager(
                 .putString(KEY_PREFIX_USERNAME + schoolId, username)
                 .putString(KEY_PREFIX_PASSWORD + schoolId, password)
                 .apply()
-            AppLogger.sensitive(TAG, "Username", username)
-            AppLogger.sensitive(TAG, "Password", password)
             AppLogger.d(TAG, "凭据已保存: schoolId=$schoolId")
         } catch (e: Exception) {
             AppLogger.e(TAG, "保存凭据失败: schoolId=$schoolId", e)

@@ -138,8 +138,8 @@ class UpdateViewModel @Inject constructor(
         }
     }
 
-    fun downloadApk(url: String) {
-        ApkDownloadManager.downloadApk(application, url)
+    fun downloadApk(url: String, sha256: String? = null) {
+        ApkDownloadManager.downloadApk(application, url, sha256)
     }
 
     fun observeDownloadState() {

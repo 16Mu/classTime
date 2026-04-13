@@ -18,7 +18,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("courseId")]
+    indices = [Index("courseId"), Index(value = ["courseId", "isEnabled"]), Index("triggerTime"), Index("dayOfWeek")]
 )
 data class Reminder(
     @PrimaryKey(autoGenerate = true)

@@ -53,11 +53,8 @@ interface ScheduleDao {
     @Query("UPDATE schedules SET isCurrent = 1 WHERE id = :scheduleId")
     suspend fun setCurrentSchedule(scheduleId: Long)
 
-    @Transaction
-    suspend fun switchCurrentSchedule(scheduleId: Long) {
-        clearCurrentSchedule()
-        setCurrentSchedule(scheduleId)
-    }
+    @Query("UPDATE schedules SET isCurrent = CASE WHEN id = :scheduleId THEN 1 ELSE 0 END")
+    suspend fun switchCurrentSchedule(scheduleId: Long)
 }
 
 

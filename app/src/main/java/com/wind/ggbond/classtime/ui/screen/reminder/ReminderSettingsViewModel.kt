@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
+import com.wind.ggbond.classtime.domain.usecase.ReminderUseCase
 import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.PermissionGuideManager
 import com.wind.ggbond.classtime.util.ReminderDiagnostic
@@ -76,7 +77,8 @@ class ReminderSettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
-    private val reminderScheduler: IAlarmScheduler
+    private val reminderScheduler: IAlarmScheduler,
+    private val reminderUseCase: ReminderUseCase
 ) : ViewModel() {
 
     // DataStore 实例

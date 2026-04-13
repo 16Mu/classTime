@@ -130,3 +130,15 @@
 # ======================== Google Tink 加密库 ========================
 # Tink 引用了 errorprone 注解（仅编译期使用），运行时不需要
 -dontwarn com.google.errorprone.annotations.**
+
+# ======================== Hilt 生成类保护 ========================
+-keep class com.wind.ggbond.classtime.CourseScheduleApp_GeneratedInjector { *; }
+-keep class com.wind.ggbond.classtime.**_GeneratedInjector { *; }
+-keep class com.wind.ggbond.classtime.**_HiltModules* { *; }
+-keep @dagger.hilt.android.lifecycle.HiltViewModel class * { *; }
+
+# ======================== 枚举方法保留 ========================
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}

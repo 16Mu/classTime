@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 
 @HiltViewModel
 class ThemeColorSelectionViewModel @Inject constructor(
@@ -49,7 +50,7 @@ class ThemeColorSelectionViewModel @Inject constructor(
                         updatePreview()
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
         }
     }
 

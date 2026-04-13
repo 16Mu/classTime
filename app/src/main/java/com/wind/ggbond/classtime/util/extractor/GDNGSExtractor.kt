@@ -18,6 +18,9 @@ class GDNGSExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "gdngs"
     override val schoolName = "广东农工商职业技术学院"
     override val systemType = "qiangzhi"
+
+    override val aliases = listOf("广东农工商职业技术学院", "广东农工商")
+    override val supportedUrls = listOf("jwmis.gdaib.edu.cn")
     
     companion object {
         private const val TAG = "GDNGSExtractor"

@@ -18,7 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.local.entity.Schedule
+import com.wind.ggbond.classtime.ui.components.NumberStepper
 import com.wind.ggbond.classtime.ui.navigation.Screen
+import com.wind.ggbond.classtime.util.Constants
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -361,6 +365,8 @@ fun ScheduleDialog(
     var name by remember(schedule?.id) { mutableStateOf(defaultScheduleName) }
     var startDate by remember(schedule?.id) { mutableStateOf(defaultStartDate) }
     var totalWeeks by remember(schedule?.id) { mutableStateOf(schedule?.totalWeeks ?: 20) }
+    var weeksInput by remember(schedule?.id) { mutableStateOf((schedule?.totalWeeks ?: 20).toString()) }
+    var weeksError by remember(schedule?.id) { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     
     // 根据开始日期和总周数自动计算结束日期
@@ -445,38 +451,57 @@ fun ScheduleDialog(
                     }
                 )
                 
-                // 总周数 - 提供快速选择
-                var showWeeksOptions by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = showWeeksOptions,
-                    onExpandedChange = { showWeeksOptions = it }
-                ) {
-                    OutlinedTextField(
-                        value = "${totalWeeks}周",
-                        onValueChange = { },
-                        label = { Text("学期总周数") },
-                        readOnly = true,
-                        trailingIcon = { 
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = showWeeksOptions) 
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = showWeeksOptions,
-                        onDismissRequest = { showWeeksOptions = false }
-                    ) {
-                        listOf(16, 18, 20, 22, 24).forEach { weeks ->
-                            DropdownMenuItem(
-                                text = { Text("${weeks}周") },
-                                onClick = {
-                                    totalWeeks = weeks
-                                    showWeeksOptions = false
-                                }
-                            )
+                // 总周数 - NumberStepper + 手动输入
+                NumberStepper(
+                    value = totalWeeks,
+                    onValueChange = { 
+                        totalWeeks = it
+                        weeksInput = it.toString()
+                        weeksError = null
+                    },
+                    range = Constants.Semester.MIN_WEEK_NUMBER..Constants.Semester.MAX_WEEK_NUMBER,
+                    label = "周",
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = weeksInput,
+                    onValueChange = { input ->
+                        weeksInput = input
+                        val parsed = input.toIntOrNull()
+                        weeksError = when {
+                            parsed == null -> "请输入有效的数字"
+                            parsed < Constants.Semester.MIN_WEEK_NUMBER -> "最少${Constants.Semester.MIN_WEEK_NUMBER}周"
+                            parsed > Constants.Semester.MAX_WEEK_NUMBER -> "最多${Constants.Semester.MAX_WEEK_NUMBER}周"
+                            else -> {
+                                totalWeeks = parsed
+                                null
+                            }
                         }
+                    },
+                    label = { Text("学期总周数") },
+                    isError = weeksError != null,
+                    supportingText = weeksError?.let { { Text(it) } },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                // 快速选择
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(16, 18, 20, 22, 24).forEach { weeks ->
+                        FilterChip(
+                            selected = totalWeeks == weeks,
+                            onClick = {
+                                totalWeeks = weeks
+                                weeksInput = weeks.toString()
+                                weeksError = null
+                            },
+                            label = { Text("${weeks}周") }
+                        )
                     }
                 }
                 
@@ -513,7 +538,7 @@ fun ScheduleDialog(
                 onClick = {
                     onConfirm(name, startDate, endDate, totalWeeks)
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank() && weeksError == null
             ) {
                 Text("确定")
             }

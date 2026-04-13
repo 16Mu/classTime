@@ -17,6 +17,9 @@ class NMGKJDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "nmgkjdx"
     override val schoolName = "内蒙古科技大学"
     override val systemType = "urp"
+
+    override val aliases = listOf("内蒙古科技大学")
+    override val supportedUrls = listOf("jwgl.imust.edu.cn")
     
     companion object {
         private const val TAG = "NMGKJDXExtractor"

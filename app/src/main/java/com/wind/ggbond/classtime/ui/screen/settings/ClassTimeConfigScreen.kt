@@ -29,8 +29,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
+import com.wind.ggbond.classtime.ui.components.NumberStepper
 import com.wind.ggbond.classtime.ui.navigation.BottomNavItem
 import com.wind.ggbond.classtime.ui.navigation.Screen
+import com.wind.ggbond.classtime.util.Constants
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.collectLatest
@@ -61,6 +63,7 @@ fun ClassTimeConfigScreen(
     val showAfternoonSectionsDialog by viewModel.showAfternoonSectionsDialog.collectAsState()
     val morningSectionCount by viewModel.morningSections.collectAsState()
     val afternoonSectionCount by viewModel.afternoonSections.collectAsState()
+    val maxCourseSection by viewModel.maxCourseSection.collectAsState()
     val currentSchedule by viewModel.currentSchedule.collectAsState()
     val currentConfigName by viewModel.currentConfigName.collectAsState()
     val haptic = LocalHapticFeedback.current
@@ -494,6 +497,9 @@ fun ClassTimeConfigScreen(
         SectionCountDialog(
             title = "设置上午节次数",
             currentSections = morningSectionCount,
+            minSections = maxOf(0, maxCourseSection - afternoonSectionCount),
+            maxCourseSection = maxCourseSection,
+            otherSections = afternoonSectionCount,
             onDismiss = { viewModel.hideMorningSectionsDialog() },
             onConfirm = { sections ->
                 viewModel.updateMorningSections(sections)
@@ -507,6 +513,9 @@ fun ClassTimeConfigScreen(
         SectionCountDialog(
             title = "设置下午节次数",
             currentSections = afternoonSectionCount,
+            minSections = maxOf(0, maxCourseSection - morningSectionCount),
+            maxCourseSection = maxCourseSection,
+            otherSections = morningSectionCount,
             onDismiss = { viewModel.hideAfternoonSectionsDialog() },
             onConfirm = { sections ->
                 viewModel.updateAfternoonSections(sections)
@@ -978,13 +987,21 @@ fun BreakDurationDialog(
 fun SectionCountDialog(
     title: String,
     currentSections: Int,
+    minSections: Int = 0,
+    maxCourseSection: Int = 0,
+    otherSections: Int = 0,
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val dialogKey = remember(currentSections) { Any() }
-    var selectedSections by remember(currentSections) { mutableIntStateOf(currentSections) }
+    var selectedSections by remember(currentSections, minSections) { 
+        mutableIntStateOf(maxOf(currentSections, minSections))
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    val totalAfterChange = selectedSections + otherSections
+    val isBelowMin = maxCourseSection > 0 && totalAfterChange < maxCourseSection
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1033,20 +1050,74 @@ fun SectionCountDialog(
                 )
             }
             
+            // 课程节次限制提示
+            if (maxCourseSection > 0) {
+                Surface(
+                    color = if (isBelowMin) {
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+                    } else {
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                    },
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "当前课表课程最大节次：第${maxCourseSection}节",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isBelowMin) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                }
+                            )
+                            Text(
+                                text = "合计${totalAfterChange}节（${if (title.contains("上午")) "上午${selectedSections}+下午${otherSections}" else "上午${otherSections}+下午${selectedSections}"}）",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isBelowMin) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                            if (isBelowMin) {
+                                Text(
+                                    text = "总节次不能低于课程最大节次",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
             // 横向滚轮选择器
-            HorizontalNumberPicker(
+            NumberStepper(
                 value = selectedSections,
-                range = 0..8,
                 onValueChange = { selectedSections = it },
+                range = minSections..Constants.Course.MAX_MORNING_SECTION_COUNT,
                 label = "节",
-                resetKey = dialogKey
+                modifier = Modifier.fillMaxWidth()
             )
             
             // 建议文本
             Text(
-                text = "设置为0表示没有${if (title.contains("上午")) "上午" else "下午"}课程",
+                text = if (minSections > 0) {
+                    "当前课表至少需要${minSections}节${if (title.contains("上午")) "上午" else "下午"}课程"
+                } else {
+                    "设置为0表示没有${if (title.contains("上午")) "上午" else "下午"}课程，最多${Constants.Course.MAX_MORNING_SECTION_COUNT}节"
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (minSections > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
             
@@ -1071,7 +1142,7 @@ fun SectionCountDialog(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp) // 增加按钮高度
+                        .height(52.dp)
                 ) {
                     Text(
                         text = "取消",
@@ -1085,9 +1156,10 @@ fun SectionCountDialog(
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onConfirm(selectedSections)
                     },
+                    enabled = !isBelowMin,
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp) // 增加按钮高度
+                        .height(52.dp)
                 ) {
                     Text(
                         text = "确定",

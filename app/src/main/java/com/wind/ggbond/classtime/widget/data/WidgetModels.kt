@@ -24,6 +24,7 @@ data class WidgetDisplayData(
 }
 
 data class WidgetCourseItem(
+    val courseId: Long,
     val courseName: String,
     val classroom: String,
     val teacher: String,
@@ -38,6 +39,7 @@ data class WidgetCourseItem(
 data class NextClassDisplayData(
     val hasNextClass: Boolean,
     val isOngoing: Boolean = false,
+    val courseId: Long = 0L,
     val courseName: String = "",
     val classroom: String = "",
     val teacher: String = "",
@@ -84,4 +86,28 @@ data class CourseBrief(
     val sectionLabel: String get() = "$startSection-$endSection"
 
     val displayLabel: String get() = "$name($sectionLabel)"
+}
+
+data class TomorrowCourseDisplayData(
+    val dateText: String,
+    val dayOfWeekText: String,
+    val weekNumberText: String,
+    val courseItems: List<WidgetCourseItem>,
+    val isShowingToday: Boolean,
+    val statusLabel: String,
+    val emptyMessage: String?,
+    val progressText: String = ""
+) {
+    companion object {
+        fun empty(message: String) = TomorrowCourseDisplayData(
+            dateText = LocalDate.now().format(DateTimeFormatter.ofPattern("M月d日")),
+            dayOfWeekText = com.wind.ggbond.classtime.util.DateUtils.getDayOfWeekName(LocalDate.now().dayOfWeek.value),
+            weekNumberText = "",
+            courseItems = emptyList(),
+            isShowingToday = true,
+            statusLabel = "",
+            emptyMessage = message,
+            progressText = ""
+        )
+    }
 }

@@ -16,6 +16,9 @@ class QDDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "qddx"
     override val schoolName = "青岛大学"
     override val systemType = "custom"
+
+    override val aliases = listOf("青岛大学")
+    override val supportedUrls = listOf("qdu.edu.cn")
     
     companion object {
         private const val TAG = "QDDXExtractor"

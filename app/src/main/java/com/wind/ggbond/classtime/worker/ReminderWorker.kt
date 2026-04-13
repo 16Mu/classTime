@@ -16,11 +16,13 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.R
+import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.DateUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 
 @HiltWorker
 class ReminderWorker @AssistedInject constructor(
@@ -73,14 +75,13 @@ class ReminderWorker @AssistedInject constructor(
             append("上课地点：${classroomText}\n")
             if (course.teacher.isNotEmpty()) append("任课教师：${teacherText}\n")
             append("上课时间：${dayOfWeekName} ${sectionText}\n")
-            append("课程编号：${course.id}\n")
             if (course.weeks.isNotEmpty()) append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
         }
 
         val notificationManager = NotificationManagerCompat.from(applicationContext)
         if (!notificationManager.areNotificationsEnabled()) {
             AppLogger.w(TAG, "通知权限未授予，无法显示通知")
-            return Result.failure()
+            return Result.success()
         }
 
         createNotificationChannel()
@@ -89,7 +90,7 @@ class ReminderWorker @AssistedInject constructor(
             val channel = notificationManager.getNotificationChannel(CHANNEL_ID)
             if (channel?.importance == NotificationManager.IMPORTANCE_NONE) {
                 AppLogger.w(TAG, "通知渠道已被用户禁用")
-                return Result.failure()
+                return Result.success()
             }
         }
 
@@ -98,7 +99,7 @@ class ReminderWorker @AssistedInject constructor(
         } else {
             generateNotificationId(courseId, weekNumber)
         }
-        val notificationId = (baseNotificationId.toString() + System.currentTimeMillis()).hashCode().and(0x7FFFFFFF)
+        val notificationId = baseNotificationId
 
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -112,19 +113,12 @@ class ReminderWorker @AssistedInject constructor(
         )
 
         val headsUpEnabled = try {
-            val prefs = applicationContext.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
-            prefs.getBoolean("heads_up_notification_enabled", true)
+            val settingsDataStore = com.wind.ggbond.classtime.data.datastore.DataStoreManager.getSettingsDataStore(applicationContext)
+            settingsDataStore.data.first()[com.wind.ggbond.classtime.data.datastore.DataStoreManager.SettingsKeys.HEADS_UP_NOTIFICATION_ENABLED_KEY] ?: true
         } catch (e: Exception) {
             AppLogger.w(TAG, "读取弹窗设置失败，使用默认值: ${e.message}")
             true
         }
-
-        val fullScreenIntent = if (headsUpEnabled) {
-            PendingIntent.getActivity(
-                applicationContext, requestCode + 10000, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        } else null
 
         val notificationTitle = if (isNextCourseReminder) {
             if (isSameCourseAndClassroom) "时课 课程继续：${course.courseName}"
@@ -173,12 +167,11 @@ class ReminderWorker @AssistedInject constructor(
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(false)
 
-        if (headsUpEnabled && fullScreenIntent != null) {
+        if (headsUpEnabled) {
             notificationBuilder
-                .setFullScreenIntent(fullScreenIntent, true)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            AppLogger.d(TAG, "弹窗通知已启用，将显示悬浮弹窗（优先级：MAX，时间戳：$currentTime）")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+            AppLogger.d(TAG, "弹窗通知已启用，将显示高优先级悬浮通知（时间戳：$currentTime）")
         } else {
             notificationBuilder.setCategory(NotificationCompat.CATEGORY_REMINDER)
             AppLogger.d(TAG, "弹窗通知已禁用，仅显示通知栏通知")

@@ -111,9 +111,10 @@ fun CourseDetailBottomSheet(
     var editedReminderEnabled by remember { mutableStateOf(true) }
     var editedReminderMinutes by remember { mutableStateOf(10) }
     
-    // 当进入编辑模式时，加载当前全部数据
-    LaunchedEffect(isEditMode, course) {
-        if (isEditMode) {
+    var hasLoadedEditData by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isEditMode) {
+        if (isEditMode && !hasLoadedEditData) {
             course?.let { c ->
                 editedCourseName = c.courseName
                 editedTeacher = c.teacher
@@ -129,6 +130,10 @@ fun CourseDetailBottomSheet(
                 editedReminderEnabled = c.reminderEnabled
                 editedReminderMinutes = c.reminderMinutes
             }
+            hasLoadedEditData = true
+        }
+        if (!isEditMode) {
+            hasLoadedEditData = false
         }
     }
     

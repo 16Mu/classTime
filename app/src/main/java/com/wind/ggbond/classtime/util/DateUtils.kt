@@ -89,49 +89,24 @@ object DateUtils {
      * @param dayOfWeek 星期数（1-7）
      * @return 中文名称，如果无效返回空字符串
      */
-    fun getDayOfWeekName(dayOfWeek: Int): String {
-        // ✅ 使用Constants验证范围
+    private val DAY_NAMES = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+    private val DAY_SHORT_NAMES = listOf("一", "二", "三", "四", "五", "六", "日")
+
+    private fun validateDayOfWeek(dayOfWeek: Int): Boolean {
         if (dayOfWeek !in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) {
             AppLogger.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
-            return ""
+            return false
         }
-        
-        return when (dayOfWeek) {
-            1 -> "周一"
-            2 -> "周二"
-            3 -> "周三"
-            4 -> "周四"
-            5 -> "周五"
-            6 -> "周六"
-            7 -> "周日"
-            else -> ""
-        }
+        return true
     }
-    
-    /**
-     * 获取星期几的简短名称
-     * 
-     * ✅ 添加边界检查
-     * 
-     * @param dayOfWeek 星期数（1-7）
-     * @return 简短名称，如果无效返回空字符串
-     */
+
+    fun getDayOfWeekName(dayOfWeek: Int): String {
+        if (!validateDayOfWeek(dayOfWeek)) return ""
+        return DAY_NAMES[dayOfWeek - 1]
+    }
+
     fun getDayOfWeekShortName(dayOfWeek: Int): String {
-        // ✅ 使用Constants验证范围
-        if (dayOfWeek !in Constants.Course.MIN_DAY_OF_WEEK..Constants.Course.MAX_DAY_OF_WEEK) {
-            AppLogger.w(TAG, "Invalid dayOfWeek: $dayOfWeek, expected ${Constants.Course.MIN_DAY_OF_WEEK}-${Constants.Course.MAX_DAY_OF_WEEK}")
-            return ""
-        }
-        
-        return when (dayOfWeek) {
-            1 -> "一"
-            2 -> "二"
-            3 -> "三"
-            4 -> "四"
-            5 -> "五"
-            6 -> "六"
-            7 -> "日"
-            else -> ""
-        }
+        if (!validateDayOfWeek(dayOfWeek)) return ""
+        return DAY_SHORT_NAMES[dayOfWeek - 1]
     }
 }

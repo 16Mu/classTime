@@ -19,7 +19,7 @@ import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.service.BackgroundWebViewFetchService
-import com.wind.ggbond.classtime.service.ScheduleFetchService
+import com.wind.ggbond.classtime.service.UnifiedScheduleFetchService
 import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.SecureCookieManager
@@ -38,7 +38,7 @@ import kotlinx.coroutines.isActive
 class ScheduleAutoUpdateWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val scheduleFetchService: ScheduleFetchService,
+    private val scheduleFetchService: UnifiedScheduleFetchService,
     private val backgroundWebViewFetchService: BackgroundWebViewFetchService,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
@@ -58,31 +58,27 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
         private const val MAX_COURSES = 1000
     }
 
-    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+    override suspend fun doWork(): Result {
         val startTime = System.currentTimeMillis()
         AppLogger.d(TAG, "开始执行课表自动更新任务")
 
         try {
-            if (!currentCoroutineContext().isActive) return@withContext Result.success()
-
             val currentSchedule = scheduleRepository.getCurrentSchedule()
             if (currentSchedule == null) {
                 AppLogger.w(TAG, "未找到当前课表，跳过更新")
-                return@withContext Result.success()
+                return Result.success()
             }
 
-            val schoolId = currentSchedule.schoolName
-            if (schoolId.isEmpty()) {
+            val schoolName = currentSchedule.schoolName
+            if (schoolName.isEmpty()) {
                 AppLogger.w(TAG, "课表未关联学校，跳过更新")
-                return@withContext Result.success()
+                return Result.success()
             }
 
-            if (!currentCoroutineContext().isActive) return@withContext Result.success()
-
-            val school = schoolRepository.getSchoolById(schoolId)
+            val school = schoolRepository.getSchoolById(schoolName)
             if (school == null) {
-                AppLogger.e(TAG, "未找到学校配置: $schoolId")
-                return@withContext Result.failure()
+                AppLogger.e(TAG, "未找到学校配置: $schoolName")
+                return Result.failure()
             }
 
             val dataFormat = try {
@@ -105,11 +101,11 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
 
             val fetchedCourses: List<com.wind.ggbond.classtime.data.model.ParsedCourse>
 
-            val cookies = secureCookieManager.getCookies(schoolId)
+            val cookies = secureCookieManager.getCookies(schoolName)
             if (cookies.isNullOrEmpty()) {
                 AppLogger.w(TAG, "未找到Cookie")
                 sendNotification("课表自动更新失败", "登录凭证不存在，请重新登录教务系统导入课表", isError = true)
-                return@withContext Result.retry()
+                return Result.failure()
             }
 
             AppLogger.d(TAG, "使用保存的Cookie尝试更新课表")
@@ -120,7 +116,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             } catch (e: Exception) {
                 AppLogger.w(TAG, "使用Cookie抓取失败: ${e.message}")
                 sendNotification("课表自动更新失败", "登录已过期，请重新登录教务系统导入课表", isError = true)
-                return@withContext Result.retry()
+                return Result.failure()
             }
 
             if (cookieResult.isSuccess && cookieResult.getOrNull()?.isNotEmpty() == true) {
@@ -129,7 +125,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             } else {
                 AppLogger.w(TAG, "Cookie已失效")
                 sendNotification("课表自动更新失败", "登录已过期，请重新登录教务系统导入课表", isError = true)
-                return@withContext Result.retry()
+                return Result.failure()
             }
 
             if (fetchedCourses.isEmpty()) {
@@ -137,33 +133,27 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
                 AppLogger.w(TAG, "学校: ${school.name}")
                 AppLogger.w(TAG, "课表URL: ${school.scheduleUrl}")
                 sendNotification("课表检查完成", "未检测到课程数据，请尝试手动重新登录教务系统", isError = true)
-                return@withContext Result.retry()
+                return Result.retry()
             }
 
             if (fetchedCourses.count() > MAX_COURSES) {
                 AppLogger.e(TAG, "课程数量超过限制: ${fetchedCourses.count()} > $MAX_COURSES")
                 sendNotification("课表自动更新失败", "课程数量异常，请联系开发者", isError = true)
-                return@withContext Result.failure()
+                return Result.failure()
             }
 
             AppLogger.d(TAG, "成功抓取 ${fetchedCourses.count()} 门课程")
-
-            if (!currentCoroutineContext().isActive) return@withContext Result.success()
 
             val localCourses = courseRepository.getAllCoursesBySchedule(currentSchedule.id)
                 .firstOrNull() ?: emptyList()
 
             AppLogger.d(TAG, "本地课程: ${localCourses.count()}, 远程课程: ${fetchedCourses.count()}")
 
-            if (!currentCoroutineContext().isActive) return@withContext Result.success()
-
             val updateResult = updateCourses(
                 localCourses = localCourses,
                 remoteCourses = fetchedCourses,
                 scheduleId = currentSchedule.id
             )
-
-            if (!currentCoroutineContext().isActive) return@withContext Result.success()
 
             if (updateResult.hasChanges) {
                 val message = buildUpdateMessage(updateResult)
@@ -185,7 +175,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
 
             val elapsed = System.currentTimeMillis() - startTime
             AppLogger.d(TAG, "课表自动更新完成: $updateResult, 耗时: ${elapsed}ms")
-            return@withContext Result.success()
+            return Result.success()
 
         } catch (e: CancellationException) {
             AppLogger.w(TAG, "Worker 被取消")
@@ -193,7 +183,7 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
         } catch (e: Exception) {
             AppLogger.e(TAG, "课表自动更新失败", e)
             sendNotification("课表自动更新失败", "发生错误: ${e.message ?: "未知错误"}", isError = true)
-            return@withContext Result.retry()
+            return Result.retry()
         }
     }
 
@@ -485,8 +475,8 @@ class ScheduleAutoUpdateWorker @AssistedInject constructor(
             val existingChannel = notificationManager.getNotificationChannel(CHANNEL_ID)
 
             if (existingChannel == null) {
-                val name = "课表自动更新"
-                val descriptionText = "课表自动更新通知"
+                val name = applicationContext.getString(com.wind.ggbond.classtime.R.string.schedule_update_channel_name)
+                val descriptionText = applicationContext.getString(com.wind.ggbond.classtime.R.string.schedule_update_channel_description)
                 val importance = NotificationManager.IMPORTANCE_HIGH
                 val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
                     description = descriptionText

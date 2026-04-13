@@ -1,42 +1,28 @@
 package com.wind.ggbond.classtime.util.extractor
 
-import com.wind.ggbond.classtime.data.model.ParsedCourse
-import com.wind.ggbond.classtime.util.WeekParser
-import org.json.JSONObject
 import javax.inject.Inject
-import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
 
-/**
- * 贵州师范大学课表提取器
- * 系统：新正方教务系统
- * 参考：temp_aishedule/正方教务/新正方教务/贵州师范大学/provider.js
- */
 @Singleton
-class GZSFDXExtractor @Inject constructor() : SchoolScheduleExtractor {
-    
+class GZSFDXExtractor @Inject constructor() : BaseSchoolExtractor() {
+
     override val schoolId = "gzsfdx"
     override val schoolName = "贵州师范大学"
     override val systemType = "zfsoft"
-    
-    companion object {
-        private const val TAG = "GZSFDXExtractor"
-    }
-    
-    override fun isSchedulePage(html: String, url: String): Boolean {
-        return url.contains("xskbcx") || 
-               url.contains("courseTableForStd") ||
-               html.contains("ajaxForm")
-    }
-    
+
+    override val tag = "GZSFDXExtractor"
+
+    override val aliases = listOf("贵州师范大学")
+    override val supportedUrls = listOf("jwgl.gznu.edu.cn")
+
     override fun getLoginUrl(): String {
         return "http://jwgl.gznu.edu.cn/"
     }
-    
+
     override fun getScheduleUrl(): String {
         return "/jwglxt/kbcx/xskbcxZccx_cxXskbcxIndex.html"
     }
-    
+
     override fun generateExtractionScript(): String {
         return """
             (function() {
@@ -153,114 +139,4 @@ class GZSFDXExtractor @Inject constructor() : SchoolScheduleExtractor {
             })();
         """.trimIndent()
     }
-    
-    override fun parseCourses(jsonData: String): List<ParsedCourse> {
-        val courses = mutableListOf<ParsedCourse>()
-        
-        try {
-            AppLogger.d(TAG, "开始解析贵州师范大学课程数据...")
-            
-            val cleanJson = jsonData.trim()
-                .removePrefix("\"").removeSuffix("\"")
-                .replace("\\\"", "\"")
-                .replace("\\n", "")
-                .replace("\\r", "")
-            
-            val jsonObject = JSONObject(cleanJson)
-            
-            if (jsonObject.has("error")) {
-                throw Exception("提取失败: ${jsonObject.getString("error")}")
-            }
-            
-            val coursesArray = jsonObject.getJSONArray("courses")
-            AppLogger.d(TAG, "找到 ${coursesArray.length()} 门课程")
-            
-            for (i in 0 until coursesArray.length()) {
-                val courseObj = coursesArray.getJSONObject(i)
-                
-                val courseName = courseObj.optString("courseName", "").trim()
-                val teacher = courseObj.optString("teacher", "").trim()
-                val classroom = courseObj.optString("classroom", "").trim()
-                val dayOfWeek = courseObj.optInt("dayOfWeek", 1)
-                val weekExpression = courseObj.optString("weekExpression", "")
-                val sectionsStr = courseObj.optString("sections", "")
-                
-                val weeks = if (weekExpression.isNotEmpty()) {
-                    WeekParser.parseWeekExpression(weekExpression)
-                } else {
-                    emptyList()
-                }
-                
-                val sections = parseSections(sectionsStr)
-                val startSection = sections.minOrNull() ?: 1
-                val sectionCount = sections.size
-                
-                if (courseName.isNotEmpty() && weeks.isNotEmpty()) {
-                    courses.add(
-                        ParsedCourse(
-                            courseName = courseName,
-                            teacher = teacher,
-                            classroom = classroom,
-                            dayOfWeek = dayOfWeek,
-                            startSection = startSection,
-                            sectionCount = sectionCount,
-                            weeks = weeks,
-                            credit = 0f,
-                            weekExpression = weekExpression
-                        )
-                    )
-                }
-            }
-            
-            AppLogger.d(TAG, "解析完成，共 ${courses.size} 门课程")
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "解析课程数据失败", e)
-            throw e
-        }
-        
-        return courses
-    }
-    
-    private fun parseSections(sectionsStr: String): List<Int> {
-        val sections = mutableListOf<Int>()
-        try {
-            val cleanStr = sectionsStr.replace("节", "").trim()
-            if (cleanStr.isEmpty()) return listOf(1)
-            
-            cleanStr.split(",").forEach { part ->
-                if (part.contains("-")) {
-                    val range = part.split("-")
-                    val start = range[0].trim().toIntOrNull() ?: 1
-                    val end = range.getOrNull(1)?.trim()?.toIntOrNull() ?: start
-                    for (i in start..end) {
-                        sections.add(i)
-                    }
-                } else {
-                    part.trim().toIntOrNull()?.let { sections.add(it) }
-                }
-            }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "解析节次失败: $sectionsStr", e)
-            return listOf(1)
-        }
-        return sections.sorted()
-    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

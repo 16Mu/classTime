@@ -18,6 +18,9 @@ class BJCMZYXYMobileExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "bjcmzyxy_mobile"
     override val schoolName = "北京财贸职业学院(手机端)"
     override val systemType = "qiangzhi"
+
+    override val aliases = listOf("北京财贸职业学院(手机端")
+    override val supportedUrls = listOf("/bjcmzyxy/")
     
     companion object {
         private const val TAG = "BJCMZYXYMobileExtractor"

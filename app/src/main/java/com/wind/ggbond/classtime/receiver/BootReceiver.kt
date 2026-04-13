@@ -9,6 +9,7 @@ import com.wind.ggbond.classtime.worker.ReminderCheckWorker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
@@ -21,6 +22,7 @@ class BootReceiver : BroadcastReceiver() {
     
     companion object {
         private const val TAG = "BootReceiver"
+        private val bootScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
     
     override fun onReceive(context: Context, intent: Intent) {
@@ -45,7 +47,7 @@ class BootReceiver : BroadcastReceiver() {
             // 使用 goAsync() 延长 BroadcastReceiver 生命周期，确保协程完成
             val pendingResult = goAsync()
             
-            CoroutineScope(Dispatchers.IO).launch {
+            bootScope.launch {
                 try {
                     alarmReminderScheduler.rescheduleAllReminders()
                     AppLogger.d(TAG, "开机后重新调度AlarmManager提醒完成")

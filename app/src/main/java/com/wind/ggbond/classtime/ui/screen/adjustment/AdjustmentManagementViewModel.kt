@@ -4,28 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
-import com.wind.ggbond.classtime.data.repository.CourseAdjustmentRepository
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
+import com.wind.ggbond.classtime.domain.usecase.AdjustmentUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 
-/**
- * 调课记录管理 ViewModel
- */
 @HiltViewModel
 class AdjustmentManagementViewModel @Inject constructor(
-    private val adjustmentRepository: CourseAdjustmentRepository,
+    private val adjustmentUseCase: AdjustmentUseCase,
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository
 ) : ViewModel() {
     
-    // 当前课表ID
     private val _currentScheduleId = MutableStateFlow<Long?>(null)
     
-    // 所有调课记录
     private val _adjustments = MutableStateFlow<List<CourseAdjustment>>(emptyList())
     val adjustments: StateFlow<List<CourseAdjustment>> = _adjustments.asStateFlow()
 
@@ -53,12 +49,11 @@ class AdjustmentManagementViewModel @Inject constructor(
     fun clearAllAdjustments() {
         viewModelScope.launch {
             try {
-                _adjustments.value.forEach { adjustmentRepository.cancelAdjustment(it) }
-            } catch (_: Exception) {}
+                adjustmentUseCase.cancelAllAdjustments(_adjustments.value)
+            } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
         }
     }
     
-    // 调课记录及对应的课程信息
     data class AdjustmentWithCourse(
         val adjustment: CourseAdjustment,
         val course: Course?
@@ -80,7 +75,6 @@ class AdjustmentManagementViewModel @Inject constructor(
         initialValue = emptyList()
     )
     
-    // 操作状态
     private val _operationState = MutableStateFlow<OperationState>(OperationState.Idle)
     val operationState: StateFlow<OperationState> = _operationState.asStateFlow()
     
@@ -108,20 +102,17 @@ class AdjustmentManagementViewModel @Inject constructor(
     
     private fun loadAdjustments(scheduleId: Long) {
         viewModelScope.launch {
-            adjustmentRepository.getAdjustmentsBySchedule(scheduleId).collect { list ->
+            adjustmentUseCase.getAdjustmentsBySchedule(scheduleId).collect { list ->
                 _adjustments.value = list.sortedByDescending { it.createdAt }
             }
         }
     }
     
-    /**
-     * 取消调课
-     */
     fun cancelAdjustment(adjustment: CourseAdjustment) {
         viewModelScope.launch {
             try {
                 _operationState.value = OperationState.Loading
-                adjustmentRepository.cancelAdjustment(adjustment)
+                adjustmentUseCase.cancelAdjustment(adjustment)
                 _operationState.value = OperationState.Success("已取消调课")
             } catch (e: Exception) {
                 _operationState.value = OperationState.Error("取消失败: ${e.message}")
@@ -129,9 +120,6 @@ class AdjustmentManagementViewModel @Inject constructor(
         }
     }
     
-    /**
-     * 重置操作状态
-     */
     fun resetOperationState() {
         _operationState.value = OperationState.Idle
     }

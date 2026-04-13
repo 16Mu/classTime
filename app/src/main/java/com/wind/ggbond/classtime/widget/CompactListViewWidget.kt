@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -104,31 +106,13 @@ private fun CompactListContent(data: WidgetDisplayData) {
 }
 
 @Composable
-private fun EmptyState(msg: String) {
-    Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Spacer(modifier = GlanceModifier.height(4.dp))
-            Text(
-                text = msg,
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 11.sp
-                )
-            )
-        }
-    }
-}
+private fun EmptyState(msg: String) = WidgetEmptyState(
+    message = msg,
+    primaryFontSize = 20f,
+    secondaryFontSize = 11f,
+    spacerHeight = 4f,
+    clickable = false
+)
 
 @Composable
 private fun CompactCourseList(courses: List<WidgetCourseItem>) {
@@ -144,6 +128,8 @@ private fun CompactCourseList(courses: List<WidgetCourseItem>) {
 private fun CompactCourseRow(course: WidgetCourseItem) {
     val color = parseCourseColor(course.color)
     val isOngoing = course.isOngoing
+    val courseIdKey = ActionParameters.Key<Long>("courseId")
+    val actionParams = actionParametersOf(courseIdKey to course.courseId)
 
     Row(
         modifier = GlanceModifier
@@ -153,6 +139,7 @@ private fun CompactCourseRow(course: WidgetCourseItem) {
                 else courseItemBg()
             )
             .cornerRadius(8.dp)
+            .clickable(actionStartActivity<MainActivity>(actionParams))
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

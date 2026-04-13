@@ -19,6 +19,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import com.wind.ggbond.classtime.util.AppLogger
+import com.wind.ggbond.classtime.util.UrlUtils
 import javax.inject.Inject
 
 class AutoLoginService @Inject constructor(
@@ -42,8 +43,14 @@ class AutoLoginService @Inject constructor(
                 ?: return loginResult(AutoLoginResultCode.UNKNOWN_ERROR, "学校信息不存在")
             val loginUrl = school.loginUrl?.takeIf { it.isNotBlank() }
                 ?: return loginResult(AutoLoginResultCode.UNKNOWN_ERROR, "登录URL不存在")
+            val secureLoginUrl = if (loginUrl.startsWith("http://")) {
+                AppLogger.w(TAG, "登录URL使用不安全的HTTP协议，已自动升级为HTTPS: $loginUrl")
+                loginUrl.replace("http://", "https://")
+            } else {
+                loginUrl
+            }
             withContext(Dispatchers.Main) {
-                performLoginViaWebView(loginUrl, username, password)
+                performLoginViaWebView(secureLoginUrl, username, password)
             }
         } catch (e: Exception) {
             AppLogger.e(TAG, "自动登录异常", e)
@@ -60,7 +67,10 @@ class AutoLoginService @Inject constructor(
                 settings.databaseEnabled = true
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
+                @Suppress("DEPRECATION")
+                settings.savePassword = false
             }
+            WebView.setWebContentsDebuggingEnabled(false)
 
             CookieManager.getInstance().setAcceptCookie(true)
 
@@ -144,7 +154,7 @@ class AutoLoginService @Inject constructor(
             wv.stopLoading(); wv.loadUrl("about:blank"); wv.clearHistory()
             (wv.context as? MutableContextWrapper)?.setBaseContext(null)
             wv.destroy()
-        } catch (_: Exception) {}
+        } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
     }
 
     private fun saveCookiesAfterLogin(loginUrl: String, currentUrl: String?) {
@@ -153,7 +163,7 @@ class AutoLoginService @Inject constructor(
             val domain = extractDomain(loginUrl)
             val merged = mergeCookies(cm.getCookie(loginUrl).orEmpty(), currentUrl?.let { cm.getCookie(it).orEmpty() }.orEmpty())
             if (merged.isNotEmpty()) secureCookieManager.saveCookies(domain, merged)
-        } catch (_: Exception) {}
+        } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
     }
 
     private fun mergeCookies(c1: String, c2: String): String {
@@ -166,7 +176,7 @@ class AutoLoginService @Inject constructor(
         return map.values.joinToString("; ")
     }
 
-    private fun extractDomain(url: String): String = try { java.net.URL(url).host } catch (_: Exception) { url }
+    private fun extractDomain(url: String): String = UrlUtils.extractDomain(url)
 }
 
 data class AutoLoginResult(val success: Boolean, val resultCode: String, val message: String)

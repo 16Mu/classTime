@@ -22,6 +22,14 @@ object DesensitizeUtils {
     private const val MASK_ALL = "***"
     private const val MASK_PARTIAL = "****"
 
+    private val KEY_VALUE_PATTERNS = listOf(
+        Regex("""(\w[\w]*[Pp]assword\w*|cookie[s]?\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
+        Regex("""(\w[\w]*[Tt]oken\w*|\w[\w]*[Ss]ecret\w*|\w[\w]*[Aa]pi[_-]?[Kk]ey\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
+        Regex("""(\w[\w]*[Ss]tudent[Ii][Dd]\w*|学号)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
+        Regex("""(\w[\w]*[Pp]hone\w*|\w[\w]*[Mm]obile\w*|\w[\w]*[Tt]el\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
+        Regex("""(\w[\w]*[Cc]redential\w*|\w[\w]*[Aa]uth\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE)
+    )
+
     /**
      * 敏感关键词列表（英文，不区分大小写）
      */
@@ -133,16 +141,7 @@ object DesensitizeUtils {
     fun desensitizeMessage(message: String): String {
         var result = message
 
-        // 匹配 key=value 格式（支持空格）
-        val keyValuePatterns = listOf(
-            Regex("""(\w[\w]*[Pp]assword\w*|cookie[s]?\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
-            Regex("""(\w[\w]*[Tt]oken\w*|\w[\w]*[Ss]ecret\w*|\w[\w]*[Aa]pi[_-]?[Kk]ey\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
-            Regex("""(\w[\w]*[Ss]tudent[Ii][Dd]\w*|学号)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
-            Regex("""(\w[\w]*[Pp]hone\w*|\w[\w]*[Mm]obile\w*|\w[\w]*[Tt]el\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE),
-            Regex("""(\w[\w]*[Cc]redential\w*|\w[\w]*[Aa]uth\w*)\s*[=:]\s*(\S+)""", RegexOption.IGNORE_CASE)
-        )
-
-        for (pattern in keyValuePatterns) {
+        for (pattern in KEY_VALUE_PATTERNS) {
             result = pattern.replace(result) { matchResult ->
                 val key = matchResult.groupValues[1]
                 val value = matchResult.groupValues[2]

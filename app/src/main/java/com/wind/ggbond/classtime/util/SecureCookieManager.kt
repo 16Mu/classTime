@@ -2,8 +2,6 @@ package com.wind.ggbond.classtime.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -35,28 +33,7 @@ class SecureCookieManager(
     }
     
     // 加密存储，初始化失败时为null（不回退到明文，避免安全降级）
-    private val encryptedPrefs: SharedPreferences?
-    
-    init {
-        // 创建或获取主密钥
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        
-        // 创建加密的SharedPreferences
-        encryptedPrefs = try {
-            EncryptedSharedPreferences.create(
-                context,
-                ENCRYPTED_PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "加密存储初始化失败，Cookie功能不可用", e)
-            null  // 不回退到明文存储
-        }
-    }
+    private val encryptedPrefs: SharedPreferences? = EncryptedPrefsFactory.create(context, ENCRYPTED_PREFS_NAME, TAG)
     
     /**
      * 保存Cookie（带默认过期时间）
@@ -86,7 +63,6 @@ class SecureCookieManager(
                 .putString(KEY_PREFIX_COOKIE + domain, cookies)
                 .putLong(KEY_PREFIX_EXPIRY + domain, expiryTime)
                 .apply()
-            AppLogger.sensitive(TAG, "Cookie", cookies)
             AppLogger.d(TAG, "Cookie已保存: domain=$domain")
         } catch (e: Exception) {
             AppLogger.e(TAG, "保存Cookie失败: domain=$domain", e)
@@ -244,9 +220,16 @@ class SecureCookieManager(
         
         return@withContext try {
             AppLogger.d(TAG, "开始验证Cookie: $domain")
-            
+
+            val secureUrl = if (validateUrl.startsWith("http://")) {
+                AppLogger.w(TAG, "Cookie验证URL使用不安全的HTTP，已升级为HTTPS: $validateUrl")
+                validateUrl.replace("http://", "https://")
+            } else {
+                validateUrl
+            }
+
             val request = Request.Builder()
-                .url(validateUrl)
+                .url(secureUrl)
                 .addHeader("Cookie", cookies)
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .build()

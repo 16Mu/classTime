@@ -799,60 +799,49 @@ class ExportFormatter @Inject constructor() {
         schedule: Schedule?,
         classTimes: List<ClassTime>
     ): String {
-        val now = LocalDateTime.now()
-
         return buildString {
             append("\uFEFF")
 
-            appendLine("\"# 课程表导出数据\"")
-            appendLine("\"# 应用版本\",\"v${ExportMeta.CURRENT_APP_VERSION}\"")
-            appendLine("\"# 导出格式版本\",\"${ExportMeta.CURRENT_EXPORT_VERSION}\"")
-            appendLine("\"# 导出时间\",\"${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\"")
-            appendLine()
-
-            appendLine("序号,课程名称,教师,教室,星期,节次,上课时间,周次,学分,颜色,提醒,备注")
+            appendLine("课程代码,课程名称,课程性质,学分,授课教师,上课周次,星期,节次,上课地点,备注")
 
             courses.sortedWith(compareBy({ it.dayOfWeek }, { it.startSection }))
-                .forEachIndexed { index, course ->
+                .forEach { course ->
                     val dayName = getDayName(course.dayOfWeek)
                     val sections = "第${course.startSection}-${course.startSection + course.sectionCount - 1}节"
-
-                    val classTime = classTimes.find { it.sectionNumber == course.startSection }
-                    val endClassTime = classTimes.find { it.sectionNumber == course.startSection + course.sectionCount - 1 }
-                    val timeStr = if (classTime != null && endClassTime != null) {
-                        "${classTime.startTime.toString().substring(0, 5)}-${endClassTime.endTime.toString().substring(0, 5)}"
-                    } else {
-                        ""
+                    val weekExpr = course.weekExpression.ifBlank {
+                        if (course.weeks.isNotEmpty()) {
+                            val sorted = course.weeks.sorted()
+                            buildString {
+                                var rs = sorted[0]
+                                var re = sorted[0]
+                                for (i in 1 until sorted.size) {
+                                    if (sorted[i] == re + 1) re = sorted[i]
+                                    else {
+                                        append(if (rs == re) "$rs," else "$rs-$re,")
+                                        rs = sorted[i]; re = sorted[i]
+                                    }
+                                }
+                                append(if (rs == re) "$rs" else "$rs-$re")
+                                append("周")
+                            }
+                        } else ""
                     }
-
-                    val reminderStr = if (course.reminderEnabled) "提前${course.reminderMinutes}分钟" else "关闭"
 
                     appendLine(
                         listOf(
-                            (index + 1).toString(),
+                            course.courseCode,
                             course.courseName,
+                            "",
+                            if (course.credit > 0) course.credit.toString() else "",
                             course.teacher,
-                            course.classroom,
+                            weekExpr,
                             dayName,
                             sections,
-                            timeStr,
-                            course.weekExpression,
-                            course.credit.toString(),
-                            course.color,
-                            reminderStr,
-                            course.note.replace("\n", " ")
+                            course.classroom,
+                            course.note.replace("\n", " ").replace(",", "，")
                         ).joinToString(",") { "\"${it.replace("\"", "\"\"")}\"" }
                     )
                 }
-
-            appendLine()
-            appendLine("\"# 统计信息\"")
-            appendLine("\"课表名称\",\"${schedule?.name ?: ""}\"")
-            appendLine("\"学期时间\",\"${schedule?.startDate ?: ""} ~ ${schedule?.endDate ?: ""}\"")
-            appendLine("\"总周数\",\"${schedule?.totalWeeks ?: 0}周\"")
-            appendLine("\"课程总数\",\"${courses.size}门\"")
-            appendLine("\"总学分\",\"${courses.sumOf { it.credit.toDouble() }}\"")
-            appendLine("\"导出时间\",\"${now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\"")
         }
     }
 }

@@ -67,9 +67,9 @@ fun ActionPanelProvider(
     val wallpaperActive = LocalWallpaperEnabled.current
 
     val topBarContainerColor = when {
-        isDesktopModeEnabled && wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.4f)
-        isGlassEffectActive -> Color.Transparent
-        wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+        isDesktopModeEnabled && wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.35f)
+        isGlassEffectActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
+        wallpaperActive -> MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)
         else -> MaterialTheme.colorScheme.surface
     }
 
@@ -133,7 +133,7 @@ fun ActionPanelProvider(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "添加课程", modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("添加", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text("添加课程", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         },
@@ -141,21 +141,6 @@ fun ActionPanelProvider(
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (wallpaperActive) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(32.dp)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
-                }
                 TopAppBar(
                     windowInsets = WindowInsets(0, 0, 0, 0),
                     colors = TopAppBarDefaults.topAppBarColors(

@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime.util
 
 import android.content.Context
+import com.wind.ggbond.classtime.di.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -49,17 +50,14 @@ data class AnnouncementInfo(
 }
 
 @Singleton
-class AnnouncementChecker @Inject constructor() {
+class AnnouncementChecker @Inject constructor(
+    @ApiClient private val apiClient: OkHttpClient
+) {
 
     companion object {
         private const val TAG = "AnnouncementChecker"
         private const val ANNOUNCEMENT_URL = "https://gitee.com/ggbondpy/classTime/raw/main/announcement.json"
     }
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
 
     suspend fun fetchAnnouncements(context: Context): Result<List<AnnouncementInfo>> {
         return withContext(Dispatchers.IO) {
@@ -75,7 +73,7 @@ class AnnouncementChecker @Inject constructor() {
                     .header("Referer", "https://gitee.com/ggbondpy/classTime")
                     .build()
 
-                response = client.newCall(request).execute()
+                response = apiClient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: return@withContext Result.success(emptyList())
                     val json = JSONObject(body)

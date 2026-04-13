@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.wind.ggbond.classtime.util.AppLogger
 
 @HiltViewModel
 class CourseColorPickerViewModel @Inject constructor(
@@ -48,7 +49,7 @@ class CourseColorPickerViewModel @Inject constructor(
                         _originalColor.value = course.color
                     }
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
         }
     }
 

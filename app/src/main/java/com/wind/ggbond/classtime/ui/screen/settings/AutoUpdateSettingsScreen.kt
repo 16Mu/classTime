@@ -34,8 +34,18 @@ import com.wind.ggbond.classtime.util.AutoLoginResultMessages
 import com.wind.ggbond.classtime.util.AutoUpdateManager
 import com.wind.ggbond.classtime.util.UpdateLogEntry
 import com.wind.ggbond.classtime.util.UpdateStatus
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import java.text.SimpleDateFormat
 import java.util.*
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface AutoLoginManagerEntryPoint {
+    fun autoLoginManager(): AutoLoginManager
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,7 +55,12 @@ fun AutoUpdateSettingsScreen(
     settingsViewModel: AutoUpdateSettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val autoLoginManager = remember { AutoLoginManager(context) }
+    val autoLoginManager = remember {
+        EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            AutoLoginManagerEntryPoint::class.java
+        ).autoLoginManager()
+    }
     
     val config by viewModel.config.collectAsState()
     val updateLogs by viewModel.updateLogs.collectAsState()

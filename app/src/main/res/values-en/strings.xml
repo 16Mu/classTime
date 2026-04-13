@@ -21,6 +21,8 @@
     <string name="class_reminder">Class Reminder</string>
     <string name="reminder_channel_name">Course Reminder</string>
     <string name="reminder_channel_description">Show upcoming class reminders</string>
+    <string name="schedule_update_channel_name">Schedule Auto Update</string>
+    <string name="schedule_update_channel_description">Schedule auto update notifications</string>
     
     <!-- General -->
     <string name="save">Save</string>

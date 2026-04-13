@@ -340,22 +340,8 @@ class MainViewModel @Inject constructor(
     fun deleteCourseForWeek(course: Course, weekNumber: Int) {
         viewModelScope.launch {
             try {
-                if (course.weeks.size == 1) {
-                    _lastDeletedSnapshot = Triple(course, weekNumber, true)
-                    courseUseCase.deleteCourse(course)
-                } else {
-                    _lastDeletedSnapshot = Triple(course, weekNumber, false)
-                    val updatedWeeks = course.weeks.filter { it != weekNumber }
-                    if (updatedWeeks.isNotEmpty()) {
-                        courseUseCase.updateCourse(course.copy(
-                            weeks = updatedWeeks,
-                            updatedAt = System.currentTimeMillis()
-                        ))
-                    } else {
-                        _lastDeletedSnapshot = Triple(course, weekNumber, true)
-                        courseUseCase.deleteCourse(course)
-                    }
-                }
+                val result = courseUseCase.deleteCourseForWeek(course, weekNumber)
+                _lastDeletedSnapshot = Triple(result.originalCourse, result.weekNumber, result.wasFullDelete)
                 forceRefreshCourses()
             } catch (e: Exception) {
                 AppLogger.e(TAG, "删除课程失败", e)
@@ -371,20 +357,7 @@ class MainViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                if (wasFullDelete) {
-                    courseUseCase.insertCourse(originalCourse.copy(id = 0))
-                } else {
-                    val currentCourse = courseUseCase.getCourseById(originalCourse.id)
-                    if (currentCourse != null) {
-                        val restoredWeeks = (currentCourse.weeks + weekNumber).sorted()
-                        courseUseCase.updateCourse(currentCourse.copy(
-                            weeks = restoredWeeks,
-                            updatedAt = System.currentTimeMillis()
-                        ))
-                    } else {
-                        courseUseCase.insertCourse(originalCourse.copy(id = 0))
-                    }
-                }
+                courseUseCase.undoDeleteCourse(originalCourse, weekNumber, wasFullDelete)
                 forceRefreshCourses()
             } catch (e: Exception) {
                 AppLogger.e(TAG, "撤销删除失败", e)

@@ -13,11 +13,20 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
     companion object {
         private const val TAG = "WidgetPinCallback"
         const val EXTRA_WIDGET_TYPE = "widget_type"
+
+        private val WIDGET_TYPE_MAP = mapOf(
+            "next_class" to NextClassWidgetReceiver::class.java,
+            "today_course" to TodayCourseWidgetReceiver::class.java,
+            "large_today_course" to LargeTodayCourseWidgetProvider::class.java,
+            "compact_list" to CompactListViewWidgetReceiver::class.java,
+            "week_overview" to WeekOverviewWidgetReceiver::class.java,
+            "tomorrow_course" to TomorrowCourseWidgetReceiver::class.java
+        )
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         AppLogger.i(TAG, "=== onReceive CALLBACK === action=${intent.action}, extras=${intent.extras}")
-        
+
         if (intent.action != AppWidgetManager.ACTION_APPWIDGET_CONFIGURE) {
             AppLogger.w(TAG, "Unexpected action: ${intent.action}, ignoring")
             return
@@ -32,7 +41,7 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
 
     private fun handleSuccess(context: Context, widgetType: String, appWidgetId: Int) {
         AppLogger.i(TAG, "Widget pin confirmed for type: $widgetType, appWidgetId: $appWidgetId")
-        
+
         Toast.makeText(
             context,
             "✅ 小组件已成功添加到桌面！",
@@ -49,49 +58,12 @@ class WidgetPinCallbackReceiver : BroadcastReceiver() {
     private fun refreshWidgetsAfterPin(context: Context, widgetType: String) {
         try {
             val appWidgetManager = AppWidgetManager.getInstance(context)
-
-            when (widgetType.lowercase()) {
-                "next_class" -> {
-                    val componentName = ComponentName(context, NextClassWidgetReceiver::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
-                }
-                "today_course" -> {
-                    val componentName = ComponentName(context, TodayCourseWidgetReceiver::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
-                }
-                "large_today_course" -> {
-                    val componentName = ComponentName(context, LargeTodayCourseWidgetProvider::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
-                }
-                "compact_list" -> {
-                    val componentName = ComponentName(context, CompactListViewWidgetReceiver::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
-                }
-                "week_overview" -> {
-                    val componentName = ComponentName(context, WeekOverviewWidgetReceiver::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
-                }
-                "tomorrow_course" -> {
-                    val componentName = ComponentName(context, TomorrowCourseWidgetReceiver::class.java)
-                    val ids = appWidgetManager.getAppWidgetIds(componentName)
-                    if (ids.isNotEmpty()) {
-                        appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
-                    }
+            val receiverClass = WIDGET_TYPE_MAP[widgetType.lowercase()]
+            if (receiverClass != null) {
+                val componentName = ComponentName(context, receiverClass)
+                val ids = appWidgetManager.getAppWidgetIds(componentName)
+                if (ids.isNotEmpty()) {
+                    appWidgetManager.notifyAppWidgetViewDataChanged(ids[0], 0)
                 }
             }
         } catch (e: Exception) {

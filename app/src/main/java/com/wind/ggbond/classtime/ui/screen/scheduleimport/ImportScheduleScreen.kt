@@ -27,6 +27,7 @@ import com.wind.ggbond.classtime.ui.navigation.Screen
 import com.wind.ggbond.classtime.ui.components.ScheduleSelectionState
 import com.wind.ggbond.classtime.ui.components.ScheduleExpiredDialog
 import com.wind.ggbond.classtime.ui.components.CreateScheduleDialog
+import com.wind.ggbond.classtime.service.helper.ImportConfidence
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
@@ -42,8 +43,12 @@ fun ImportScheduleScreen(
     val importState by viewModel.importState.collectAsState()
     val parsedCourses by viewModel.parsedCourses.collectAsState()
     val htmlFilePickerTrigger by viewModel.htmlFilePickerTrigger.collectAsState()
-    val jsonFilePickerTrigger by viewModel.jsonFilePickerTrigger.collectAsState()
+    val filePickerTrigger by viewModel.filePickerTrigger.collectAsState()
+    val excelRecognitionState by viewModel.excelRecognitionState.collectAsState()
+    val isCsvFile by viewModel.isCsvFile.collectAsState()
     val scheduleState by viewModel.scheduleState.collectAsState()
+    val importProgress by viewModel.importProgress.collectAsState()
+    val cookieExpiredEvent by viewModel.cookieExpiredEvent.collectAsState()
     val haptic = LocalHapticFeedback.current
     
     // 根据课表状态显示对应对话框
@@ -100,11 +105,11 @@ fun ImportScheduleScreen(
         uri?.let { viewModel.handleHtmlFile(it) }
     }
     
-    // JSON文件选择器
-    val jsonFilePicker = rememberLauncherForActivityResult(
+    // 统一文件选择器（支持JSON/ICS/CSV/Excel）
+    val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { viewModel.handleJsonFile(it) }
+        uri?.let { viewModel.handleFile(it) }
     }
     
     // 监听HTML文件选择器触发
@@ -115,11 +120,11 @@ fun ImportScheduleScreen(
         }
     }
     
-    // 监听JSON文件选择器触发
-    LaunchedEffect(jsonFilePickerTrigger) {
-        if (jsonFilePickerTrigger) {
-            jsonFilePicker.launch("application/json")
-            viewModel.resetJsonFilePickerTrigger()
+    // 监听统一文件选择器触发
+    LaunchedEffect(filePickerTrigger) {
+        if (filePickerTrigger) {
+            filePicker.launch("*/*")
+            viewModel.resetFilePickerTrigger()
         }
     }
     
@@ -148,33 +153,36 @@ fun ImportScheduleScreen(
         ) {
             when (importState) {
                 ImportState.Idle -> {
-                    ImportMethodSelection(
-                        onWebViewLogin = {
-                            navController.navigate(Screen.SchoolSelection.route)
-                        },
-                        onFileImport = {
-                            viewModel.selectFile()
-                        },
-                        onHtmlPaste = {
-                            viewModel.selectHtmlFile()
-                        },
-                        onManualBatchCreate = {
-                            navController.navigate(Screen.BatchCourseCreate.route)
-                        }
-                    )
+                    val showExcelWizard = excelRecognitionState !is ExcelRecognitionState.Idle
+                    if (showExcelWizard) {
+                        ExcelRecognitionWizard(
+                            state = excelRecognitionState,
+                            onConfirmRecognition = { viewModel.confirmExcelRecognition() },
+                            onApplyTemplate = { viewModel.applyExcelTemplate(it) },
+                            onApplyManualMapping = { mapping, headerRow -> viewModel.applyExcelManualMapping(mapping, headerRow) },
+                            onDismiss = { viewModel.resetExcelRecognition() },
+                            isCsvFile = isCsvFile
+                        )
+                    } else {
+                        ImportMethodSelection(
+                            onWebViewLogin = {
+                                navController.navigate(Screen.SchoolSelection.route)
+                            },
+                            onFileImport = {
+                                viewModel.selectFile()
+                            },
+                            onHtmlPaste = {
+                                viewModel.selectHtmlFile()
+                            },
+                            onManualBatchCreate = {
+                                navController.navigate(Screen.BatchCourseCreate.route)
+                            }
+                        )
+                    }
                 }
                 
                 ImportState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("正在导入课表...")
-                        }
-                    }
+                    ImportProgressIndicator(progress = importProgress)
                 }
                 
                 ImportState.Preview -> {
@@ -191,10 +199,21 @@ fun ImportScheduleScreen(
                 }
                 
                 is ImportState.Error -> {
-                    val error = (importState as ImportState.Error).message
-                    ErrorDisplay(
-                        message = error,
-                        onRetry = { viewModel.resetState() }
+                    val errorState = importState as ImportState.Error
+                    ImportErrorDisplay(
+                        errorState = errorState,
+                        onRetry = { viewModel.retryLastAction() },
+                        onReset = { viewModel.resetState() },
+                        onRelogin = {
+                            val schoolId = cookieExpiredEvent
+                            if (schoolId != null) {
+                                viewModel.onCookieExpiredHandled()
+                                navController.navigate("smart_webview_import/$schoolId")
+                            } else {
+                                navController.navigate(Screen.SchoolSelection.route)
+                            }
+                        },
+                        onSwitchMethod = { viewModel.resetState() }
                     )
                 }
                 
@@ -211,7 +230,6 @@ fun ImportScheduleScreen(
                 }
                 
                 is ImportState.NeedSectionSetup -> {
-                    // 显示节次数设置对话框
                     val maxSection = (importState as ImportState.NeedSectionSetup).maxSection
                     SectionSetupDialog(
                         maxSection = maxSection,
@@ -220,6 +238,19 @@ fun ImportScheduleScreen(
                         },
                         onConfirm = { morning, afternoon ->
                             viewModel.updateSectionCountsAndRetry(morning, afternoon)
+                        }
+                    )
+                }
+                
+                is ImportState.NeedManualFill -> {
+                    val incompleteCourses = (importState as ImportState.NeedManualFill).incompleteCourses
+                    ManualFillScreen(
+                        incompleteCourses = incompleteCourses,
+                        onFillComplete = { updatedCourses ->
+                            viewModel.applyManualFilledCourses(updatedCourses)
+                        },
+                        onDismiss = {
+                            viewModel.resetState()
                         }
                     )
                 }
@@ -737,7 +768,9 @@ fun ImportMethodSelection(
                 }
             }
 
-            // 从文件导入
+            // 从文件导入（支持JSON/CSV/Excel）
+            // TODO: [临时禁用Excel/CSV导入功能 - 后续需要恢复]
+            // 原描述: "JSON / CSV / xlsx"
             Card(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -745,7 +778,7 @@ fun ImportMethodSelection(
                 },
                 modifier = Modifier.weight(1f),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
                 )
             ) {
                 Column(
@@ -755,19 +788,19 @@ fun ImportMethodSelection(
                         Icons.Default.Upload,
                         contentDescription = "从文件导入",
                         modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         "从文件导入",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
-                    // 不使用技术术语
                     Text(
-                        "支持多种格式",
+                        "JSON / ICS",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -967,14 +1000,694 @@ fun ErrorDisplay(
     }
 }
 
+@Composable
+fun ImportErrorDisplay(
+    errorState: ImportState.Error,
+    onRetry: () -> Unit,
+    onReset: () -> Unit,
+    onRelogin: () -> Unit,
+    onSwitchMethod: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val errorIcon = when (errorState.errorType) {
+        ImportErrorType.NETWORK -> Icons.Default.WifiOff
+        ImportErrorType.PARSE -> Icons.Default.BrokenImage
+        ImportErrorType.COOKIE_EXPIRED -> Icons.Default.Lock
+        ImportErrorType.UNKNOWN -> Icons.Default.Error
+    }
+    val errorTitle = when (errorState.errorType) {
+        ImportErrorType.NETWORK -> "网络连接失败"
+        ImportErrorType.PARSE -> "数据解析失败"
+        ImportErrorType.COOKIE_EXPIRED -> "登录已过期"
+        ImportErrorType.UNKNOWN -> "导入失败"
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            errorIcon,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = errorTitle,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = errorState.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (errorState.retryAction) {
+                ImportErrorRetryAction.RETRY -> {
+                    OutlinedButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onReset()
+                    }) {
+                        Text("取消")
+                    }
+                    Button(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onRetry()
+                    }) {
+                        Text("重试")
+                    }
+                }
+                ImportErrorRetryAction.RELOGIN -> {
+                    OutlinedButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onReset()
+                    }) {
+                        Text("取消")
+                    }
+                    Button(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onRelogin()
+                    }) {
+                        Text("重新登录")
+                    }
+                }
+                ImportErrorRetryAction.SWITCH_METHOD -> {
+                    OutlinedButton(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onReset()
+                    }) {
+                        Text("取消")
+                    }
+                    Button(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onSwitchMethod()
+                    }) {
+                        Text("切换导入方式")
+                    }
+                }
+                ImportErrorRetryAction.RESET -> {
+                    Button(onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onReset()
+                    }) {
+                        Text("返回")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ImportProgressIndicator(progress: ImportProgress) {
+    val steps = ImportStep.entries
+    val currentStepIndex = steps.indexOf(progress.step)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = progress.step.label + "...",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(32.dp))
+        steps.forEachIndexed { index, step ->
+            val isActive = index == currentStepIndex
+            val isCompleted = index < currentStepIndex
+            val isPending = index > currentStepIndex
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .padding(vertical = 4.dp)
+            ) {
+                when {
+                    isCompleted -> Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    isActive -> CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                    isPending -> Icon(
+                        Icons.Default.RadioButtonUnchecked,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = step.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when {
+                        isCompleted -> MaterialTheme.colorScheme.primary
+                        isActive -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    },
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
 sealed class ImportState {
     object Idle : ImportState()
     object Loading : ImportState()
     object Preview : ImportState()
-    object NeedScheduleSetup : ImportState()  // 需要设置课表
-    data class NeedSectionSetup(val maxSection: Int) : ImportState()  // 需要设置节次数
+    object NeedScheduleSetup : ImportState()
+    data class NeedSectionSetup(val maxSection: Int) : ImportState()
+    data class NeedManualFill(
+        val incompleteCourses: List<IncompleteCourseInfo>
+    ) : ImportState()
     object Success : ImportState()
-    data class Error(val message: String) : ImportState()
+    data class Error(
+        val message: String,
+        val errorType: ImportErrorType = ImportErrorType.UNKNOWN,
+        val retryAction: ImportErrorRetryAction = ImportErrorRetryAction.RESET
+    ) : ImportState()
+}
+
+data class IncompleteCourseInfo(
+    val index: Int,
+    val course: ParsedCourse,
+    val missingFields: List<String>
+)
+
+enum class ImportErrorType {
+    NETWORK,
+    PARSE,
+    COOKIE_EXPIRED,
+    UNKNOWN
+}
+
+enum class ImportErrorRetryAction {
+    RESET,
+    RETRY,
+    RELOGIN,
+    SWITCH_METHOD
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExcelRecognitionWizard(
+    state: ExcelRecognitionState,
+    onConfirmRecognition: () -> Unit,
+    onApplyTemplate: (String) -> Unit,
+    onApplyManualMapping: (Map<String, Int>, Int) -> Unit,
+    onDismiss: () -> Unit,
+    isCsvFile: Boolean = false
+) {
+    val haptic = LocalHapticFeedback.current
+    val fileTypeLabel = if (isCsvFile) "CSV" else "Excel"
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onDismiss()
+            }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+            }
+            Text(
+                text = "${fileTypeLabel}智能识别",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        when (state) {
+            is ExcelRecognitionState.Analyzing -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("正在智能识别${fileTypeLabel}文件...")
+                    }
+                }
+            }
+
+            is ExcelRecognitionState.NeedConfirmation -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.AutoFixHigh,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "识别结果需要确认",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "检测到${state.courses.size}门课程，模板: ${state.decision.templateName ?: "通用格式"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        if (state.decision.suggestedAction.isNotEmpty()) {
+                            Text(
+                                state.decision.suggestedAction,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onConfirmRecognition()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("确认识别结果")
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("重新选择")
+                }
+            }
+
+            is ExcelRecognitionState.NeedManualSetup -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.HelpOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "无法自动识别",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "请选择教务系统模板或手动设置字段映射",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+
+                Text(
+                    "选择教务系统模板",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                listOf(
+                    "ZHENGFANG" to "正方教务",
+                    "QINGGUO" to "青果教务",
+                    "URP" to "URP教务"
+                ).forEach { (templateName, displayName) ->
+                    Card(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onApplyTemplate(templateName)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                displayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                if (state.preview.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "文件预览（前${minOf(state.preview.size, 5)}行）",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    state.preview.take(5).forEachIndexed { rowIdx, row ->
+                        Text(
+                            row.take(6).joinToString(" | "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("重新选择文件")
+                }
+            }
+
+            else -> {}
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ManualFillScreen(
+    incompleteCourses: List<IncompleteCourseInfo>,
+    onFillComplete: (List<IncompleteCourseInfo>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val filledData = remember(incompleteCourses) {
+        mutableStateMapOf<Int, MutableMap<String, String>>().apply {
+            incompleteCourses.forEach { info ->
+                this[info.index] = mutableMapOf(
+                    "weeks" to info.course.weekExpression,
+                    "dayOfWeek" to if (info.course.dayOfWeek in 1..7) info.course.dayOfWeek.toString() else "",
+                    "startSection" to if (info.course.startSection > 0) info.course.startSection.toString() else "",
+                    "sectionCount" to if (info.course.sectionCount > 0) info.course.sectionCount.toString() else "1"
+                )
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onDismiss()
+            }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+            }
+            Text(
+                text = "补充课程信息",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Icon(
+                    Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "以下课程的部分信息未能自动识别，请手动补充。标有 * 的为必填项。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(incompleteCourses) { info ->
+                val courseData = filledData[info.index] ?: mutableMapOf()
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = info.course.courseName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (info.course.teacher.isNotEmpty()) {
+                            Text(
+                                "教师：${info.course.teacher}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (info.course.classroom.isNotEmpty()) {
+                            Text(
+                                "教室：${info.course.classroom}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        val missingLabel = info.missingFields.joinToString("、") {
+                            when (it) {
+                                "weeks" -> "上课周次"
+                                "dayOfWeek" -> "星期"
+                                "startSection" -> "开始节次"
+                                "sectionCount" -> "持续节数"
+                                else -> it
+                            }
+                        }
+                        Text(
+                            text = "缺失：$missingLabel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        if ("weeks" in info.missingFields) {
+                            var weeksText by remember(courseData) {
+                                mutableStateOf(courseData["weeks"] ?: "")
+                            }
+                            OutlinedTextField(
+                                value = weeksText,
+                                onValueChange = { newValue ->
+                                    weeksText = newValue
+                                    courseData["weeks"] = newValue
+                                },
+                                label = { Text("上课周次 *") },
+                                placeholder = { Text("如：1-16周 或 1,3,5,7,9周") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                supportingText = { Text("支持格式：1-16周、1-16单周、1,3,5,7") }
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        if ("dayOfWeek" in info.missingFields) {
+                            var dayText by remember(courseData) {
+                                mutableStateOf(courseData["dayOfWeek"] ?: "")
+                            }
+                            var dayExpanded by remember { mutableStateOf(false) }
+                            ExposedDropdownMenuBox(
+                                expanded = dayExpanded,
+                                onExpandedChange = { dayExpanded = it }
+                            ) {
+                                OutlinedTextField(
+                                    value = when (dayText) {
+                                        "1" -> "周一"; "2" -> "周二"; "3" -> "周三"
+                                        "4" -> "周四"; "5" -> "周五"; "6" -> "周六"; "7" -> "周日"
+                                        else -> dayText
+                                    },
+                                    onValueChange = {},
+                                    label = { Text("星期 *") },
+                                    readOnly = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dayExpanded) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = dayExpanded,
+                                    onDismissRequest = { dayExpanded = false }
+                                ) {
+                                    listOf("周一" to "1", "周二" to "2", "周三" to "3",
+                                        "周四" to "4", "周五" to "5", "周六" to "6", "周日" to "7"
+                                    ).forEach { (label, value) ->
+                                        DropdownMenuItem(
+                                            text = { Text(label) },
+                                            onClick = {
+                                                dayText = value
+                                                courseData["dayOfWeek"] = value
+                                                dayExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        if ("startSection" in info.missingFields) {
+                            var sectionText by remember(courseData) {
+                                mutableStateOf(courseData["startSection"] ?: "")
+                            }
+                            OutlinedTextField(
+                                value = sectionText,
+                                onValueChange = { newValue ->
+                                    sectionText = newValue
+                                    courseData["startSection"] = newValue
+                                },
+                                label = { Text("开始节次 *") },
+                                placeholder = { Text("如：1") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        if ("sectionCount" in info.missingFields) {
+                            var countText by remember(courseData) {
+                                mutableStateOf(courseData["sectionCount"] ?: "1")
+                            }
+                            OutlinedTextField(
+                                value = countText,
+                                onValueChange = { newValue ->
+                                    countText = newValue
+                                    courseData["sectionCount"] = newValue
+                                },
+                                label = { Text("持续节数 *") },
+                                placeholder = { Text("如：2") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onDismiss()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("取消")
+            }
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val updatedCourses = incompleteCourses.map { info ->
+                        val data = filledData[info.index] ?: emptyMap()
+                        val original = info.course
+                        info.copy(
+                            course = original.copy(
+                                weekExpression = data["weeks"]?.takeIf { it.isNotBlank() } ?: original.weekExpression,
+                                dayOfWeek = data["dayOfWeek"]?.toIntOrNull() ?: original.dayOfWeek,
+                                startSection = data["startSection"]?.toIntOrNull() ?: original.startSection,
+                                sectionCount = data["sectionCount"]?.toIntOrNull() ?: original.sectionCount
+                            )
+                        )
+                    }
+                    onFillComplete(updatedCourses)
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("确认并继续")
+            }
+        }
+    }
 }
 
 

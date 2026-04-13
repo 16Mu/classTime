@@ -18,6 +18,9 @@ class TYKJDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "tykjdx"
     override val schoolName = "太原科技大学"
     override val systemType = "zfsoft"
+
+    override val aliases = listOf("太原科技大学")
+    override val supportedUrls = listOf("jwgl.tyust.edu.cn")
     
     companion object {
         private const val TAG = "TYKJDXExtractor"

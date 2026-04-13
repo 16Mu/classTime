@@ -31,41 +31,35 @@ object DatabaseMigrationHelper {
      * @param migration 实际的迁移操作
      * @return 是否迁移成功
      */
-    fun safeMigrate(
+    fun createMigrationBackup(
         context: Context,
         dbName: String,
         fromVersion: Int,
-        toVersion: Int,
-        migration: (androidx.sqlite.db.SupportSQLiteDatabase) -> Unit
+        toVersion: Int
     ): Boolean {
         val startTime = System.currentTimeMillis()
-        AppLogger.i(TAG, "========== 开始安全迁移 $fromVersion -> $toVersion ==========")
-        
+        AppLogger.i(TAG, "========== 开始迁移备份 $fromVersion -> $toVersion ==========")
+
         try {
-            // 1. 创建备份
             val backupPath = createBackup(context, dbName, fromVersion, toVersion)
-            AppLogger.i(TAG, "✅ 数据库备份成功: $backupPath")
-            
-            // 2. 获取数据库实例执行迁移
+            AppLogger.i(TAG, "数据库备份成功: $backupPath")
+
             val dbFile = context.getDatabasePath(dbName)
             if (!dbFile.exists()) {
-                AppLogger.w(TAG, "⚠️ 数据库文件不存在，跳过迁移")
+                AppLogger.w(TAG, "数据库文件不存在，跳过迁移")
                 return true
             }
-            
-            // 3. 打开数据库并执行迁移（通过回调方式）
-            // 注意：这里不直接打开数据库，而是由 Room 在适当时机调用 migration 回调
-            // 我们只负责备份和记录日志
-            AppLogger.i(TAG, "✅ 准备就绪，等待 Room 执行实际迁移逻辑...")
-            
+
+            AppLogger.i(TAG, "准备就绪，等待 Room 执行实际迁移逻辑...")
+
             return true
-            
+
         } catch (e: Exception) {
-            AppLogger.e(TAG, "❌ 迁移准备阶段失败: ${e.message}", e)
+            AppLogger.e(TAG, "迁移准备阶段失败: ${e.message}", e)
             return false
         } finally {
             val duration = System.currentTimeMillis() - startTime
-            AppLogger.i(TAG, "========== 迁移 $fromVersion -> $toVersion 准备完成，耗时: ${duration}ms ==========")
+            AppLogger.i(TAG, "========== 迁移 $fromVersion -> $toVersion 备份完成，耗时: ${duration}ms ==========")
         }
     }
     

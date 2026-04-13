@@ -12,10 +12,10 @@ object CourseChangeDetector {
     fun detectChanges(localCourses: List<Course>, remoteCourses: List<Course>): CourseChangeResult {
         AppLogger.d(TAG, "开始检测课程变更... 本地:${localCourses.size}, 远程:${remoteCourses.size}")
 
-        val localCourseMap = localCourses.associateBy { it.getFullKey() }
-        val remoteCourseMap = remoteCourses.associateBy { it.getFullKey() }
-        val localGrouped = localCourses.groupBy { it.getCourseIdentity() }
-        val remoteGrouped = remoteCourses.groupBy { it.getCourseIdentity() }
+        val localCourseMap = localCourses.associateBy { it.toFullKey() }
+        val remoteCourseMap = remoteCourses.associateBy { it.toFullKey() }
+        val localGrouped = localCourses.groupBy { it.toIdentity() }
+        val remoteGrouped = remoteCourses.groupBy { it.toIdentity() }
 
         val addedCourses = mutableListOf<Course>()
         val removedCourses = mutableListOf<Course>()
@@ -35,18 +35,18 @@ object CourseChangeDetector {
                     AppLogger.d(TAG, "删除课程: $identity (${localList.size}个时间段)")
                 }
                 else -> {
-                    val localKeys = localList.map { it.getFullKey() }.toSet()
-                    val remoteKeys = remoteList.map { it.getFullKey() }.toSet()
+                    val localKeys = localList.map { it.toFullKey() }.toSet()
+                    val remoteKeys = remoteList.map { it.toFullKey() }.toSet()
                     if (localKeys == remoteKeys) continue
 
                     val adjustmentsDetected = detectWeekMigrations(localList, remoteList, identity)
                     adjustedCourses.addAll(adjustmentsDetected)
 
-                    remoteList.filter { !localKeys.contains(it.getFullKey()) }
+                    remoteList.filter { !localKeys.contains(it.toFullKey()) }
                         .filterNot { r -> adjustmentsDetected.any { it.newTime.dayOfWeek == r.dayOfWeek && it.newTime.startSection == r.startSection && it.newTime.weeks.containsAll(r.weeks) } }
                         .let { addedCourses.addAll(it) }
 
-                    localList.filter { !remoteKeys.contains(it.getFullKey()) }
+                    localList.filter { !remoteKeys.contains(it.toFullKey()) }
                         .filterNot { l -> adjustmentsDetected.any { it.oldTime.dayOfWeek == l.dayOfWeek && it.oldTime.startSection == l.startSection && it.oldTime.weeks.containsAll(l.weeks) } }
                         .let { removedCourses.addAll(it) }
 
@@ -59,7 +59,7 @@ object CourseChangeDetector {
         return CourseChangeResult(addedCourses, removedCourses, adjustedCourses)
     }
 
-    private fun detectWeekMigrations(localList: List<Course>, remoteList: List<Course>, identity: String): List<CourseTimeAdjustment> {
+    private fun detectWeekMigrations(localList: List<Course>, remoteList: List<Course>, identity: CourseIdentity): List<CourseTimeAdjustment> {
         val localWeekToTimeSlot = mutableMapOf<Int, Course>().also { m ->
             localList.forEach { c -> c.weeks.forEach { w -> m[w] = c } }
         }
@@ -93,9 +93,25 @@ object CourseChangeDetector {
         }
     }
 
-    private fun Course.getFullKey(): String = "${courseName}_${teacher}_${dayOfWeek}_${startSection}_${sectionCount}_${weeks.sorted().joinToString(",")}"
+    private data class CourseFullKey(
+        val courseName: String,
+        val teacher: String,
+        val dayOfWeek: Int,
+        val startSection: Int,
+        val sectionCount: Int,
+        val weeks: List<Int>
+    )
 
-    private fun Course.getCourseIdentity(): String = "${courseName}_${teacher}"
+    private fun Course.toFullKey(): CourseFullKey = CourseFullKey(
+        courseName, teacher, dayOfWeek, startSection, sectionCount, weeks.sorted()
+    )
+
+    private data class CourseIdentity(
+        val courseName: String,
+        val teacher: String
+    )
+
+    private fun Course.toIdentity(): CourseIdentity = CourseIdentity(courseName, teacher)
 
     private fun hasTimeOrLocationChanged(local: Course, remote: Course): Boolean =
         local.dayOfWeek != remote.dayOfWeek || local.startSection != remote.startSection ||

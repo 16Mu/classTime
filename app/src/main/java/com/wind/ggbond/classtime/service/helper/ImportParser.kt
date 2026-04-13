@@ -47,26 +47,44 @@ class ImportParser @Inject constructor() {
 
     fun parseIcsContentFull(content: String, scheduleId: Long, semesterStartDate: LocalDate,
         classTimes: List<ClassTime>, existingColors: MutableList<String>): List<Course> {
+        val courseMap = parseIcsEvents(content)
+        val courses = buildCoursesFromEvents(courseMap, scheduleId, semesterStartDate, classTimes, existingColors)
+        AppLogger.d(TAG, "ICS解析完成: ${courses.size} 门课程")
+        return courses
+    }
+
+    private fun parseIcsEvents(content: String): Map<String, MutableList<IcsEventData>> {
         val courseMap = mutableMapOf<String, MutableList<IcsEventData>>()
         content.split("BEGIN:VEVENT").drop(1).forEach { event ->
             try {
                 val summary = extractIcsField(event, "SUMMARY")
                 if (summary.isEmpty() || extractIcsField(event, "DTSTART").isEmpty()) return@forEach
                 val startDateTime = parseIcsDateTime(extractIcsField(event, "DTSTART")) ?: return@forEach
-                courseMap.getOrPut("$summary|${extractIcsField(event, "LOCATION")}|${extractTeacherFromDescription(extractIcsField(event, "DESCRIPTION"))}") { mutableListOf() }
-                    .add(IcsEventData(summary, extractTeacherFromDescription(extractIcsField(event, "DESCRIPTION")),
-                        extractIcsField(event, "LOCATION"), startDateTime,
+                val teacher = extractTeacherFromDescription(extractIcsField(event, "DESCRIPTION"))
+                val location = extractIcsField(event, "LOCATION")
+                val description = extractIcsField(event, "DESCRIPTION")
+                val key = "$summary|$location|$teacher"
+                courseMap.getOrPut(key) { mutableListOf() }
+                    .add(IcsEventData(summary, teacher, location, startDateTime,
                         extractIcsField(event, "DTEND").takeIf { it.isNotEmpty() }?.let { parseIcsDateTime(it) },
                         extractIcsField(event, "RRULE"),
-                        extractSectionFromDescription(extractIcsField(event, "DESCRIPTION")),
-                        extractWeekFromDescription(extractIcsField(event, "DESCRIPTION"))))
+                        extractSectionFromDescription(description),
+                        extractWeekFromDescription(description)))
             } catch (e: Exception) { AppLogger.w(TAG, "解析事件失败: ${e.message}") }
         }
+        return courseMap
+    }
 
+    private fun buildCoursesFromEvents(
+        courseMap: Map<String, MutableList<IcsEventData>>,
+        scheduleId: Long,
+        semesterStartDate: LocalDate,
+        classTimes: List<ClassTime>,
+        existingColors: MutableList<String>
+    ): List<Course> {
         val courses = mutableListOf<Course>()
         courseMap.forEach { (_, eventList) ->
-            val timeSlotMap = mutableMapOf<String, MutableList<IcsEventData>>()
-            eventList.forEach { e -> timeSlotMap.getOrPut("${e.startDateTime.dayOfWeek.value}|${e.startDateTime.toLocalTime()}") { mutableListOf() }.add(e) }
+            val timeSlotMap = groupEventsByTimeSlot(eventList)
             timeSlotMap.forEach { (_, events) ->
                 val first = events.first()
                 val (startSec, secCount) = first.sectionInfo ?: matchSectionByTime(first.startDateTime.toLocalTime(), first.endDateTime?.toLocalTime(), classTimes)
@@ -79,7 +97,15 @@ class ImportParser @Inject constructor() {
                     createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
             }
         }
-        AppLogger.d(TAG, "ICS解析完成: ${courses.size} 门课程"); return courses
+        return courses
+    }
+
+    private fun groupEventsByTimeSlot(eventList: List<IcsEventData>): Map<String, MutableList<IcsEventData>> {
+        val timeSlotMap = mutableMapOf<String, MutableList<IcsEventData>>()
+        eventList.forEach { e ->
+            timeSlotMap.getOrPut("${e.startDateTime.dayOfWeek.value}|${e.startDateTime.toLocalTime()}") { mutableListOf() }.add(e)
+        }
+        return timeSlotMap
     }
 
     fun extractIcsField(event: String, fieldName: String): String {

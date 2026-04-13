@@ -81,6 +81,7 @@ class NextClassDataProvider(private val context: Context) {
         return NextClassDisplayData(
             hasNextClass = true,
             isOngoing = true,
+            courseId = nextCourse.courseId,
             courseName = nextCourse.courseName,
             classroom = nextCourse.classroom,
             teacher = nextCourse.teacher,
@@ -108,6 +109,7 @@ class NextClassDataProvider(private val context: Context) {
         return NextClassDisplayData(
             hasNextClass = true,
             isOngoing = true,
+            courseId = ongoingCourse.courseId,
             courseName = ongoingCourse.courseName,
             classroom = ongoingCourse.classroom,
             teacher = ongoingCourse.teacher,
@@ -137,6 +139,7 @@ class NextClassDataProvider(private val context: Context) {
         return NextClassDisplayData(
             hasNextClass = true,
             isOngoing = false,
+            courseId = nextCourse.courseId,
             courseName = nextCourse.courseName,
             classroom = nextCourse.classroom,
             teacher = nextCourse.teacher,
@@ -150,14 +153,8 @@ class NextClassDataProvider(private val context: Context) {
         )
     }
 
-    private suspend fun getTomorrowPreview(): String {
-        return try {
-            val todayCourseProvider = TodayCourseDataProvider(context)
-            val todayData = todayCourseProvider.getTodayCourses()
-            "今日课程已结束"
-        } catch (e: Exception) {
-            "今日课程已结束"
-        }
+    private fun getTomorrowPreview(): String {
+        return "今日课程已结束"
     }
 
     private fun parseTimes(course: WidgetCourseItem): Pair<LocalTime?, LocalTime?> {

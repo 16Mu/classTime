@@ -47,6 +47,9 @@ interface ReminderDao {
     @Delete
     suspend fun deleteReminder(reminder: Reminder)
     
+    @Query("DELETE FROM reminders WHERE id = :id")
+    suspend fun deleteReminderById(id: Long)
+
     @Query("DELETE FROM reminders WHERE courseId = :courseId")
     suspend fun deleteRemindersByCourse(courseId: Long)
     
@@ -55,6 +58,9 @@ interface ReminderDao {
     
     @Query("DELETE FROM reminders")
     suspend fun deleteAllReminders()
+
+    @Query("DELETE FROM reminders WHERE courseId IN (SELECT id FROM courses WHERE scheduleId = :scheduleId)")
+    suspend fun deleteRemindersBySchedule(scheduleId: Long)
     
     @Query("SELECT COUNT(*) FROM reminders WHERE isEnabled = 1")
     suspend fun getActiveReminderCount(): Int

@@ -136,7 +136,7 @@ fun UpdateDialog(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             LinearProgressIndicator(
-                                progress = { downloadState.progress / 100f },
+                                progress = { (downloadState.progress / 100f).coerceIn(0f, 1f) },
                                 modifier = Modifier.fillMaxWidth().height(8.dp),
                             )
                             Spacer(modifier = Modifier.height(4.dp))

@@ -7,13 +7,15 @@ import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.local.entity.UpdateResult
 import com.wind.ggbond.classtime.data.repository.AutoUpdateLogRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
-import com.wind.ggbond.classtime.service.CookieAutoUpdateService
-import com.wind.ggbond.classtime.ui.screen.update.FloatingUpdateActivity
+import com.wind.ggbond.classtime.service.UnifiedScheduleUpdateService
 import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import com.wind.ggbond.classtime.util.AppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import java.time.Duration
+import java.time.LocalTime
 
 /**
  * 定时自动更新 Worker
@@ -30,87 +32,96 @@ class ScheduledUpdateWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val scheduleRepository: ScheduleRepository,
-    private val cookieAutoUpdateService: CookieAutoUpdateService,
+    private val unifiedScheduleUpdateService: UnifiedScheduleUpdateService,
     private val logRepository: AutoUpdateLogRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         return try {
-            AppLogger.d("ScheduledUpdateWorker", "开始执行定时更新任务")
-            
-            // 读取设置
+            AppLogger.d(TAG, "开始执行定时更新任务")
+
             val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
             val preferences = settingsDataStore.data.first()
-            
-            // 检查自动更新总开关
+
             val autoUpdateEnabled = preferences[DataStoreManager.SettingsKeys.AUTO_UPDATE_ENABLED_KEY]
                 ?: DataStoreManager.SettingsKeys.DEFAULT_AUTO_UPDATE_ENABLED
-            
+
             if (!autoUpdateEnabled) {
-                AppLogger.d("ScheduledUpdateWorker", "自动更新未启用，跳过")
+                AppLogger.d(TAG, "自动更新未启用，跳过")
                 return Result.success()
             }
-            
-            // 检查定时更新是否启用
+
             val scheduledUpdateEnabled = preferences[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_ENABLED_KEY]
                 ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_ENABLED
-            
+
             if (!scheduledUpdateEnabled) {
-                AppLogger.d("ScheduledUpdateWorker", "定时更新未启用，跳过")
+                AppLogger.d(TAG, "定时更新未启用，跳过")
                 return Result.success()
             }
-            
-            // 检查防重复机制：距离上次更新是否 < 5分钟
+
+            val scheduledTimeStr = preferences[DataStoreManager.SettingsKeys.SCHEDULED_UPDATE_TIME_KEY]
+                ?: DataStoreManager.SettingsKeys.DEFAULT_SCHEDULED_UPDATE_TIME
+            val scheduledTime = try {
+                LocalTime.parse(scheduledTimeStr)
+            } catch (_: Exception) {
+                LocalTime.of(7, 0)
+            }
+            val now = LocalTime.now()
+            val timeDiff = Duration.between(scheduledTime, now).abs().toMinutes()
+            if (timeDiff > 15) {
+                AppLogger.d(TAG, "当前时间 $now 不在定时窗口 $scheduledTime 内，跳过")
+                return Result.success()
+            }
+
             val lastUpdateTime = preferences[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] ?: 0L
-            val now = System.currentTimeMillis()
+            val nowMs = System.currentTimeMillis()
             val dedupIntervalMs = DataStoreManager.SettingsKeys.UPDATE_DEDUP_INTERVAL_MS
-            val timeSinceLastUpdate = now - lastUpdateTime
-            
+            val timeSinceLastUpdate = nowMs - lastUpdateTime
+
             if (timeSinceLastUpdate < dedupIntervalMs) {
-                AppLogger.d("ScheduledUpdateWorker", "防重复：距离上次更新不足5分钟，跳过")
+                AppLogger.d(TAG, "防重复：距离上次更新不足5分钟，跳过")
                 return Result.success()
             }
-            
-            // 检查前置条件：课表和学校配置
+
             val currentSchedule = scheduleRepository.getCurrentSchedule()
             if (currentSchedule == null) {
-                AppLogger.d("ScheduledUpdateWorker", "未导入课表，跳过更新")
+                AppLogger.d(TAG, "未导入课表，跳过更新")
                 return Result.success()
             }
-            
-            val schoolId = currentSchedule.schoolName
-            if (schoolId.isNullOrEmpty()) {
-                AppLogger.d("ScheduledUpdateWorker", "课表缺少学校配置，跳过更新")
+
+            val schoolName = currentSchedule.schoolName
+            if (schoolName.isNullOrEmpty()) {
+                AppLogger.d(TAG, "课表缺少学校配置，跳过更新")
                 return Result.success()
             }
-            
-            AppLogger.d("ScheduledUpdateWorker", "前置条件满足，执行更新 (课表: ${currentSchedule.name}, 学校: $schoolId)")
-            
-            // 更新最后更新时间
+
+            AppLogger.d(TAG, "前置条件满足，执行更新 (课表: ${currentSchedule.name}, 学校: $schoolName)")
+
             settingsDataStore.updateData { prefs ->
                 prefs.toMutablePreferences().apply {
-                    this[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] = now
+                    this[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] = nowMs
                 }
             }
-            
-            // 执行更新
-            val (success, message) = cookieAutoUpdateService.performUpdate()
-            
-            // 记录日志
+
+            val (success, message) = unifiedScheduleUpdateService.performSimpleUpdate()
+
             logRepository.logUpdate(
                 triggerEvent = "ScheduledUpdate",
                 result = if (success) UpdateResult.SUCCESS else UpdateResult.FAILED,
                 successMessage = if (success) message else null,
                 failureReason = if (!success) message else null
             )
-            
-            AppLogger.d("ScheduledUpdateWorker", "定时更新完成: ${if (success) "成功" else "失败"} - $message")
-            
+
+            AppLogger.d(TAG, "定时更新完成: ${if (success) "成功" else "失败"} - $message")
+
             return Result.success()
-            
+
+        } catch (e: CancellationException) {
+            AppLogger.d(TAG, "Worker 被取消")
+            throw e
         } catch (e: Exception) {
-            AppLogger.e("ScheduledUpdateWorker", "定时更新异常", e)
-            
+            AppLogger.e(TAG, "定时更新异常", e)
+
             try {
                 logRepository.logUpdate(
                     triggerEvent = "ScheduledUpdate",
@@ -118,11 +129,13 @@ class ScheduledUpdateWorker @AssistedInject constructor(
                     failureReason = "定时更新异常: ${e.message}"
                 )
             } catch (logError: Exception) {
-                AppLogger.e("ScheduledUpdateWorker", "记录异常日志失败", logError)
+                AppLogger.e(TAG, "记录异常日志失败", logError)
             }
-            
-            // 重试一次
-            return Result.retry()
+
+            return when (e) {
+                is java.io.IOException -> Result.retry()
+                else -> Result.failure()
+            }
         }
     }
 

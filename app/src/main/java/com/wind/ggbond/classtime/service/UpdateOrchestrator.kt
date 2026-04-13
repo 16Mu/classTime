@@ -17,7 +17,8 @@ import java.util.concurrent.atomic.AtomicLong
 class UpdateOrchestrator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val scheduleRepository: ScheduleRepository,
-    private val dataStoreManager: DataStoreManager
+    private val dataStoreManager: DataStoreManager,
+    private val unifiedScheduleUpdateService: UnifiedScheduleUpdateService
 ) : IUpdateManager {
 
     companion object {
@@ -129,7 +130,7 @@ class UpdateOrchestrator @Inject constructor(
     }
 
     private suspend fun executeUpdate(config: UpdateConfig) {
-        AppLogger.d(TAG, "✅ 触发自动更新")
+        AppLogger.d(TAG, "触发自动更新")
 
         val now = System.currentTimeMillis()
         val settingsDataStore = DataStoreManager.getSettingsDataStore(context)
@@ -137,9 +138,46 @@ class UpdateOrchestrator @Inject constructor(
             prefs[DataStoreManager.SettingsKeys.LAST_AUTO_UPDATE_TIME_KEY] = now
         }
 
-        delay(500)
+        showUpdateNotification(context)
+    }
 
-        com.wind.ggbond.classtime.ui.screen.update.FloatingUpdateActivity.start(context)
+    private fun showUpdateNotification(context: Context) {
+        try {
+            val notificationManager = androidx.core.app.NotificationManagerCompat.from(context)
+            if (!notificationManager.areNotificationsEnabled()) return
+
+            val channelId = "auto_update"
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val channel = android.app.NotificationChannel(
+                    channelId, "自动更新通知",
+                    android.app.NotificationManager.IMPORTANCE_HIGH
+                )
+                (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                    .createNotificationChannel(channel)
+            }
+
+            val intent = android.content.Intent(context, com.wind.ggbond.classtime.MainActivity::class.java).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                putExtra("open_update", true)
+            }
+            val pendingIntent = android.app.PendingIntent.getActivity(
+                context, 0, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notification = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(com.wind.ggbond.classtime.R.drawable.ic_notification)
+                .setContentTitle("课表有更新")
+                .setContentText("点击查看更新详情")
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                .build()
+
+            notificationManager.notify(3001, notification)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "显示更新通知失败", e)
+        }
     }
 
     override suspend fun isUpdateEnabled(): Boolean {

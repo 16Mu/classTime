@@ -177,14 +177,13 @@ class ReminderCheckWorker @AssistedInject constructor(
      */
     private fun sendReminderNotification(course: Course, classTime: ClassTime, weekNumber: Int) {
         try {
+            createNotificationChannel()
             val notificationManager = NotificationManagerCompat.from(context)
-            // 检查通知权限
             if (!notificationManager.areNotificationsEnabled()) {
                 AppLogger.w(TAG, "通知权限未授予")
                 return
             }
 
-            // 构建通知内容
             val classroomText = course.classroom.ifEmpty { "教室未设置" }
             val teacherText = course.teacher.ifEmpty { "教师未设置" }
             val dayOfWeekName = DateUtils.getDayOfWeekName(course.dayOfWeek)
@@ -203,14 +202,11 @@ class ReminderCheckWorker @AssistedInject constructor(
                 }
                 append("上课时间：${dayOfWeekName} ${sectionText}\n")
                 append("具体时间：${classTime.startTime}\n")
-                // 添加更多详细信息
-                append("课程编号：${course.id}\n")
                 if (course.weeks.isNotEmpty()) {
                     append("上课周次：第${course.weeks.sorted().joinToString(",")}周\n")
                 }
             }
 
-            // 点击通知打开App
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 putExtra("courseId", course.id)
@@ -222,8 +218,7 @@ class ReminderCheckWorker @AssistedInject constructor(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // 使用唯一ID（包含时间戳，避免与AlarmManager的通知冲突后被覆盖）
-            val notificationId = ("fallback_${course.id}_${weekNumber}_${System.currentTimeMillis()}")
+            val notificationId = ("fallback_${course.id}_${weekNumber}")
                 .hashCode().and(0x7FFFFFFF)
 
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -244,6 +239,23 @@ class ReminderCheckWorker @AssistedInject constructor(
 
         } catch (e: Exception) {
             AppLogger.e(TAG, "发送兜底通知失败: ${e.message}", e)
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (notificationManager.getNotificationChannel(CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    context.getString(R.string.reminder_channel_name),
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = context.getString(R.string.reminder_channel_description)
+                    enableVibration(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
         }
     }
 }

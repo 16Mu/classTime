@@ -66,6 +66,24 @@ object WidgetPinHelper {
         data class Failed(val widgetType: WidgetType, val reason: String) : PinResult()
     }
 
+    private val providerMap: Map<WidgetType, Class<*>> = mapOf(
+        WidgetType.TODAY_COURSE to TodayCourseWidgetReceiver::class.java,
+        WidgetType.NEXT_CLASS to NextClassWidgetReceiver::class.java,
+        WidgetType.COMPACT_LIST to CompactListViewWidgetReceiver::class.java,
+        WidgetType.WEEK_OVERVIEW to WeekOverviewWidgetReceiver::class.java,
+        WidgetType.LARGE_TODAY_COURSE to LargeTodayCourseWidgetProvider::class.java,
+        WidgetType.TOMORROW_COURSE to TomorrowCourseWidgetReceiver::class.java
+    )
+
+    private val descriptionMap: Map<WidgetType, String> = mapOf(
+        WidgetType.TODAY_COURSE to "4x2 尺寸，显示今日课程列表",
+        WidgetType.NEXT_CLASS to "3x2 尺寸，显示下节课倒计时",
+        WidgetType.COMPACT_LIST to "紧凑列表样式的小组件",
+        WidgetType.WEEK_OVERVIEW to "周概览样式的小组件",
+        WidgetType.LARGE_TODAY_COURSE to "4x4 大屏展示更多课程细节",
+        WidgetType.TOMORROW_COURSE to "3x2 智能切换今日/明日课程"
+    )
+
     private val manufacturer: String get() = Build.MANUFACTURER.lowercase()
 
     private fun isKnownProblematicOEM(): Boolean {
@@ -135,14 +153,8 @@ object WidgetPinHelper {
             return PinResult.FallbackNeeded(widgetType, "请手动添加小组件", getManualGuideSteps())
         }
 
-        val providerComponent = when (widgetType) {
-            WidgetType.TODAY_COURSE -> ComponentName(context, TodayCourseWidgetReceiver::class.java)
-            WidgetType.NEXT_CLASS -> ComponentName(context, NextClassWidgetReceiver::class.java)
-            WidgetType.COMPACT_LIST -> ComponentName(context, CompactListViewWidgetReceiver::class.java)
-            WidgetType.WEEK_OVERVIEW -> ComponentName(context, WeekOverviewWidgetReceiver::class.java)
-            WidgetType.LARGE_TODAY_COURSE -> ComponentName(context, LargeTodayCourseWidgetProvider::class.java)
-            WidgetType.TOMORROW_COURSE -> ComponentName(context, TomorrowCourseWidgetReceiver::class.java)
-        }
+        val providerComponent = ComponentName(context, providerMap[widgetType]
+            ?: throw IllegalArgumentException("Unknown widget type: $widgetType"))
 
         val callbackIntent = Intent(context, WidgetPinCallbackReceiver::class.java).apply {
             action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
@@ -308,14 +320,7 @@ object WidgetPinHelper {
     }
 
     fun getWidgetDescription(widgetType: WidgetType): String {
-        return when (widgetType) {
-            WidgetType.TODAY_COURSE -> "4x2 尺寸，显示今日课程列表"
-            WidgetType.NEXT_CLASS -> "3x2 尺寸，显示下节课倒计时"
-            WidgetType.COMPACT_LIST -> "紧凑列表样式的小组件"
-            WidgetType.WEEK_OVERVIEW -> "周概览样式的小组件"
-            WidgetType.LARGE_TODAY_COURSE -> "4x4 大屏展示更多课程细节"
-            WidgetType.TOMORROW_COURSE -> "3x2 智能切换今日/明日课程"
-        }
+        return descriptionMap[widgetType] ?: "未知小组件"
     }
 
     fun getDeviceCompatibilityReport(): CompatibilityReport {

@@ -12,9 +12,12 @@ import android.webkit.WebViewClient
 import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.model.SchoolConfig
 import com.wind.ggbond.classtime.util.AppLogger
+import com.wind.ggbond.classtime.util.UrlUtils
 import com.wind.ggbond.classtime.util.HtmlScheduleParser
 import com.wind.ggbond.classtime.util.MutableContextWrapper
 import com.wind.ggbond.classtime.util.SecureCookieManager
+import com.wind.ggbond.classtime.service.contract.CookieExpiredException
+import com.wind.ggbond.classtime.service.contract.CookieExpiredReason
 import com.wind.ggbond.classtime.service.contract.IScheduleFetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -24,6 +27,7 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+@Deprecated("已合并到 UnifiedScheduleUpdateService，请使用新服务")
 @Singleton
 class UnifiedScheduleFetchService @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -42,18 +46,28 @@ class UnifiedScheduleFetchService @Inject constructor(
         val savedCookies = secureCookieManager.getCookies(domain)
         if (savedCookies.isNullOrEmpty()) {
             AppLogger.w(TAG, "未找到保存的Cookie")
-            return Result.failure(Exception("登录凭证不存在，请重新登录教务系统导入课表"))
+            return Result.failure(CookieExpiredException(
+                "登录凭证不存在，请重新登录教务系统导入课表",
+                CookieExpiredReason.COOKIE_EMPTY
+            ))
         }
 
         return try {
             fetchWithCookie(schoolConfig, savedCookies)
+        } catch (e: CookieExpiredException) {
+            AppLogger.w(TAG, "Cookie已失效: ${e.reason}")
+            Result.failure(e)
         } catch (e: Exception) {
             AppLogger.w(TAG, "使用Cookie获取课表失败: ${e.message}")
-            Result.failure(Exception("登录已过期，请重新登录教务系统导入课表"))
+            Result.failure(CookieExpiredException(
+                "登录已过期，请重新登录教务系统导入课表",
+                CookieExpiredReason.SESSION_EXPIRED,
+                cause = e
+            ))
         }
     }
 
-    private fun extractDomain(url: String): String = try { java.net.URL(url).host } catch (_: Exception) { url }
+    private fun extractDomain(url: String): String = UrlUtils.extractDomain(url)
 
     private suspend fun fetchWithCookie(config: SchoolConfig, cookies: String): Result<Pair<List<ParsedCourse>, String>> =
         suspendCancellableCoroutine { continuation ->
@@ -100,7 +114,10 @@ class UnifiedScheduleFetchService @Inject constructor(
                                 val isLoginPage = url?.contains("login", ignoreCase = true) == true || url?.contains("cas", ignoreCase = true) == true
                                 if (isLoginPage && pageLoadCount > 1) {
                                     AppLogger.w(TAG, "Cookie已失效")
-                                    safeResume { continuation.resumeWithException(Exception("Cookie已失效")) }; return
+                                    safeResume { continuation.resumeWithException(CookieExpiredException(
+                                        "Cookie已失效",
+                                        CookieExpiredReason.REDIRECTED_TO_LOGIN
+                                    )) }; return
                                 }
                                 if (!isLoginPage) {
                                     mainHandler.postDelayed({

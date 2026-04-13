@@ -17,10 +17,12 @@ object Constants {
         const val MAX_NOTE_LENGTH = 500
         
         const val MIN_SECTION_NUMBER = 1
-        const val MAX_SECTION_NUMBER = 16  // 扩大到16节，支持更多学校（早上1-4，下午5-8，晚上9-12，深夜13-16）
+        const val MAX_SECTION_NUMBER = 24  // 上午+下午各最多12节，总共最多24节
         
         const val MIN_SECTION_COUNT = 1
         const val MAX_SECTION_COUNT = 12
+        const val MAX_MORNING_SECTION_COUNT = 12
+        const val MAX_AFTERNOON_SECTION_COUNT = 12
         
         const val MIN_DAY_OF_WEEK = 1
         const val MAX_DAY_OF_WEEK = 7

@@ -116,7 +116,7 @@ class ImportValidator @Inject constructor() {
     private fun validateWeeks(weeks: List<Int>, weekExpression: String): FieldValidation {
         return when {
             weeks.isEmpty() && weekExpression.isBlank() ->
-                FieldValidation("weeks", true, "周次信息为空，将使用默认1-16周")
+                FieldValidation("weeks", false, "周次信息为必填字段，未能自动识别")
             weeks.any { it < 1 || it > 30 } ->
                 FieldValidation("weeks", false, "周次超出有效范围(1-30)")
             else -> FieldValidation("weeks", true, "")

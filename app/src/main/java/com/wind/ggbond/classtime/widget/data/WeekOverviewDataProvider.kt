@@ -1,9 +1,6 @@
 package com.wind.ggbond.classtime.widget.data
 
 import android.content.Context
-import androidx.room.Room
-import com.wind.ggbond.classtime.data.local.database.CourseDatabase
-import com.wind.ggbond.classtime.data.local.database.Migrations
 import com.wind.ggbond.classtime.util.DateUtils
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
@@ -14,40 +11,20 @@ class WeekOverviewDataProvider(private val context: Context) {
     companion object {
         private const val DATABASE_TIMEOUT_MS = 5000L
         private val DATE_FORMATTER = DateTimeFormatter.ofPattern("M月d日")
-
-        @Volatile
-        private var databaseInstance: CourseDatabase? = null
-
-        private fun getDatabase(context: Context): CourseDatabase {
-            return databaseInstance ?: synchronized(this) {
-                databaseInstance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    CourseDatabase::class.java,
-                    CourseDatabase.DATABASE_NAME
-                )
-                    .addMigrations(*Migrations.getAllMigrations())
-                    .fallbackToDestructiveMigration()
-                    .build()
-                    .also { databaseInstance = it }
-            }
-        }
     }
 
     suspend fun getWeekOverview(): WeekOverviewData {
         return try {
             withTimeoutOrNull(DATABASE_TIMEOUT_MS) {
                 getWeekOverviewInternal()
-            } ?: run {
-                WeekOverviewData.empty("数据加载超时")
-            }
+            } ?: WeekOverviewData.empty("数据加载超时")
         } catch (e: Exception) {
             WeekOverviewData.empty("数据加载失败")
         }
     }
 
     private suspend fun getWeekOverviewInternal(): WeekOverviewData {
-        val db = getDatabase(context)
-
+        val db = WidgetDatabaseProvider.getDatabase(context)
         val schedule = db.scheduleDao().getCurrentSchedule()
             ?: return WeekOverviewData.empty("未设置课表")
 

@@ -49,7 +49,7 @@ class WeekOverviewWidget : GlanceAppWidget() {
     }
 }
 
-private val WEEKDAY_LABELS = arrayOf("一", "二", "三", "四", "五", "六", "日")
+
 
 @Composable
 private fun WeekOverviewContent(data: WeekOverviewData) {
@@ -120,7 +120,7 @@ private fun WeekBody(days: List<DayCourseInfo>, todayDow: Int) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         days.forEachIndexed { i, d ->
             DayBlock(
-                label = "周${WEEKDAY_LABELS[i.coerceIn(0, 6)]}",
+                label = "周${WidgetColors.WEEKDAY_LABELS_FULL[i.coerceIn(0, 6)]}",
                 courses = d.courses,
                 isToday = i + 1 == todayDow
             )
@@ -137,7 +137,7 @@ private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean
         modifier = GlanceModifier
             .fillMaxWidth()
             .background(
-                if (isToday) dayNightColorProvider(day = Color(0xFFE8F0FE), night = Color(0xFF1A237E))
+                if (isToday) dayNightColorProvider(day = WidgetColors.todayHighlightBgDay, night = WidgetColors.todayHighlightBgNight)
                 else dayNightColorProvider(day = Color.Transparent, night = Color.Transparent)
             )
             .cornerRadius(8.dp)
@@ -147,7 +147,7 @@ private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean
             Text(
                 text = label,
                 style = TextStyle(
-                    color = if (isToday) dayNightColorProvider(day = Color(0xFF1565C0), night = Color(0xFF64B5F6))
+                    color = if (isToday) dayNightColorProvider(day = WidgetColors.todayHighlightTextDay, night = WidgetColors.todayHighlightTextNight)
                     else dayNightColorProvider(day = WidgetColors.textSecondaryDay, night = WidgetColors.textSecondaryNight),
                     fontSize = 11.sp,
                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
@@ -189,28 +189,11 @@ private fun DayBlock(label: String, courses: List<CourseBrief>, isToday: Boolean
 }
 
 @Composable
-private fun EmptyState(msg: String) {
-    Box(
-        modifier = GlanceModifier.fillMaxSize().padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Spacer(modifier = GlanceModifier.height(3.dp))
-            Text(
-                text = msg,
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 12.sp
-                )
-            )
-        }
-    }
-}
+private fun EmptyState(msg: String) = WidgetEmptyState(
+    message = msg,
+    primaryFontSize = 20f,
+    secondaryFontSize = 12f,
+    spacerHeight = 3f,
+    verticalPadding = 16f,
+    clickable = false
+)

@@ -30,9 +30,7 @@ class ReminderRepository @Inject constructor(
 
     override suspend fun delete(entity: Reminder) = dao.deleteReminder(entity)
 
-    override suspend fun deleteById(id: Long) {
-        getById(id)?.let { delete(it) }
-    }
+    override suspend fun deleteById(id: Long) = dao.deleteReminderById(id)
 
     override suspend fun deleteAll() = dao.deleteAllReminders()
 
@@ -61,6 +59,9 @@ class ReminderRepository @Inject constructor(
 
     suspend fun deleteRemindersByCourse(courseId: Long) =
         dao.deleteRemindersByCourse(courseId)
+
+    suspend fun deleteRemindersBySchedule(scheduleId: Long) =
+        dao.deleteRemindersBySchedule(scheduleId)
 
     suspend fun deleteExpiredReminders(timestamp: Long = System.currentTimeMillis()): Int =
         dao.deleteExpiredReminders(timestamp)

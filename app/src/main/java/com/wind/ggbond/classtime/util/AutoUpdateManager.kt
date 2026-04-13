@@ -242,7 +242,7 @@ class AutoUpdateManager(
         copy(totalAttempts = 0, successCount = 0, failureCount = 0, skipCount = 0, totalChangesDetected = 0)
     }
 
-    private fun extractDomain(url: String): String = try { java.net.URI(url).host ?: "" } catch (_: Exception) { "" }
+    private fun extractDomain(url: String): String = UrlUtils.extractDomain(url)
     private fun elapsed(start: Long): Long = System.currentTimeMillis() - start
 }
 

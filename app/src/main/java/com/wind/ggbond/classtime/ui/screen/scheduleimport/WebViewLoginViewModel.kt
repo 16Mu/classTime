@@ -10,6 +10,7 @@ import javax.inject.Inject
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.data.local.entity.SchoolEntity
 import com.wind.ggbond.classtime.util.SecureCookieManager
+import com.wind.ggbond.classtime.util.UrlUtils
 
 /**
  * WebView 登录 ViewModel
@@ -52,13 +53,7 @@ class WebViewLoginViewModel @Inject constructor(
     /**
      * 从URL提取域名
      */
-    private fun extractDomain(url: String): String {
-        return try {
-            Uri.parse(url).host ?: "default"
-        } catch (e: Exception) {
-            "default"
-        }
-    }
+    private fun extractDomain(url: String): String = UrlUtils.extractDomain(url).ifEmpty { "default" }
     
     /**
      * 加载已保存的Cookie
@@ -78,7 +73,7 @@ class WebViewLoginViewModel @Inject constructor(
     }
     
     /**
-     * 保存Cookie（✅ 使用加密存储）
+     * 保存Cookie（ 使用加密存储）
      */
     fun saveCookies(cookies: String) {
         viewModelScope.launch {

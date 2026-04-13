@@ -30,7 +30,7 @@ import com.wind.ggbond.classtime.data.repository.AutoUpdateLogRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.service.AutoLoginResult
-import com.wind.ggbond.classtime.service.CookieAutoUpdateService
+import com.wind.ggbond.classtime.service.UnifiedScheduleUpdateService
 import com.wind.ggbond.classtime.ui.theme.CourseScheduleTheme
 import com.wind.ggbond.classtime.util.SecureCookieManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -66,7 +66,10 @@ class FloatingUpdateActivity : ComponentActivity() {
     lateinit var extractorFactory: com.wind.ggbond.classtime.util.extractor.SchoolExtractorFactory
     
     @Inject
-    lateinit var cookieAutoUpdateService: CookieAutoUpdateService
+    lateinit var unifiedScheduleUpdateService: UnifiedScheduleUpdateService
+
+    @Inject
+    lateinit var autoLoginManager: com.wind.ggbond.classtime.util.AutoLoginManager
     
     companion object {
         private const val TAG = "FloatingUpdate"
@@ -105,8 +108,9 @@ class FloatingUpdateActivity : ComponentActivity() {
                 CourseScheduleTheme {
                     SilentUpdateDialog(
                         onClose = { finish() },
-                        cookieAutoUpdateService = cookieAutoUpdateService,
+                        unifiedScheduleUpdateService = unifiedScheduleUpdateService,
                         logRepository = logRepository,
+                        autoLoginManager = autoLoginManager,
                         onResult = { success, message ->
                             sendUpdateNotification(success, message)
                             finish()
@@ -396,8 +400,9 @@ fun DebugWebViewDialog(
 @Composable
 fun SilentUpdateDialog(
     onClose: () -> Unit,
-    cookieAutoUpdateService: CookieAutoUpdateService,
+    unifiedScheduleUpdateService: UnifiedScheduleUpdateService,
     logRepository: AutoUpdateLogRepository,
+    autoLoginManager: com.wind.ggbond.classtime.util.AutoLoginManager,
     onResult: (success: Boolean, message: String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -406,81 +411,42 @@ fun SilentUpdateDialog(
     LaunchedEffect(Unit) {
         try {
             AppLogger.d("SilentUpdate", "🚀 开始执行课表更新（静默模式）")
-            
-            val autoLoginManager = com.wind.ggbond.classtime.util.AutoLoginManager(context)
-            
-            // 检查自动登录是否启用
-            if (autoLoginManager.isAutoLoginEnabled()) {
-                AppLogger.d("SilentUpdate", "自动登录已启用，检查账号...")
-                
-                if (!autoLoginManager.hasCredentials()) {
-                    // 未配置账号
-                    AppLogger.w("SilentUpdate", "未配置自动登录账号")
-                    autoLoginManager.saveLastUpdateResult(
-                        com.wind.ggbond.classtime.util.AutoLoginResultCode.NO_CREDENTIAL,
-                        com.wind.ggbond.classtime.util.AutoLoginResultMessages.getMessage(
-                            com.wind.ggbond.classtime.util.AutoLoginResultCode.NO_CREDENTIAL
-                        )
-                    )
-                    onResult(false, "未配置自动登录账号")
-                    return@LaunchedEffect
-                }
-                
-                // 执行自动登录
-                AppLogger.d("SilentUpdate", "开始自动登录...")
-                val loginStartTime = System.currentTimeMillis()
-                val loginResult = performAutoLogin(context, autoLoginManager)
-                val loginDuration = System.currentTimeMillis() - loginStartTime
-                
-                if (!loginResult.success) {
-                    // 登录失败或需要验证码
-                    AppLogger.w("SilentUpdate", "自动登录失败: ${loginResult.message}")
-                    autoLoginManager.saveLastUpdateResult(loginResult.resultCode, loginResult.message)
-                    onResult(false, loginResult.message)
-                    return@LaunchedEffect
-                }
-                
-                AppLogger.d("SilentUpdate", "自动登录成功，继续执行课表更新...")
-            }
-            
-            // ✅ 使用CookieAutoUpdateService执行完整更新流程
-            val (success, message) = cookieAutoUpdateService.performUpdate()
-            
+
+            val (success, message) = unifiedScheduleUpdateService.performSimpleUpdate()
+
             AppLogger.d("SilentUpdate", "更新结果: ${if (success) "成功" else "失败"} - $message")
-            
-            // 保存更新结果
+
             if (autoLoginManager.isAutoLoginEnabled()) {
                 autoLoginManager.saveLastUpdateResult(
-                    if (success) com.wind.ggbond.classtime.util.AutoLoginResultCode.OK 
+                    if (success) com.wind.ggbond.classtime.util.AutoLoginResultCode.OK
                     else com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
                     message
                 )
             }
-            
-            // ✅ 记录日志
+
             logRepository.logUpdate(
                 triggerEvent = "自动更新",
-                result = if (success) 
-                    com.wind.ggbond.classtime.data.local.entity.UpdateResult.SUCCESS 
-                else 
+                result = if (success)
+                    com.wind.ggbond.classtime.data.local.entity.UpdateResult.SUCCESS
+                else
                     com.wind.ggbond.classtime.data.local.entity.UpdateResult.FAILED,
                 successMessage = if (success) message else null,
                 failureReason = if (!success) message else null,
                 durationMs = 0
             )
-            
+
             onResult(success, message)
-            
+
         } catch (e: Exception) {
             AppLogger.e("SilentUpdate", "更新失败", e)
-            
+
             logRepository.logUpdate(
                 triggerEvent = "自动更新",
                 result = com.wind.ggbond.classtime.data.local.entity.UpdateResult.FAILED,
                 failureReason = "异常: ${e.message}",
                 durationMs = 0
             )
-            
+
             onResult(false, "更新失败: ${e.message}")
         }
     }
@@ -493,91 +459,7 @@ fun SilentUpdateDialog(
     )
 }
 
-/**
- * 执行自动登录流程
- */
-private suspend fun performAutoLogin(
-    context: Context,
-    autoLoginManager: com.wind.ggbond.classtime.util.AutoLoginManager
-): AutoLoginResult {
-    return try {
-        val username = autoLoginManager.getUsername() ?: ""
-        val password = autoLoginManager.getPassword() ?: ""
-        
-        if (username.isBlank() || password.isBlank()) {
-            return AutoLoginResult(
-                success = false,
-                resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.NO_CREDENTIAL,
-                message = com.wind.ggbond.classtime.util.AutoLoginResultMessages.getMessage(
-                    com.wind.ggbond.classtime.util.AutoLoginResultCode.NO_CREDENTIAL
-                )
-            )
-        }
-        
-        // 获取当前学校ID
-        val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-        val schoolId = prefs.getString("current_school_id", null)
-        
-        if (schoolId.isNullOrBlank()) {
-            AppLogger.w("AutoLogin", "未找到当前学校ID")
-            return AutoLoginResult(
-                success = false,
-                resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
-                message = "未找到当前学校信息"
-            )
-        }
-        
-        AppLogger.d("AutoLogin", "开始自动登录: $schoolId - $username")
-        
-        // 使用 AutoLoginService 执行自动登录
-        // 注意：这里需要通过 Hilt 注入 SchoolRepository
-        // 临时方案：直接创建服务实例（后续可改为注入）
-        val schoolRepository = (context as? FloatingUpdateActivity)?.schoolRepository
-        
-        if (schoolRepository == null) {
-            AppLogger.w("AutoLogin", "无法获取 SchoolRepository")
-            return AutoLoginResult(
-                success = false,
-                resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
-                message = "系统错误：无法获取学校信息"
-            )
-        }
-        
-        // 获取SecureCookieManager用于登录后保存Cookie
-        val activity = context as? FloatingUpdateActivity
-        val secureCookieManager = activity?.secureCookieManager
-        val loginScriptGenerator = activity?.loginScriptGenerator
-        
-        if (secureCookieManager == null || loginScriptGenerator == null) {
-            AppLogger.w("AutoLogin", "无法获取 SecureCookieManager 或 LoginScriptGenerator")
-            return AutoLoginResult(
-                success = false,
-                resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
-                message = "系统错误：无法获取Cookie管理器"
-            )
-        }
-        
-        val autoLoginService = com.wind.ggbond.classtime.service.AutoLoginService(
-            context,
-            schoolRepository,
-            secureCookieManager,
-            loginScriptGenerator
-        )
-        
-        val result = autoLoginService.performAutoLogin(schoolId, username, password)
-        
-        AppLogger.d("AutoLogin", "自动登录结果: ${result.resultCode} - ${result.message}")
-        
-        result
-    } catch (e: Exception) {
-        AppLogger.e("AutoLogin", "自动登录异常", e)
-        AutoLoginResult(
-            success = false,
-            resultCode = com.wind.ggbond.classtime.util.AutoLoginResultCode.UNKNOWN_ERROR,
-            message = "自动登录异常: ${e.message}"
-        )
-    }
-}
+
 
 /**
  * 发送更新通知
@@ -589,9 +471,6 @@ private suspend fun performAutoLogin(
  */
 fun FloatingUpdateActivity.sendUpdateNotification(success: Boolean, message: String) {
     try {
-        val autoLoginManager = com.wind.ggbond.classtime.util.AutoLoginManager(this)
-        
-        // 只有在启用了自动登录时才发送自动登录相关的通知
         if (autoLoginManager.isAutoLoginEnabled()) {
             val resultCode = autoLoginManager.getLastUpdateResultCode() ?: ""
             

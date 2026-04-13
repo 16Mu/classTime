@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 
-/**
- * 课程数设置页面
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SectionCountConfigScreen(
@@ -31,6 +29,8 @@ fun SectionCountConfigScreen(
     val showMorningSectionsDialog by viewModel.showMorningSectionsDialog.collectAsState()
     val showAfternoonSectionsDialog by viewModel.showAfternoonSectionsDialog.collectAsState()
     val displayMode by viewModel.displayMode.collectAsState()
+    val maxCourseSection by viewModel.maxCourseSection.collectAsState()
+    val sectionWarning by viewModel.sectionWarning.collectAsState()
     
     val totalSections = morningSectionCount + afternoonSectionCount
     val recommendedMode = totalSections <= 12
@@ -38,7 +38,6 @@ fun SectionCountConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                // 外层 Scaffold 已处理状态栏 insets，此处置空避免双重添加
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("课程数设置") },
                 navigationIcon = {
@@ -79,6 +78,46 @@ fun SectionCountConfigScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                }
+            }
+            
+            // 节次不足警告卡片
+            if (sectionWarning != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "节次设置不足",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = sectionWarning!!,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -201,16 +240,33 @@ fun SectionCountConfigScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "每天总节次数",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium
-                        )
+                        Column {
+                            Text(
+                                text = "每天总节次数",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (maxCourseSection > 0) {
+                                Text(
+                                    text = "课程最大节次：第${maxCourseSection}节",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (totalSections < maxCourseSection) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
                         Text(
                             text = "${morningSectionCount + afternoonSectionCount}节",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (maxCourseSection > 0 && totalSections < maxCourseSection) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            }
                         )
                     }
                 }
@@ -315,6 +371,9 @@ fun SectionCountConfigScreen(
         SectionCountDialog(
             title = "设置上午节次数",
             currentSections = morningSectionCount,
+            minSections = maxOf(0, maxCourseSection - afternoonSectionCount),
+            maxCourseSection = maxCourseSection,
+            otherSections = afternoonSectionCount,
             onDismiss = { viewModel.hideMorningSectionsDialog() },
             onConfirm = { sections ->
                 viewModel.updateMorningSections(sections)
@@ -328,6 +387,9 @@ fun SectionCountConfigScreen(
         SectionCountDialog(
             title = "设置下午节次数",
             currentSections = afternoonSectionCount,
+            minSections = maxOf(0, maxCourseSection - morningSectionCount),
+            maxCourseSection = maxCourseSection,
+            otherSections = morningSectionCount,
             onDismiss = { viewModel.hideAfternoonSectionsDialog() },
             onConfirm = { sections ->
                 viewModel.updateAfternoonSections(sections)
@@ -336,4 +398,3 @@ fun SectionCountConfigScreen(
         )
     }
 }
-

@@ -177,6 +177,18 @@ fun NavGraph(
             )
         }
         
+        // 课程详情
+        composable(
+            route = Screen.CourseDetail.route,
+            arguments = listOf(navArgument("courseId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val courseId = backStackEntry.arguments?.getLong("courseId") ?: 0L
+            com.wind.ggbond.classtime.ui.screen.course.CourseDetailScreen(
+                navController = navController,
+                courseId = courseId
+            )
+        }
+        
         // 学期管理
         composable(
             route = Screen.SemesterManagement.route,

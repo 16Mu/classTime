@@ -36,25 +36,17 @@ object InputValidator {
      * @return 过滤后的安全字符串
      */
     fun sanitizeXSS(input: String): String {
-        var result = input
-        
-        // 转义HTML特殊字符
-        result = result
+        if (containsXSSPattern(input)) {
+            AppLogger.w(TAG, "XSS pattern detected in input: ${input.take(50)}")
+        }
+
+        return input
             .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&#x27;")
             .replace("/", "&#x2F;")
-        
-        // 检测并记录可疑模式
-        for (pattern in XSS_PATTERNS) {
-            if (input.contains(pattern, ignoreCase = true)) {
-                AppLogger.w(TAG, "XSS pattern detected: $pattern in input: ${input.take(50)}")
-            }
-        }
-        
-        return result
     }
     
     private fun validateField(value: String, maxLength: Int, fieldName: String): Boolean {

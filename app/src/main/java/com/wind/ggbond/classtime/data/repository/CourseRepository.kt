@@ -87,7 +87,7 @@ class CourseRepository @Inject constructor(
      */
     private fun notifyWidgetRefresh() {
         if (WidgetRefreshHelper.hasActiveWidgets(context)) {
-            WidgetRefreshHelper.refreshAllWidgets(context)
+            WidgetRefreshHelper.notifyDataChanged(context)
         }
     }
     
@@ -230,11 +230,10 @@ class CourseRepository @Inject constructor(
      * @param defaultReminderMinutes 默认提醒时间（分钟）
      * @return 更新的课程数量
      */
-    suspend fun enableAllCoursesReminder(scheduleId: Long, defaultReminderMinutes: Int): Int {
+    private suspend fun fetchCoursesWithRetry(scheduleId: Long, maxRetries: Int = 3): List<Course> {
         var courses: List<Course> = emptyList()
         var retryCount = 0
-        val maxRetries = 3
-        
+
         while (courses.isEmpty() && retryCount < maxRetries) {
             courses = try {
                 getAllCoursesBySchedule(scheduleId).first()
@@ -242,7 +241,7 @@ class CourseRepository @Inject constructor(
                 AppLogger.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries")
                 emptyList()
             }
-            
+
             if (courses.isEmpty()) {
                 retryCount++
                 if (retryCount < maxRetries) {
@@ -250,12 +249,17 @@ class CourseRepository @Inject constructor(
                 }
             }
         }
-        
+
         if (courses.isEmpty()) {
             AppLogger.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
-            return 0
         }
-        
+        return courses
+    }
+
+    suspend fun enableAllCoursesReminder(scheduleId: Long, defaultReminderMinutes: Int): Int {
+        val courses = fetchCoursesWithRetry(scheduleId)
+        if (courses.isEmpty()) return 0
+
         AppLogger.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量开启提醒")
 
         courseDao.updateReminderBySchedule(
@@ -269,33 +273,11 @@ class CourseRepository @Inject constructor(
         AppLogger.d("CourseRepository", "批量开启提醒完成")
         return courses.size
     }
-    
+
     suspend fun disableAllCoursesReminder(scheduleId: Long): Int {
-        var courses: List<Course> = emptyList()
-        var retryCount = 0
-        val maxRetries = 3
-        
-        while (courses.isEmpty() && retryCount < maxRetries) {
-            courses = try {
-                getAllCoursesBySchedule(scheduleId).first()
-            } catch (e: Exception) {
-                AppLogger.w("CourseRepository", "获取课程数据失败，重试 ${retryCount + 1}/$maxRetries")
-                emptyList()
-            }
-            
-            if (courses.isEmpty()) {
-                retryCount++
-                if (retryCount < maxRetries) {
-                    kotlinx.coroutines.delay(100)
-                }
-            }
-        }
-        
-        if (courses.isEmpty()) {
-            AppLogger.w("CourseRepository", "经过 $maxRetries 次重试后仍无法获取课程数据，scheduleId: $scheduleId")
-            return 0
-        }
-        
+        val courses = fetchCoursesWithRetry(scheduleId)
+        if (courses.isEmpty()) return 0
+
         AppLogger.d("CourseRepository", "成功获取到 ${courses.size} 门课程，开始批量关闭提醒")
 
         val updatedCount = courseDao.updateReminderBySchedule(

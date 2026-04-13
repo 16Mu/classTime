@@ -134,7 +134,7 @@ fun ToolsScreen(
                     ToolsCompactCard(
                         icon = Icons.Outlined.Upload,
                         title = "从文件导入",
-                        subtitle = "JSON/ICS/CSV",
+                        subtitle = "JSON/CSV/Excel",
                         modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)

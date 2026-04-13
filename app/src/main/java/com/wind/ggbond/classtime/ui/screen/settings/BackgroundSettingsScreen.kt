@@ -57,6 +57,7 @@ fun BackgroundSettingsScreen(
     // 莫奈取色状态
     val monetEnabled by settingsViewModel.monetEnabled.collectAsState()
     val desktopModeEnabled by settingsViewModel.desktopModeEnabled.collectAsState()
+    val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
     val courseColorSaturation by settingsViewModel.courseColorSaturation.collectAsState()
     val previewColors by settingsViewModel.observeCourseColors(
         saturationLevel = when (courseColorSaturation) {
@@ -617,8 +618,11 @@ fun BackgroundSettingsScreen(
     // 背景应用成功提示
     LaunchedEffect(uiState.backgroundAppliedSuccess) {
         if (uiState.backgroundAppliedSuccess) {
+            if (!glassEffectEnabled) {
+                settingsViewModel.updateGlassEffectEnabled(true)
+            }
             snackbarHostState.showSnackbar(
-                message = if (monetEnabled) "✅ 课程颜色已自动更新" 
+                message = if (monetEnabled) "✅ 课程颜色已自动更新"
                           else "💡 开启'莫奈取色'可让课程颜色随背景变化",
                 duration = SnackbarDuration.Short
             )

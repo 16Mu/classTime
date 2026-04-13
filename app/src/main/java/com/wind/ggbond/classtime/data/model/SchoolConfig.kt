@@ -13,8 +13,9 @@ data class SchoolConfig(
     val dataFormat: DataFormat = DataFormat.JSON,
     val jsonPaths: Map<String, String> = emptyMap(), // 字段映射
     val htmlSelectors: Map<String, String> = emptyMap(), // HTML选择器
-    val needCsrfToken: Boolean = false, // 是否需要CSRF Token
-    val csrfTokenName: String = "_csrf" // CSRF Token的字段名
+    val needCsrfToken: Boolean = false,
+    val csrfTokenName: String = "_csrf",
+    val extractorClass: String? = null
 )
 
 enum class DataFormat {
@@ -34,7 +35,12 @@ data class ParsedCourse(
     val weekExpression: String = "",
     val weeks: List<Int> = emptyList(),
     val credit: Float = 0f,
-    val courseCode: String = ""
+    val courseCode: String = "",
+    val className: String = "",
+    val courseNature: String = "",
+    val studentCount: Int = 0,
+    val selectedCount: Int = 0,
+    val courseHours: String = ""
 )
 
 /**

@@ -27,6 +27,7 @@ import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import com.wind.ggbond.classtime.data.repository.SettingsRepository
 import com.wind.ggbond.classtime.service.contract.IDataExporter
 import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
+import com.wind.ggbond.classtime.service.ImportService
 import com.wind.ggbond.classtime.service.KeepAliveService
 import com.wind.ggbond.classtime.util.BackgroundPermissionHelper
 import com.wind.ggbond.classtime.util.ReminderDiagnostic
@@ -40,11 +41,15 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.wind.ggbond.classtime.util.MonetColorPalette
 import com.wind.ggbond.classtime.util.CourseColorPalette
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import javax.inject.Inject
 
@@ -55,7 +60,7 @@ class SettingsViewModel @Inject constructor(
     private val scheduleRepository: ScheduleRepository,
     private val settingsRepository: SettingsRepository,
     private val exportService: IDataExporter,
-    private val importService: com.wind.ggbond.classtime.service.ImportService,
+    private val importService: ImportService,
     private val reminderScheduler: IAlarmScheduler,
     private val backgroundThemeManager: BackgroundThemeManager
 ) : ViewModel() {
@@ -102,6 +107,10 @@ class SettingsViewModel @Inject constructor(
         backgroundThemeManager.observeCourseColors(saturationLevel, isDarkMode)
 
     val monetCourseColorsEnabled: StateFlow<Boolean> = settingsRepository.observeMonetCourseColorsEnabled()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isWallpaperSet: StateFlow<Boolean> = backgroundThemeManager.getActiveBackgroundScheme()
+        .map { it != null }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val monetColorPreview: StateFlow<List<String>> = combine(monetCourseColorsEnabled, courseColorSaturation,
@@ -214,10 +223,52 @@ class SettingsViewModel @Inject constructor(
             try {
                 val schedule = scheduleRepository.getCurrentSchedule()
                 if (schedule == null) { toast("导入失败：未找到当前课表，请先创建课表"); return@launch }
+
+                val fileName = getFileName(uri)
+                val extension = fileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+
+                // TODO: [临时禁用Excel/CSV导入功能 - 后续需要恢复]
+                // 原逻辑: if (extension in listOf("xlsx", "xls")) { importExcelSchedule(uri, schedule.id) } else { ... }
+                // 现在统一使用importService.importFromUri处理，不再单独处理Excel文件
+                if (extension in listOf("xlsx", "xls", "csv")) {
+                    toast("暂不支持Excel/CSV格式导入，请使用JSON或ICS格式")
+                    return@launch
+                }
+                
                 val result = importService.importFromUri(uri, schedule.id)
                 toast(if (result.success) "导入成功！共导入 ${result.importedCount} 门课程" else "导入失败: ${result.errorMessage}")
             } catch (e: Exception) { toast("导入失败: ${e.message}") }
         }
+    }
+
+    // TODO: [临时禁用Excel导入功能 - 后续需要恢复]
+    // 以下方法暂时不使用，保留代码以便后续恢复
+    /*
+    private fun importExcelSchedule(uri: Uri, scheduleId: Long) {
+        viewModelScope.launch {
+            try {
+                val result = importService.importExcelFromUri(uri, scheduleId)
+                toast(if (result.success) "导入成功！共导入 ${result.importedCount} 门课程" else "导入失败: ${result.errorMessage}")
+            } catch (e: Exception) {
+                toast("Excel导入失败: ${e.message}")
+            }
+        }
+    }
+    */
+
+    private fun getFileName(uri: Uri): String? {
+        var fileName: String? = null
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = cursor.getString(nameIndex)
+                    }
+                }
+            }
+        } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
+        return fileName ?: uri.lastPathSegment
     }
 
     private fun getMimeType(format: IDataExporter.ExportFormat): String = when (format) {

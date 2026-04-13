@@ -18,6 +18,9 @@ class HBSLSDOldExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "hbslsd_old"
     override val schoolName = "华北水利水电大学(旧版)"
     override val systemType = "kingosoft"
+
+    override val aliases = listOf("华北水利水电大学(旧版")
+    override val supportedUrls = emptyList<String>()
     
     companion object {
         private const val TAG = "HBSLSDOldExtractor"

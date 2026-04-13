@@ -81,69 +81,94 @@ class HtmlScheduleParser @Inject constructor() {
             courseName = cleanCourseName(courseName)
 
             val tchDiv = itemBox.select("div.tch-name").firstOrNull()
-            var teacher = ""
-            var credit = 0f
-            var startSection = 1
-            var sectionCount = 2
+            val (teacher, credit, startSection, sectionCount) = parseTeacherInfo(tchDiv)
 
-            tchDiv?.let { div ->
-                div.select("span").forEach { span ->
-                    val text = span.text().trim()
-                    when {
-                        TEACHER_PREFIXES.any { prefix -> text.startsWith(prefix) || text.startsWith("$prefix：") || text.startsWith("$prefix:") || text.startsWith("$prefix ：") || text.startsWith("$prefix :") } -> {
-                            teacher = text.replace(Regex("^(教师|任课教师|授课教师)\\s*[：:]"), "")
-                                .split("教学班")[0].trim()
-                        }
-                        text.startsWith("学分：") || text.startsWith("学分:") -> {
-                            credit = text.replace(Regex("^学分[：:]"), "").trim().toFloatOrNull() ?: 0f
-                        }
-                        text.contains("~") && text.contains("节") -> {
-                            Regex("""\d+""").findAll(text).map { it.value.toIntOrNull() ?: 0 }.filter { it > 0 }.toList()
-                                .takeIf { it.isNotEmpty() }?.let { nums ->
-                                    startSection = nums.first()
-                                    sectionCount = nums.last() - nums.first() + 1
-                                }
-                        }
-                        text.matches(Regex(".*\\(?\\d+-\\d+节\\)?.*")) -> {
-                            SECTION_RANGE_PATTERN.find(text)?.let { m ->
-                                startSection = m.groupValues[1].toIntOrNull() ?: 1
-                                sectionCount = (m.groupValues[2].toIntOrNull() ?: startSection) - startSection + 1
-                            }
-                        }
-                    }
-                }
-
-                if (teacher.isEmpty()) {
-                    TEACHER_NAME_PATTERN.findAll(div.text())
-                        .map { it.value }
-                        .find { candidate -> !EXCLUDED_TEACHER_WORDS.any { candidate.contains(it) } }
-                        ?.let { teacher = it }
-                }
-            }
-
-            var classroom = ""
-            var weekExpression = ""
-            var weeks = emptyList<Int>()
-
-            itemBox.select("div").filter { it.select("img").isNotEmpty() && !it.hasClass("tch-name") }.forEach { div ->
-                div.select("span").forEach { span ->
-                    val imgSrc = span.select("img").firstOrNull()?.attr("src") ?: ""
-                    val text = span.text().trim()
-                    when {
-                        imgSrc.contains("item1.png") -> classroom = text
-                        imgSrc.contains("item3.png") -> {
-                            weekExpression = text
-                            weeks = parseQiangzhiWeekExpression(text)
-                        }
-                    }
-                }
-            }
+            val (classroom, weekExpression, weeks) = parseLocationAndWeeks(itemBox)
 
             ParsedCourse(courseName, teacher, classroom, dayOfWeek, startSection, sectionCount, weekExpression, weeks, credit)
         } catch (e: Exception) {
             AppLogger.e(TAG, "解析强智课程失败: ${e.message}", e)
             null
         }
+    }
+
+    private data class TeacherInfo(
+        val teacher: String = "",
+        val credit: Float = 0f,
+        val startSection: Int = 1,
+        val sectionCount: Int = 2
+    )
+
+    private fun parseTeacherInfo(tchDiv: org.jsoup.nodes.Element?): TeacherInfo {
+        var teacher = ""
+        var credit = 0f
+        var startSection = 1
+        var sectionCount = 2
+
+        tchDiv?.let { div ->
+            div.select("span").forEach { span ->
+                val text = span.text().trim()
+                when {
+                    TEACHER_PREFIXES.any { prefix -> text.startsWith(prefix) || text.startsWith("$prefix：") || text.startsWith("$prefix:") || text.startsWith("$prefix ：") || text.startsWith("$prefix :") } -> {
+                        teacher = text.replace(Regex("^(教师|任课教师|授课教师)\\s*[：:]"), "")
+                            .split("教学班")[0].trim()
+                    }
+                    text.startsWith("学分：") || text.startsWith("学分:") -> {
+                        credit = text.replace(Regex("^学分[：:]"), "").trim().toFloatOrNull() ?: 0f
+                    }
+                    text.contains("~") && text.contains("节") -> {
+                        Regex("""\d+""").findAll(text).map { it.value.toIntOrNull() ?: 0 }.filter { it > 0 }.toList()
+                            .takeIf { it.isNotEmpty() }?.let { nums ->
+                                startSection = nums.first()
+                                sectionCount = nums.last() - nums.first() + 1
+                            }
+                    }
+                    text.matches(Regex(".*\\(?\\d+-\\d+节\\)?.*")) -> {
+                        SECTION_RANGE_PATTERN.find(text)?.let { m ->
+                            startSection = m.groupValues[1].toIntOrNull() ?: 1
+                            sectionCount = (m.groupValues[2].toIntOrNull() ?: startSection) - startSection + 1
+                        }
+                    }
+                }
+            }
+
+            if (teacher.isEmpty()) {
+                TEACHER_NAME_PATTERN.findAll(div.text())
+                    .map { it.value }
+                    .find { candidate -> !EXCLUDED_TEACHER_WORDS.any { candidate.contains(it) } }
+                    ?.let { teacher = it }
+            }
+        }
+
+        return TeacherInfo(teacher, credit, startSection, sectionCount)
+    }
+
+    private data class LocationWeekInfo(
+        val classroom: String = "",
+        val weekExpression: String = "",
+        val weeks: List<Int> = emptyList()
+    )
+
+    private fun parseLocationAndWeeks(itemBox: org.jsoup.nodes.Element): LocationWeekInfo {
+        var classroom = ""
+        var weekExpression = ""
+        var weeks = emptyList<Int>()
+
+        itemBox.select("div").filter { it.select("img").isNotEmpty() && !it.hasClass("tch-name") }.forEach { div ->
+            div.select("span").forEach { span ->
+                val imgSrc = span.select("img").firstOrNull()?.attr("src") ?: ""
+                val text = span.text().trim()
+                when {
+                    imgSrc.contains("item1.png") -> classroom = text
+                    imgSrc.contains("item3.png") -> {
+                        weekExpression = text
+                        weeks = parseQiangzhiWeekExpression(text)
+                    }
+                }
+            }
+        }
+
+        return LocationWeekInfo(classroom, weekExpression, weeks)
     }
 
     private fun parseQiangzhiWeekExpression(expression: String): List<Int> {

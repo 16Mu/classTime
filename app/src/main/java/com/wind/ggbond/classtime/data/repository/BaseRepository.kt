@@ -32,8 +32,7 @@ abstract class BaseRepository<T, DAO>(protected val dao: DAO) {
     }
 
     open suspend fun insertOrUpdate(entity: T, predicate: (T) -> Boolean): Long {
-        val all = getAll()
-        val existing = all.find(predicate)
+        val existing = getAll().find(predicate)
         return if (existing != null) {
             update(entity)
             -1

@@ -18,6 +18,9 @@ class NNSFDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "nnsfdx"
     override val schoolName = "南宁师范大学"
     override val systemType = "qiangzhi"
+
+    override val aliases = listOf("南宁师范大学", "南宁师大")
+    override val supportedUrls = listOf("jwc.nnnu.edu.cn")
     
     companion object {
         private const val TAG = "NNSFDXExtractor"

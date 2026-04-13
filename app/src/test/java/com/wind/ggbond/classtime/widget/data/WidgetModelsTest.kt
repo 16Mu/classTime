@@ -26,6 +26,7 @@ class WidgetModelsTest {
             weekNumberText = "第10周",
             courseItems = listOf(
                 WidgetCourseItem(
+                    courseId = 1L,
                     courseName = "高等数学",
                     classroom = "教A101",
                     teacher = "张三",
@@ -52,6 +53,7 @@ class WidgetModelsTest {
     @Test
     fun `WidgetCourseItem - should store all fields correctly`() {
         val item = WidgetCourseItem(
+            courseId = 2L,
             courseName = "大学英语",
             classroom = "教B202",
             teacher = "李四",

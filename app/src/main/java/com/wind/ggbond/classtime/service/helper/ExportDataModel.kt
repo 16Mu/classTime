@@ -9,7 +9,7 @@ data class ExportMeta(
     val checksum: String = ""
 ) {
     companion object {
-        const val CURRENT_APP_VERSION = "1.2.1"
+        const val CURRENT_APP_VERSION = "1.2.2"
         const val CURRENT_EXPORT_VERSION = "3.0"
         const val LEGACY_EXPORT_VERSION_2_0 = "2.0"
         const val LEGACY_EXPORT_VERSION_1_0 = "1.0"

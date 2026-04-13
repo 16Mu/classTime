@@ -34,7 +34,7 @@ fun GifBackgroundPlayer(
 ) {
     Box(modifier = modifier) {
         val imageLoader = rememberGifImageLoader()
-        var hasError by remember { mutableStateOf(false) }
+        var hasError by remember(gifUri) { mutableStateOf(false) }
 
         if (hasError) {
             Box(

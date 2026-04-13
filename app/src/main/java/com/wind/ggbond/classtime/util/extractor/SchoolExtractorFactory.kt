@@ -1,187 +1,96 @@
 package com.wind.ggbond.classtime.util.extractor
 
+import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import javax.inject.Inject
 import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Singleton
+import kotlinx.coroutines.runBlocking
 
 @Singleton
 class SchoolExtractorFactory @Inject constructor(
-    private val cqepcExtractor: CQEPCExtractor,
-    private val cqustExtractor: CQUSTExtractor, private val gzgsxyExtractor: GZGSXYExtractor,
-    private val shsdExtractor: SHSDExtractor, private val zykjxyExtractor: ZYKJXYExtractor,
-    private val nmgcjdxExtractor: NMGCJDXExtractor, private val sqgxyExtractor: SQGXYExtractor,
-    private val sqsfxyExtractor: SQSFXYExtractor, private val ahykdxExtractor: AHYKDXExtractor,
-    private val ahkjxyExtractor: AHKJXYExtractor, private val sdslzyxyExtractor: SDSLZYXYExtractor,
-    private val cdxxgcdxExtractor: CDXXGCDXExtractor, private val whzyjsxyExtractor: WHZYJSXYExtractor,
-    private val hnlgdxExtractor: HNLGDXExtractor, private val xahkxyExtractor: XAHKXYExtractor,
-    private val lnkjxyExtractor: LNKJXYExtractor, private val lnzbzzzyjsxyExtractor: LNZBZZZYJSXYExtractor,
-    private val zzdxExtractor: ZZDXExtractor, private val zzxysExtractor: ZZXYSExtractor,
-    private val cqykdxExtractor: CQYKDXExtractor, private val cjdxExtractor: CJDXExtractor,
-    private val dhlgdxExtractor: DHLGDXExtractor, private val btzyjsxyExtractor: BTZYJSXYExtractor,
-    private val hebhdxyExtractor: HEBHDXYExtractor, private val ksdxExtractor: KSDXExtractor,
-    private val scgsxyExtractor: SCGSXYExtractor, private val scqhgdxExtractor: SCQHGDXExtractor,
-    private val tykjdxExtractor: TYKJDXExtractor, private val nxsfxyExtractor: NXSFXYExtractor,
-    private val ahjzdxExtractor: AHJZDXExtractor, private val sdsfxyExtractor: SDSFXYExtractor,
-    private val gxwgyxyExtractor: GXWGYXYExtractor, private val whdxExtractor: WHDXExtractor,
-    private val hbcmxyExtractor: HBCMXYExtractor, private val szxxzyjsxyExtractor: SZXXZYJSXYExtractor,
-    private val hbjtxzyjsxyExtractor: HBJTZYJSXYExtractor, private val zjkjxyExtractor: ZJKJXYExtractor,
-    private val ycsfxyExtractor: YCSFXYExtractor, private val gzsfdxExtractor: GZSFDXExtractor,
-    private val hznydxExtractor: HZNYDXExtractor, private val gzsxyExtractor: GZSXYExtractor,
-    private val cdyszydxExtractor: CDYSZYDXExtractor, private val hznydxByytExtractor: HZNYDXBYYTExtractor,
-    private val nmgkjdxExtractor: NMGKJDXExtractor, private val hblgdxExtractor: HBLGDXExtractor,
-    private val hbnydxExtractor: HBNYDXExtractor, private val ytdxExtractor: YTDXExtractor,
-    private val ahyxgdzkxxExtractor: AHYXGDZKXXExtractor, private val ysdxExtractor: YSDXExtractor,
-    private val ccqcgygdzkxxExtractor: CCQCGYGDZKXXExtractor,
-    private val bjcmzyxyExtractor: BJCMZYXYExtractor, private val nnsfdxExtractor: NNSFDXExtractor,
-    private val sddxExtractor: SDDXExtractor, private val gdngsExtractor: GDNGSExtractor,
-    private val gzhsxyExtractor: GZHSXYExtractor, private val cdgyxyExtractor: CDGYXYExtractor,
-    private val whxxcbzyjsxyExtractor: WHXXCBZYJSXYExtractor, private val whgckjxyExtractor: WHGCKJXYExtractor,
-    private val hnzyyExtractor: HNZYYExtractor, private val hysfxyExtractor: HYSFXYExtractor,
-    private val cqrwkjxyExtractor: CQRWKJXYExtractor, private val ccdxExtractor: CCDXExtractor,
-    private val bjcmzyxyMobileExtractor: BJCMZYXYMobileExtractor,
-    private val whxxcbzyjsxyMobileExtractor: WHXXCBZYJSXYMobileExtractor,
-    private val hnrjzyjsxyExtractor: HNRJZYJSXYExtractor,
-    private val hbslsdExtractor: HBSLSDExtractor, private val hbslsdOldExtractor: HBSLSDOldExtractor,
-    private val sdnzxyExtractor: SDNZXYExtractor, private val xjdxExtractor: XJDXExtractor,
-    private val kmykdxExtractor: KMYKDXExtractor, private val jhdxExtractor: JHDXExtractor,
-    private val hnnydxExtractor: HNNYDXExtractor, private val hxxyExtractor: HXXYExtractor,
-    private val zjkjxyQingguoExtractor: ZJKJXYQingguoExtractor, private val ytnsxyExtractor: YTNSXYExtractor,
-    private val xafyxyExtractor: XAFYXYExtractor, private val zzsdjmglxyExtractor: ZZSDJMGLXYExtractor,
-    private val ldxyExtractor: LDXYExtractor,
-    private val njzyydxExtractor: NJZYYDXExtractor, private val hebgydxExtractor: HEBGYDXExtractor,
-    private val sddyykdxExtractor: SDDYYKDXExtractor, private val sdypzyxyExtractor: SDYPZYXYExtractor,
-    private val sxgckjzydxExtractor: SXGCKJZYDXExtractor, private val whzyjsxyCustomExtractor: WHZYJSXYCustomExtractor,
-    private val hnzyydxYjsExtractor: HNZYYDXYJSExtractor, private val qzsfxyExtractor: QZSFXYExtractor,
-    private val tzzyjsxyExtractor: TZZYJSXYExtractor, private val xajzkjdxExtractor: XAJZKJDXExtractor,
-    private val gzgcyyjsxyExtractor: GZGCYYJSXYExtractor, private val qddxExtractor: QDDXExtractor,
-    private val qqheyxyExtractor: QQHEYXYExtractor, private val gdjtzyjsxyExtractor: GDJTZYJSXYExtractor,
-    private val gzzyydxExtractor: GZZYYDXExtractor, private val whjgzyxyExtractor: WHJGZYXYExtractor,
-    private val jzlgzyxyExtractor: JZLGZYXYExtractor, private val xaoyxyExtractor: XAOYXYExtractor,
-    private val dytydzkjxxExtractor: DYTYDZKJXXExtractor, private val ccsfdxExtractor: CCSFDXExtractor,
-    private val jxslzyxyExtractor: JXSLZYXYExtractor, private val cddxExtractor: CDDXExtractor,
-    private val sckjzyxyExtractor: SCKJZYXYExtractor
+    private val extractors: Map<String, @JvmSuppressWildcards SchoolScheduleExtractor>,
+    private val schoolRepository: SchoolRepository
 ) {
 
-    data class SchoolMapping(val ids: List<String>, val urls: List<String>, val extractor: SchoolScheduleExtractor)
+    private val allExtractors by lazy { extractors.values.toList() }
 
-    private val allMappings by lazy {
-        listOf(
-            SchoolMapping(listOf("cqepc", "重庆电力高等专科学校", "jwxt.cqepc.edu.cn", "11848"),
-                listOf("jwxt.cqepc.edu.cn", "cqepc.edu.cn"), cqepcExtractor),
-            SchoolMapping(listOf("cqust", "重庆科技学院"), listOf("web.cqust.edu.cn"), cqustExtractor),
-            SchoolMapping(listOf("gzgsxy", "广州工商学院", "广工商"), listOf("eams.gzgs.edu.cn"), gzgsxyExtractor),
-            SchoolMapping(listOf("shsd", "上海杉达学院", "上海杉达", "杉达"), listOf("jwgl.sandau.edu.cn"), shsdExtractor),
-            SchoolMapping(listOf("zykjxy", "中原科技学院", "中原科技"), listOf("jwxt.zykj.edu.cn"), zykjxyExtractor),
-            SchoolMapping(listOf("nmgcjdx", "内蒙古财经大学", "内财大"), listOf("jwxt.imufe.edu.cn"), nmgcjdxExtractor),
-            SchoolMapping(listOf("sqgxy", "商丘工学院", "商工"), listOf("jwgl.sqgxy.edu.cn"), sqgxyExtractor),
-            SchoolMapping(listOf("sqsfxy", "商丘师范学院", "商师"), listOf("jw.sqnu.edu.cn"), sqsfxyExtractor),
-            SchoolMapping(listOf("ahykdx", "安徽医科大学", "安医大"), listOf("jxgl.ahmu.edu.cn"), ahykdxExtractor),
-            SchoolMapping(listOf("ahkjxy", "安徽科技学院", "安科"), listOf("jw.ahstu.edu.cn"), ahkjxyExtractor),
-            SchoolMapping(listOf("sdslzyxy", "山东水利职业学院", "山水院"), listOf("jw.sdwcvc.edu.cn"), sdslzyxyExtractor),
-            SchoolMapping(listOf("cdxxgcdx", "成都信息工程大学", "成信大"), listOf("jwgl.cuit.edu.cn"), cdxxgcdxExtractor),
-            SchoolMapping(listOf("whzyjsxy", "武汉职业技术学院", "武职"), listOf("jxgl.wtc.edu.cn"), whzyjsxyExtractor),
-            SchoolMapping(listOf("hnlgdx", "河南理工大学", "河理工"), listOf("adms.hpu.edu.cn"), hnlgdxExtractor),
-            SchoolMapping(listOf("xahkxy", "西安航空学院", "西航"), listOf("jiaowu.xaau.edu.cn"), xahkxyExtractor),
-            SchoolMapping(listOf("lnkjxy", "辽宁科技学院", "辽科院"), listOf("jwc.lnist.edu.cn"), lnkjxyExtractor),
-            SchoolMapping(listOf("lnzbzzzyjsxy", "辽宁装备制造职业技术学院", "辽装院"), listOf("xsc.ltcem.com"), lnzbzzzyjsxyExtractor),
-            SchoolMapping(listOf("zzdx", "郑州大学", "郑大"), listOf("jw.zzu.edu.cn"), zzdxExtractor),
-            SchoolMapping(listOf("zzxys", "郑州西亚斯学院", "郑州西亚斯", "西亚斯"), listOf("ems.sias.edu.cn"), zzxysExtractor),
-            SchoolMapping(listOf("cqykdx", "重庆医科大学", "重医"), listOf("jwc.cqmu.edu.cn"), cqykdxExtractor),
-            SchoolMapping(listOf("cjdx", "长江大学", "长大"), listOf("jw.yangtzeu.edu.cn"), cjdxExtractor),
-            SchoolMapping(listOf("bjcmzyxy", "北京财贸职业学院", "北京财贸"), listOf("jwgl.bjczy.edu.cn"), bjcmzyxyExtractor),
-            SchoolMapping(listOf("nnsfdx", "南宁师范大学", "南宁师大"), listOf("jwc.nnnu.edu.cn"), nnsfdxExtractor),
-            SchoolMapping(listOf("sddx", "山东大学", "山大"), listOf("bkjws.sdu.edu.cn"), sddxExtractor),
-            SchoolMapping(listOf("gdngs", "广东农工商职业技术学院", "广东农工商"), listOf("jwmis.gdaib.edu.cn"), gdngsExtractor),
-            SchoolMapping(listOf("gzhsxy", "广州华商学院", "华商学院"), listOf("jwc.gdhsc.edu.cn"), gzhsxyExtractor),
-            SchoolMapping(listOf("cdgyxy", "成都工业学院", "成工院"), listOf("jwglxt.cdtu.edu.cn"), cdgyxyExtractor),
-            SchoolMapping(listOf("whxxcbzyjsxy", "武汉信息传播职业技术学院", "武信"), listOf("jwgl.whxxcb.com"), whxxcbzyjsxyExtractor),
-            SchoolMapping(listOf("whgckjxy", "武汉工程科技学院", "武工科"), listOf("jwgl.whgc.edu.cn"), whgckjxyExtractor),
-            SchoolMapping(listOf("hnzyy", "湖南中医药大学", "湖南中医药"), listOf("jwgl.hnucm.edu.cn"), hnzyyExtractor),
-            SchoolMapping(listOf("hysfxy", "衡阳师范学院", "衡阳师院"), listOf("jwgl.hynu.edu.cn"), hysfxyExtractor),
-            SchoolMapping(listOf("cqrwkjxy", "重庆人文科技学院", "重庆人文"), listOf("jwgl.cqrk.edu.cn"), cqrwkjxyExtractor),
-            SchoolMapping(listOf("ccdx", "长春大学"), listOf("jwgl.ccu.edu.cn"), ccdxExtractor),
-            SchoolMapping(listOf("bjcmzyxy_mobile", "北京财贸职业学院(手机端)"), listOf("/bjcmzyxy/"), bjcmzyxyMobileExtractor),
-            SchoolMapping(listOf("whxxcbzyjsxy_mobile", "武汉信息传播职业技术学院(手机端)"), listOf("bzb_njwhd"), whxxcbzyjsxyMobileExtractor),
-            SchoolMapping(listOf("hnrjzyjsxy", "湖南软件职业技术学院", "湖南软件"), listOf("hnrjzyxyhd"), hnrjzyjsxyExtractor),
-            SchoolMapping(listOf("hbslsd", "华北水利水电大学", "华水"), listOf("hsjw.ncwu.edu.cn"), hbslsdExtractor),
-            SchoolMapping(listOf("hbslsd_old", "华北水利水电大学(旧版)"), emptyList(), hbslsdOldExtractor),
-            SchoolMapping(listOf("sdnzxy", "山东女子学院", "山东女院"), listOf("jwxt.sdwu.edu.cn"), sdnzxyExtractor),
-            SchoolMapping(listOf("xjdx", "新疆大学", "新大"), listOf("portal.xju.edu.cn"), xjdxExtractor),
-            SchoolMapping(listOf("kmykdx", "昆明医科大学", "昆医大"), listOf("jwxt.kmmu.edu.cn"), kmykdxExtractor),
-            SchoolMapping(listOf("jhdx", "江汉大学", "江大"), listOf("jwgl.jhun.edu.cn"), jhdxExtractor),
-            SchoolMapping(listOf("hnnydx", "河南农业大学", "河南农大"), listOf("jwgl.henau.edu.cn"), hnnydxExtractor),
-            SchoolMapping(listOf("hxxy", "河西学院", "河西"), listOf("jwxt.hxu.edu.cn"), hxxyExtractor),
-            SchoolMapping(listOf("zjkjxy_qingguo", "湛江科技学院(青果)"), listOf("jwgl.zjkjedu.cn"), zjkjxyQingguoExtractor),
-            SchoolMapping(listOf("ytnsxy", "烟台南山学院", "南山学院"), listOf("jwxt.nanshan.edu.cn"), ytnsxyExtractor),
-            SchoolMapping(listOf("xafyxy", "西安翻译学院", "西翻"), listOf("jwgl.xafy.edu.cn"), xafyxyExtractor),
-            SchoolMapping(listOf("zzsdjmglxy", "郑州升达经贸管理学院", "郑州升达"), listOf("jwgl.shengda.edu.cn"), zzsdjmglxyExtractor),
-            SchoolMapping(listOf("ldxy", "陇东学院", "陇东"), listOf("jwgl.ldxy.edu.cn"), ldxyExtractor),
-            SchoolMapping(listOf("dhlgdx", "东华理工大学"), listOf("jwc.ecut.edu.cn"), dhlgdxExtractor),
-            SchoolMapping(listOf("btzyjsxy", "包头职业技术学院"), listOf("jwgl.btvtc.edu.cn"), btzyjsxyExtractor),
-            SchoolMapping(listOf("hebhdxy", "哈尔滨华德学院"), listOf("jwgl.hdhxy.edu.cn"), hebhdxyExtractor),
-            SchoolMapping(listOf("ksdx", "喀什大学"), listOf("jwgl.ksu.edu.cn"), ksdxExtractor),
-            SchoolMapping(listOf("scgsxy", "四川工商学院"), listOf("jwgl.stbu.edu.cn"), scgsxyExtractor),
-            SchoolMapping(listOf("scqhgdx", "四川轻化工大学"), listOf("jwgl.suse.edu.cn"), scqhgdxExtractor),
-            SchoolMapping(listOf("tykjdx", "太原科技大学"), listOf("jwgl.tyust.edu.cn"), tykjdxExtractor),
-            SchoolMapping(listOf("nxsfxy", "宁夏师范学院"), listOf("jwgl.nxnu.edu.cn"), nxsfxyExtractor),
-            SchoolMapping(listOf("ahjzdx", "安徽建筑大学"), listOf("jwgl.ahjzu.edu.cn"), ahjzdxExtractor),
-            SchoolMapping(listOf("sdsfxy", "山东师范大学"), listOf("bkjx.sdnu.edu.cn"), sdsfxyExtractor),
-            SchoolMapping(listOf("gxwgyxy", "广西外国语学院"), listOf("jwgl.gxufl.com"), gxwgyxyExtractor),
-            SchoolMapping(listOf("whdx", "武汉大学"), listOf("210.42.121.241"), whdxExtractor),
-            SchoolMapping(listOf("hbcmxy", "河北传媒学院"), listOf("jwgl.hebic.cn"), hbcmxyExtractor),
-            SchoolMapping(listOf("szxxzyjsxy", "深圳信息职业技术学院"), listOf("jwgl.sziit.edu.cn"), szxxzyjsxyExtractor),
-            SchoolMapping(listOf("hbjtxzyjsxy", "湖北交通职业技术学院"), listOf("jwgl.hbctc.edu.cn"), hbjtxzyjsxyExtractor),
-            SchoolMapping(listOf("zjkjxy", "湛江科技学院"), listOf("jwgl.zjkjxy.edu.cn"), zjkjxyExtractor),
-            SchoolMapping(listOf("ycsfxy", "盐城师范学院"), listOf("jwgl.yctc.edu.cn"), ycsfxyExtractor),
-            SchoolMapping(listOf("gzsfdx", "贵州师范大学"), listOf("jwgl.gznu.edu.cn"), gzsfdxExtractor),
-            SchoolMapping(listOf("hznydx", "华中农业大学"), listOf("jwgl.hzau.edu.cn"), hznydxExtractor),
-            SchoolMapping(listOf("gzsxy", "广州商学院"), listOf("jw.gzcc.cn"), gzsxyExtractor),
-            SchoolMapping(listOf("cdyszydx", "成都艺术职业大学"), listOf("jwgl.cdau.edu.cn"), cdyszydxExtractor),
-            SchoolMapping(listOf("hznydx_byyt", "华中农业大学-本研一体化"), listOf("jwgl.hzau.edu.cn"), hznydxByytExtractor),
-            SchoolMapping(listOf("nmgkjdx", "内蒙古科技大学"), listOf("jwgl.imust.edu.cn"), nmgkjdxExtractor),
-            SchoolMapping(listOf("hblgdx", "华北理工大学"), listOf("jwgl.ncst.edu.cn"), hblgdxExtractor),
-            SchoolMapping(listOf("hbnydx", "河北农业大学"), listOf("jwgl.hebau.edu.cn"), hbnydxExtractor),
-            SchoolMapping(listOf("ytdx", "烟台大学"), listOf("jwgl.ytu.edu.cn"), ytdxExtractor),
-            SchoolMapping(listOf("ahyxgdzkxx", "安徽医学高等专科学校"), listOf("jwgl.ahyz.cn"), ahyxgdzkxxExtractor),
-            SchoolMapping(listOf("ysdx", "燕山大学"), listOf("jwgl.ysu.edu.cn"), ysdxExtractor),
-            SchoolMapping(listOf("ccqcgygdzkxx", "长春汽车工业高等专科学校"), listOf("jwgl.caii.edu.cn"), ccqcgygdzkxxExtractor),
-            SchoolMapping(listOf("njzyydx", "南京中医药大学"), listOf("njucm.edu.cn"), njzyydxExtractor),
-            SchoolMapping(listOf("hebgydx", "哈尔滨工业大学", "哈工大"), listOf("hit.edu.cn", "jwts.hit.edu.cn"), hebgydxExtractor),
-            SchoolMapping(listOf("sddyykdx", "山东第一医科大学"), listOf("sddfvc.cn", "sdfmu.edu.cn"), sddyykdxExtractor),
-            SchoolMapping(listOf("sdypzyxy", "山东药品职业学院"), listOf("sddfvc.cn"), sdypzyxyExtractor),
-            SchoolMapping(listOf("sxgckjzydx", "山西工程科技职业大学"), listOf("sxgy.cn"), sxgckjzydxExtractor),
-            SchoolMapping(listOf("whzyjsxy_custom", "武汉职业技术学院(自研)", "武职(自研)"), listOf("wtc.edu.cn"), whzyjsxyCustomExtractor),
-            SchoolMapping(listOf("hnzyydx_yjs", "河南中医药大学(研究生)", "河南中医药大学研究生"), listOf("hactcm.edu.cn"), hnzyydxYjsExtractor),
-            SchoolMapping(listOf("qzsfxy", "泉州师范学院"), listOf("qztc.edu.cn"), qzsfxyExtractor),
-            SchoolMapping(listOf("tzzyjsxy", "泰州职业技术学院"), listOf("tzpc.edu.cn"), tzzyjsxyExtractor),
-            SchoolMapping(listOf("xajzkjdx", "西安建筑科技大学"), listOf("xauat.edu.cn"), xajzkjdxExtractor),
-            SchoolMapping(listOf("gzgcyyjsxy", "贵州工程应用技术学院"), listOf("gues.edu.cn"), gzgcyyjsxyExtractor),
-            SchoolMapping(listOf("qddx", "青岛大学"), listOf("qdu.edu.cn"), qddxExtractor),
-            SchoolMapping(listOf("qqheyxy", "齐齐哈尔医学院"), listOf("qmu.edu.cn"), qqheyxyExtractor),
-            SchoolMapping(listOf("gdjtzyjsxy", "广东交通职业技术学院"), listOf("gdcp.cn"), gdjtzyjsxyExtractor),
-            SchoolMapping(listOf("gzzyydx", "广州中医药大学"), listOf("gzucm.edu.cn"), gzzyydxExtractor),
-            SchoolMapping(listOf("whjgzyxy", "武汉警官职业学院"), listOf("whpa.edu.cn"), whjgzyxyExtractor),
-            SchoolMapping(listOf("jzlgzyxy", "荆州理工职业学院"), listOf("jzlgedu.cn"), jzlgzyxyExtractor),
-            SchoolMapping(listOf("xaoyxy", "西安欧亚学院"), listOf("eurasia.edu"), xaoyxyExtractor),
-            SchoolMapping(listOf("dytydzkjxx", "德阳通用电子科技学校"), listOf("aixiaoyuan.cn"), dytydzkjxxExtractor),
-            SchoolMapping(listOf("ccsfdx", "长春师范大学"), listOf("ccsfu.edu.cn"), ccsfdxExtractor),
-            SchoolMapping(listOf("jxslzyxy", "江西水利职业学院"), listOf("jxssly.cn"), jxslzyxyExtractor),
-            SchoolMapping(listOf("cddx", "成都大学"), listOf("cdu.edu.cn", "chaoxing.com"), cddxExtractor),
-            SchoolMapping(listOf("sckjzyxy", "四川科技职业学院"), listOf("scstc.cn"), sckjzyxyExtractor)
-        )
+    private val reflectionCache = mutableMapOf<String, SchoolScheduleExtractor?>()
+
+    private val aliasMap by lazy {
+        val map = mutableMapOf<String, SchoolScheduleExtractor>()
+        for (extractor in allExtractors) {
+            map[extractor.schoolId.lowercase()] = extractor
+            map[extractor.schoolName.lowercase()] = extractor
+            for (alias in extractor.aliases) {
+                map[alias.lowercase()] = extractor
+            }
+        }
+        map
     }
 
-    private val idMap by lazy { allMappings.associateByTo(mutableMapOf()) { it.ids.first().lowercase() } }
-    private val allExtractors by lazy { allMappings.map { it.extractor } }
+    private val urlMap by lazy {
+        val map = mutableMapOf<String, SchoolScheduleExtractor>()
+        for (extractor in allExtractors) {
+            for (url in extractor.supportedUrls) {
+                map[url.lowercase()] = extractor
+            }
+        }
+        map
+    }
 
     fun getExtractor(schoolId: String): SchoolScheduleExtractor? {
-        return allMappings.find { mapping -> mapping.ids.any { it.equals(schoolId, ignoreCase = true) } }
-            ?.extractor ?: run { AppLogger.w("SchoolExtractorFactory", "未找到学校 '$schoolId' 的提取器"); null }
+        val key = schoolId.lowercase()
+        return aliasMap[key]
+            ?: extractors[key]
+            ?: createExtractorFromConfig(schoolId)
+            ?: run {
+                AppLogger.w("SchoolExtractorFactory", "未找到学校 '$schoolId' 的提取器")
+                null
+            }
+    }
+
+    private fun createExtractorFromConfig(schoolId: String): SchoolScheduleExtractor? {
+        reflectionCache[schoolId]?.let { return it }
+        if (schoolId in reflectionCache) return null
+
+        val className = runCatching {
+            runBlocking { schoolRepository.getSchoolById(schoolId) }
+        }.getOrNull()?.extractorClass
+
+        if (className.isNullOrBlank()) {
+            reflectionCache[schoolId] = null
+            return null
+        }
+
+        val extractor = createExtractorByReflection(className)
+        reflectionCache[schoolId] = extractor
+        if (extractor != null) {
+            AppLogger.i("SchoolExtractorFactory", "通过反射创建提取器: $className -> $schoolId")
+        }
+        return extractor
+    }
+
+    private fun createExtractorByReflection(className: String): SchoolScheduleExtractor? {
+        return try {
+            val clazz = Class.forName(className)
+            val constructor = clazz.getDeclaredConstructor()
+            constructor.isAccessible = true
+            val instance = constructor.newInstance()
+            instance as SchoolScheduleExtractor
+        } catch (e: Exception) {
+            AppLogger.e("SchoolExtractorFactory", "反射创建提取器失败: $className", e)
+            null
+        }
     }
 
     fun detectExtractorByUrl(url: String): SchoolScheduleExtractor? {
-        return allMappings.find { mapping -> mapping.urls.any { url.contains(it, ignoreCase = true) } }?.extractor
-            ?: if (url.contains("/eams/", ignoreCase = true) && url.contains("courseTableForStd", ignoreCase = true)) cqustExtractor else null
+        return urlMap.entries.find { (urlKey, _) ->
+            url.contains(urlKey, ignoreCase = true)
+        }?.value
+            ?: if (url.contains("/eams/", ignoreCase = true) &&
+                    url.contains("courseTableForStd", ignoreCase = true)) {
+                extractors["cqust"]
+            } else null
     }
 
     fun detectExtractorByContent(html: String, url: String): SchoolScheduleExtractor? =

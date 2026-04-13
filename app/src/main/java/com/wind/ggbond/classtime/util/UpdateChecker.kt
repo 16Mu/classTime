@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.pm.PackageInfoCompat
 import com.wind.ggbond.classtime.BuildConfig
+import com.wind.ggbond.classtime.di.ApiClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -21,7 +22,8 @@ data class VersionInfo(
     val updateLog: String,
     val forceUpdate: Boolean,
     val minSupportVersion: String,
-    val publishTime: String
+    val publishTime: String,
+    val sha256: String? = null
 ) {
     fun needUpdate(currentVersion: String): Boolean {
         return compareVersion(currentVersion, latestVersion) < 0
@@ -45,7 +47,9 @@ data class VersionInfo(
 }
 
 @Singleton
-class UpdateChecker @Inject constructor() {
+class UpdateChecker @Inject constructor(
+    @ApiClient private val apiClient: OkHttpClient
+) {
     
     companion object {
         private const val TAG = "UpdateChecker"
@@ -53,11 +57,6 @@ class UpdateChecker @Inject constructor() {
         private const val VERSION_URL = "https://gitee.com/ggbondpy/classTime/raw/main/version.json"
         private const val RELEASES_API = "https://gitee.com/api/v5/repos/ggbondpy/classTime/releases/latest"
     }
-    
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
     
     suspend fun checkUpdate(context: Context): Result<VersionInfo?> {
         return withContext(Dispatchers.IO) {
@@ -97,7 +96,7 @@ class UpdateChecker @Inject constructor() {
                 .header("Referer", "https://gitee.com/ggbondpy/classTime")
                 .build()
             
-            response = client.newCall(request).execute()
+            response = apiClient.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: return null
                 val json = JSONObject(body)
@@ -132,7 +131,7 @@ class UpdateChecker @Inject constructor() {
                 .header("Accept", "application/json")
                 .build()
             
-            response = client.newCall(request).execute()
+            response = apiClient.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: return null
                 val json = JSONObject(body)

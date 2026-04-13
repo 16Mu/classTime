@@ -8,7 +8,7 @@ import javax.inject.Singleton
 class FormatDetector @Inject constructor() {
 
     enum class DetectedFormat {
-        JSON, ICS, CSV, HTML, UNKNOWN
+        JSON, ICS, CSV, HTML, EXCEL, UNKNOWN
     }
 
     data class FormatDetectionResult(
@@ -26,6 +26,10 @@ class FormatDetector @Inject constructor() {
             return extensionResult.copy(confidence = 1.0f)
         }
 
+        if (extensionResult != null && extensionResult.format == DetectedFormat.EXCEL) {
+            return extensionResult
+        }
+
         if (extensionResult != null && extensionResult.confidence > contentResult.confidence) {
             return extensionResult
         }
@@ -40,6 +44,7 @@ class FormatDetector @Inject constructor() {
             "ics", "ical" -> FormatDetectionResult(DetectedFormat.ICS, 0.7f, null, false)
             "csv" -> FormatDetectionResult(DetectedFormat.CSV, 0.7f, null, false)
             "html", "htm" -> FormatDetectionResult(DetectedFormat.HTML, 0.7f, null, false)
+            "xlsx", "xls" -> FormatDetectionResult(DetectedFormat.EXCEL, 0.9f, null, true)
             else -> null
         }
     }

@@ -30,7 +30,7 @@ import com.wind.ggbond.classtime.data.local.entity.SchoolEntity
         AutoUpdateLog::class,
         AutoLoginLog::class
     ],
-    version = 16,
+    version = 19,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

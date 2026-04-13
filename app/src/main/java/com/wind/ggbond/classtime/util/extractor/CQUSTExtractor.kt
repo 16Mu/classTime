@@ -16,6 +16,9 @@ class CQUSTExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "cqust"
     override val schoolName = "重庆科技学院"
     override val systemType = "shuwei"
+
+    override val aliases = listOf("重庆科技学院")
+    override val supportedUrls = listOf("web.cqust.edu.cn")
     
     companion object {
         private const val TAG = "CQUSTExtractor"

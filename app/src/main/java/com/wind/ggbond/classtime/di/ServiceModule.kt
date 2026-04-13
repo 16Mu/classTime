@@ -1,6 +1,6 @@
 package com.wind.ggbond.classtime.di
 
-import com.wind.ggbond.classtime.service.AlarmReminderScheduler
+import com.wind.ggbond.classtime.service.UnifiedReminderScheduler
 import com.wind.ggbond.classtime.service.ExportService
 import com.wind.ggbond.classtime.service.UnifiedScheduleFetchService
 import com.wind.ggbond.classtime.service.UpdateOrchestrator
@@ -21,7 +21,7 @@ abstract class ServiceModule {
     @Binds
     @Singleton
     abstract fun bindAlarmScheduler(
-        impl: AlarmReminderScheduler
+        impl: UnifiedReminderScheduler
     ): IAlarmScheduler
 
     @Binds

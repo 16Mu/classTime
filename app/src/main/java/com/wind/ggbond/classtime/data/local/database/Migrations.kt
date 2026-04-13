@@ -182,23 +182,23 @@ object Migrations {
 
     val MIGRATION_8_9 = object : Migration(8, 9) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            try { database.execSQL("UPDATE `courses` SET `reminderEnabled` = 1 WHERE `reminderEnabled` = 0") } catch (_: Exception) {}
+            try { database.execSQL("UPDATE `courses` SET `reminderEnabled` = 1 WHERE `reminderEnabled` = 0") } catch (e: Exception) { AppLogger.e("Migration", "更新操作失败", e) }
             AppLogger.i("Migration", "Database migrated from version 8 to 9")
         }
     }
 
     val MIGRATION_9_10 = object : Migration(9, 10) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            try { database.execSQL("ALTER TABLE `schedules` ADD COLUMN `classTimeConfigName` TEXT NOT NULL DEFAULT 'default'") } catch (_: Exception) {}
+            safeAddColumn(database, "schedules", "`classTimeConfigName` TEXT NOT NULL DEFAULT 'default'")
             AppLogger.i("Migration", "Database migrated from version 9 to 10: Added classTimeConfigName field to schedules table")
         }
     }
 
     val MIGRATION_10_11 = object : Migration(10, 11) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            try { database.execSQL("ALTER TABLE `schools` ADD COLUMN `defaultSemesterStartDate` TEXT DEFAULT NULL") } catch (_: Exception) {}
-            try { database.execSQL("ALTER TABLE `schools` ADD COLUMN `fallSemesterStartDate` TEXT DEFAULT NULL") } catch (_: Exception) {}
-            try { database.execSQL("ALTER TABLE `schools` ADD COLUMN `springSemesterStartDate` TEXT DEFAULT NULL") } catch (_: Exception) {}
+            safeAddColumn(database, "schools", "`defaultSemesterStartDate` TEXT DEFAULT NULL")
+            safeAddColumn(database, "schools", "`fallSemesterStartDate` TEXT DEFAULT NULL")
+            safeAddColumn(database, "schools", "`springSemesterStartDate` TEXT DEFAULT NULL")
             database.execSQL(
                 """
                 CREATE TABLE IF NOT EXISTS `auto_login_logs` (
@@ -284,16 +284,36 @@ object Migrations {
                 )
                 """.trimIndent()
             )
-            database.execSQL(
-                """
-                INSERT INTO `schedules_new` (`id`,`name`,`schoolName`,`startDate`,`endDate`,`totalWeeks`,`isCurrent`,`classTimeConfigName`,`createdAt`,`updatedAt`)
-                SELECT s.`id`, s.`name`, COALESCE(s.`schoolName`, ''),
-                       COALESCE(sem.`startDate`, ''), COALESCE(sem.`endDate`, ''), COALESCE(sem.`totalWeeks`, 20),
-                       s.`isCurrent`, COALESCE(s.`classTimeConfigName`, 'default'),
-                       s.`createdAt`, s.`updatedAt`
-                FROM `schedules` s LEFT JOIN `semesters` sem ON s.`semesterId` = sem.`id`
-                """.trimIndent()
-            )
+            val hasSemestersTable = try {
+                database.execSQL("SELECT 1 FROM semesters LIMIT 1")
+                true
+            } catch (_: Exception) {
+                false
+            }
+
+            if (hasSemestersTable) {
+                database.execSQL(
+                    """
+                    INSERT INTO `schedules_new` (`id`,`name`,`schoolName`,`startDate`,`endDate`,`totalWeeks`,`isCurrent`,`classTimeConfigName`,`createdAt`,`updatedAt`)
+                    SELECT s.`id`, s.`name`, COALESCE(s.`schoolName`, ''),
+                           COALESCE(sem.`startDate`, ''), COALESCE(sem.`endDate`, ''), COALESCE(sem.`totalWeeks`, 20),
+                           s.`isCurrent`, COALESCE(s.`classTimeConfigName`, 'default'),
+                           s.`createdAt`, s.`updatedAt`
+                    FROM `schedules` s LEFT JOIN `semesters` sem ON s.`semesterId` = sem.`id`
+                    """.trimIndent()
+                )
+            } else {
+                database.execSQL(
+                    """
+                    INSERT INTO `schedules_new` (`id`,`name`,`schoolName`,`startDate`,`endDate`,`totalWeeks`,`isCurrent`,`classTimeConfigName`,`createdAt`,`updatedAt`)
+                    SELECT `id`, `name`, COALESCE(`schoolName`, ''),
+                           '', '', 20,
+                           `isCurrent`, COALESCE(`classTimeConfigName`, 'default'),
+                           `createdAt`, `updatedAt`
+                    FROM `schedules`
+                    """.trimIndent()
+                )
+            }
             database.execSQL("DROP TABLE `schedules`")
             database.execSQL("ALTER TABLE `schedules_new` RENAME TO `schedules`")
             database.execSQL("CREATE INDEX IF NOT EXISTS `index_schedules_isCurrent` ON `schedules` (`isCurrent`)")
@@ -389,18 +409,18 @@ object Migrations {
 
     val MIGRATION_13_14 = object : Migration(13, 14) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            try { database.execSQL("DROP INDEX IF EXISTS `index_schools_name`") } catch (_: Exception) {}
-            try { database.execSQL("DROP INDEX IF EXISTS `index_schools_province`") } catch (_: Exception) {}
-            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_update_logs_timestamp`") } catch (_: Exception) {}
-            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_update_logs_result`") } catch (_: Exception) {}
-            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_login_logs_timestamp`") } catch (_: Exception) {}
+            try { database.execSQL("DROP INDEX IF EXISTS `index_schools_name`") } catch (e: Exception) { if (e.message?.contains("already exists", ignoreCase = true) == true) AppLogger.d("Migration", "已存在，跳过") else throw e }
+            try { database.execSQL("DROP INDEX IF EXISTS `index_schools_province`") } catch (e: Exception) { if (e.message?.contains("already exists", ignoreCase = true) == true) AppLogger.d("Migration", "已存在，跳过") else throw e }
+            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_update_logs_timestamp`") } catch (e: Exception) { if (e.message?.contains("already exists", ignoreCase = true) == true) AppLogger.d("Migration", "已存在，跳过") else throw e }
+            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_update_logs_result`") } catch (e: Exception) { if (e.message?.contains("already exists", ignoreCase = true) == true) AppLogger.d("Migration", "已存在，跳过") else throw e }
+            try { database.execSQL("DROP INDEX IF EXISTS `index_auto_login_logs_timestamp`") } catch (e: Exception) { if (e.message?.contains("already exists", ignoreCase = true) == true) AppLogger.d("Migration", "已存在，跳过") else throw e }
             AppLogger.i("Migration", "Database migrated from version 13 to 14: Cleaned up extra indices")
         }
     }
 
     val MIGRATION_14_15 = object : Migration(14, 15) {
         override fun migrate(database: SupportSQLiteDatabase) {
-            try { database.execSQL("ALTER TABLE `course_adjustments` ADD COLUMN `newClassroom` TEXT NOT NULL DEFAULT ''") } catch (_: Exception) {}
+            safeAddColumn(database, "course_adjustments", "`newClassroom` TEXT NOT NULL DEFAULT ''")
             AppLogger.i("Migration", "Database migrated from version 14 to 15: Added newClassroom field to course_adjustments")
         }
     }
@@ -413,6 +433,28 @@ object Migrations {
             ensureCourseAdjustmentsSchema(database)
             ensureSchoolsSchema(database)
             AppLogger.i("Migration", "Database migrated from version 15 to 16: Ultimate schema validation - all tables verified against Entity definitions")
+        }
+    }
+
+    val MIGRATION_16_17 = object : Migration(16, 17) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            safeAddColumn(database, "schools", "`extractorClass` TEXT DEFAULT NULL")
+            AppLogger.i("Migration", "Database migrated from version 16 to 17: Added extractorClass field to schools table")
+        }
+    }
+
+    val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_courseId_isEnabled` ON `reminders` (`courseId`, `isEnabled`)")
+            AppLogger.i("Migration", "Database migrated from version 17 to 18: Added composite index on reminders(courseId, isEnabled)")
+        }
+    }
+
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_triggerTime` ON `reminders` (`triggerTime`)")
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_reminders_dayOfWeek` ON `reminders` (`dayOfWeek`)")
+            AppLogger.i("Migration", "Database migrated from version 18 to 19: Added missing indices on reminders(triggerTime, dayOfWeek)")
         }
     }
 
@@ -604,14 +646,15 @@ object Migrations {
                 `defaultSemesterStartDate` TEXT,
                 `fallSemesterStartDate` TEXT,
                 `springSemesterStartDate` TEXT,
+                `extractorClass` TEXT,
                 PRIMARY KEY(`id`)
             )
             """.trimIndent()
         )
         db.execSQL(
             """
-            INSERT OR IGNORE INTO `schools_backup` (`id`,`name`,`shortName`,`province`,`systemType`,`loginUrl`,`scheduleUrl`,`scheduleMethod`,`scheduleParams`,`dataFormat`,`needCsrfToken`,`csrfTokenName`,`jsonMapping`,`description`,`tips`,`isEnabled`,`createdAt`,`defaultSemesterStartDate`,`fallSemesterStartDate`,`springSemesterStartDate`)
-            SELECT `id`,`name`,`shortName`,`province`,`systemType`,`loginUrl`,`scheduleUrl`,`scheduleMethod`,`scheduleParams`,`dataFormat`,`needCsrfToken`,`csrfTokenName`,`jsonMapping`,`description`,`tips`,COALESCE(`isEnabled`, 1),`createdAt`,`defaultSemesterStartDate`,`fallSemesterStartDate`,`springSemesterStartDate`
+            INSERT OR IGNORE INTO `schools_backup` (`id`,`name`,`shortName`,`province`,`systemType`,`loginUrl`,`scheduleUrl`,`scheduleMethod`,`scheduleParams`,`dataFormat`,`needCsrfToken`,`csrfTokenName`,`jsonMapping`,`description`,`tips`,`isEnabled`,`createdAt`,`defaultSemesterStartDate`,`fallSemesterStartDate`,`springSemesterStartDate`,`extractorClass`)
+            SELECT `id`,`name`,`shortName`,`province`,`systemType`,`loginUrl`,`scheduleUrl`,`scheduleMethod`,`scheduleParams`,`dataFormat`,`needCsrfToken`,`csrfTokenName`,`jsonMapping`,`description`,`tips`,COALESCE(`isEnabled`, 1),`createdAt`,`defaultSemesterStartDate`,`fallSemesterStartDate`,`springSemesterStartDate`,`extractorClass`
             FROM `schools`
             """.trimIndent()
         )
@@ -635,7 +678,10 @@ object Migrations {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
-            MIGRATION_15_16
+            MIGRATION_15_16,
+            MIGRATION_16_17,
+            MIGRATION_17_18,
+            MIGRATION_18_19
         )
     }
 }

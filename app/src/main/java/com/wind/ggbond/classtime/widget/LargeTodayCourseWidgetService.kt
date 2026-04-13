@@ -7,9 +7,14 @@ import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import com.wind.ggbond.classtime.R
 import com.wind.ggbond.classtime.widget.data.WidgetCourseItem
-import kotlinx.coroutines.Dispatchers
 import com.wind.ggbond.classtime.util.AppLogger
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LargeTodayCourseWidgetService : RemoteViewsService() {
 
@@ -25,25 +30,31 @@ class LargeTodayCourseRemoteViewsFactory(
     private var courseItems: List<WidgetCourseItem> = emptyList()
     private var loadError: String? = null
 
+    private val loadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {}
 
     override fun onDataSetChanged() {
         courseItems = emptyList()
         loadError = null
-        try {
-            courseItems = runBlocking(Dispatchers.IO) {
-                try {
-                    val displayData = WidgetDataProvider.getTodayCourses(context)
-                    displayData.courseItems
-                } catch (e: Exception) {
-                    AppLogger.e("LargeWidgetFactory", "数据加载失败", e)
-                    loadError = "数据加载失败"
-                    emptyList()
-                }
+        val latch = CountDownLatch(1)
+        loadScope.launch {
+            try {
+                val displayData = WidgetDataProvider.getTodayCourses(context)
+                courseItems = displayData.courseItems
+            } catch (e: Exception) {
+                AppLogger.e("LargeWidgetFactory", "数据加载失败", e)
+                loadError = "数据加载失败"
+                courseItems = emptyList()
+            } finally {
+                latch.countDown()
             }
-        } catch (e: Exception) {
-            AppLogger.e("LargeWidgetFactory", "onDataSetChanged 异常", e)
-            loadError = "加载异常"
+        }
+        try {
+            latch.await(3, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            AppLogger.e("LargeWidgetFactory", "onDataSetChanged 等待被中断", e)
+            loadError = "加载超时"
         }
     }
 

@@ -1,6 +1,7 @@
 package com.wind.ggbond.classtime
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -29,28 +30,18 @@ import com.wind.ggbond.classtime.initializer.InitializationResult
 import com.wind.ggbond.classtime.service.contract.IUpdateManager
 import com.wind.ggbond.classtime.ui.components.MainContent
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
+import com.wind.ggbond.classtime.util.StartupTracker
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
-/**
- * 初始化状态
- */
 sealed class InitializationState {
     object Loading : InitializationState()
     object Success : InitializationState()
     data class Error(val message: String, val throwable: Throwable) : InitializationState()
 }
 
-/**
- * 主Activity
- * 
- * ✅ 正确的启动流程：
- * 1. 安装SplashScreen
- * 2. 等待初始化完成
- * 3. 显示UI或错误界面
- */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -66,21 +57,26 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var updateOrchestrator: IUpdateManager
     
-    // 初始化状态
     private var initState by mutableStateOf<InitializationState>(InitializationState.Loading)
+    private var deepLinkIntent by mutableStateOf<Intent?>(null)
 
-    // 通知权限请求
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // 权限已授予
+            AppLogger.d("MainActivity", "通知权限已授予")
         } else {
-            // 权限被拒绝
+            AppLogger.w("MainActivity", "通知权限被拒绝")
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        deepLinkIntent = intent
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
+        StartupTracker.markActivityCreateStart()
         val splashScreen = installSplashScreen()
         
         super.onCreate(savedInstanceState)
@@ -95,11 +91,14 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermission()
         
         lifecycleScope.launch {
-            initState = performInitialization()
-            
+            initState = performCriticalInitialization()
+
             if (initState is InitializationState.Success) {
+                StartupTracker.markFirstFrameRendered()
+                StartupTracker.report()
                 appInitializer.refreshWidgets()
-                checkAndTriggerAutoUpdate()
+                launch { appInitializer.initializeDeferred() }
+                launch { checkAndTriggerAutoUpdate() }
             }
         }
         
@@ -108,10 +107,10 @@ class MainActivity : ComponentActivity() {
                 initState = initState,
                 appInitializer = appInitializer,
                 backgroundThemeManager = backgroundThemeManager,
-                intent = intent,
+                intent = deepLinkIntent ?: intent,
                 onRetry = {
                     initState = InitializationState.Loading
-                    lifecycleScope.launch { initState = performInitialization() }
+                    lifecycleScope.launch { initState = performCriticalInitialization() }
                 }
             )
         }
@@ -126,9 +125,9 @@ class MainActivity : ComponentActivity() {
         }
     }
     
-    private suspend fun performInitialization(): InitializationState {
+    private suspend fun performCriticalInitialization(): InitializationState {
         return try {
-            when (val result = appInitializer.initialize()) {
+            when (val result = appInitializer.initializeCritical()) {
                 is InitializationResult.Success -> InitializationState.Success
                 is InitializationResult.Timeout -> InitializationState.Error(
                     message = "初始化超时（10秒），请重试",
@@ -160,4 +159,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

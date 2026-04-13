@@ -30,8 +30,9 @@ data class SchoolEntity(
     val isEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val defaultSemesterStartDate: String? = null,  // 学校特定的默认学期开始日期，格式：yyyy-MM-dd（已废弃，使用fallSemesterStartDate）
-    val fallSemesterStartDate: String? = null,     // 秋季学期的默认开始日期，格式：yyyy-MM-dd
-    val springSemesterStartDate: String? = null    // 春季学期的默认开始日期，格式：yyyy-MM-dd
+    val fallSemesterStartDate: String? = null,
+    val springSemesterStartDate: String? = null,
+    val extractorClass: String? = null
 )
 
 

@@ -55,8 +55,10 @@ fun ImportDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // TODO: [临时禁用Excel/CSV导入功能 - 后续需要恢复]
+                // 原文本: "支持导入JSON、ICS、CSV、xlsx格式的课程表文件"
                 Text(
-                    "支持导入JSON、ICS、CSV格式的课程表文件",
+                    "支持导入JSON、ICS格式的课程表文件",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

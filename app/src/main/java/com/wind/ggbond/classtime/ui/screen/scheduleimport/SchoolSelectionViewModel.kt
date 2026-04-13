@@ -22,9 +22,19 @@ import java.util.Locale
 import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
-/**
- * 学校分组数据类
- */
+enum class ImportMethod {
+    WEBVIEW_AUTO,
+    CLIPBOARD,
+    FILE
+}
+
+data class ImportRecommendation(
+    val method: ImportMethod,
+    val label: String,
+    val description: String,
+    val priority: Int
+)
+
 data class SchoolGroup(
     val province: String,
     val schools: List<SchoolEntity>
@@ -198,8 +208,34 @@ class SchoolSelectionViewModel @Inject constructor(
     
     fun selectSchool(school: SchoolEntity) {
         _selectedSchool.value = school
-        // 保存到最近使用列表
         saveRecentSchool(school.id)
+    }
+
+    fun getImportRecommendation(school: SchoolEntity): ImportRecommendation {
+        val hasLoginUrl = school.loginUrl.isNotEmpty()
+        val hasExtractor = !school.extractorClass.isNullOrEmpty()
+        val hasScheduleUrl = school.scheduleUrl.isNotEmpty()
+
+        return when {
+            hasLoginUrl && hasExtractor -> ImportRecommendation(
+                method = ImportMethod.WEBVIEW_AUTO,
+                label = "推荐：一键导入",
+                description = "该学校支持自动提取课表，登录后即可一键导入",
+                priority = 3
+            )
+            hasLoginUrl && hasScheduleUrl -> ImportRecommendation(
+                method = ImportMethod.CLIPBOARD,
+                label = "推荐：WebView导入",
+                description = "登录教务系统后手动提取课表数据",
+                priority = 2
+            )
+            else -> ImportRecommendation(
+                method = ImportMethod.FILE,
+                label = "推荐：文件导入",
+                description = "从教务系统导出文件后导入",
+                priority = 1
+            )
+        }
     }
     
     /**

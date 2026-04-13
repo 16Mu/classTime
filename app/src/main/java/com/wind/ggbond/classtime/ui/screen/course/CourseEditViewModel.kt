@@ -3,11 +3,9 @@ package com.wind.ggbond.classtime.ui.screen.course
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wind.ggbond.classtime.data.local.entity.Course
-import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
+import com.wind.ggbond.classtime.domain.usecase.CourseUseCase
 import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
-import com.wind.ggbond.classtime.util.CourseColorPalette
-import com.wind.ggbond.classtime.util.CourseColorProvider
 import com.wind.ggbond.classtime.util.WeekParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,9 +15,6 @@ import kotlinx.coroutines.launch
 import com.wind.ggbond.classtime.util.AppLogger
 import javax.inject.Inject
 
-/**
- * 保存状态
- */
 sealed class SaveState {
     object Idle : SaveState()
     object Saving : SaveState()
@@ -27,12 +22,9 @@ sealed class SaveState {
     data class Error(val message: String) : SaveState()
 }
 
-/**
- * 课程编辑 ViewModel
- */
 @HiltViewModel
 class CourseEditViewModel @Inject constructor(
-    private val courseRepository: CourseRepository,
+    private val courseUseCase: CourseUseCase,
     private val scheduleRepository: ScheduleRepository,
     private val reminderScheduler: IAlarmScheduler
 ) : ViewModel() {
@@ -42,7 +34,6 @@ class CourseEditViewModel @Inject constructor(
     private var hasAppliedDefaults: Boolean = false
     private var isUserSelectedColor: Boolean = false
     
-    // 课程基本信息
     private val _courseName = MutableStateFlow("")
     val courseName: StateFlow<String> = _courseName.asStateFlow()
     
@@ -52,7 +43,6 @@ class CourseEditViewModel @Inject constructor(
     private val _classroom = MutableStateFlow("")
     val classroom: StateFlow<String> = _classroom.asStateFlow()
     
-    // 时间信息
     private val _dayOfWeek = MutableStateFlow(1)
     val dayOfWeek: StateFlow<Int> = _dayOfWeek.asStateFlow()
     
@@ -65,15 +55,12 @@ class CourseEditViewModel @Inject constructor(
     private val _selectedWeeks = MutableStateFlow<List<Int>>(emptyList())
     val selectedWeeks: StateFlow<List<Int>> = _selectedWeeks.asStateFlow()
     
-    // 学期总周数（动态从当前学期读取，用于周次选择器范围限制）
     private val _totalWeeks = MutableStateFlow(20)
     val totalWeeks: StateFlow<Int> = _totalWeeks.asStateFlow()
     
-    // 学分
     private val _credit = MutableStateFlow(0f)
     val credit: StateFlow<Float> = _credit.asStateFlow()
     
-    // 样式和提醒
     private val _selectedColor = MutableStateFlow("#42A5F5")
     val selectedColor: StateFlow<String> = _selectedColor.asStateFlow()
     
@@ -89,7 +76,6 @@ class CourseEditViewModel @Inject constructor(
     private val _courseCode = MutableStateFlow("")
     val courseCode: StateFlow<String> = _courseCode.asStateFlow()
     
-    // UI 状态
     private val _showWeekSelector = MutableStateFlow(false)
     val showWeekSelector: StateFlow<Boolean> = _showWeekSelector.asStateFlow()
     
@@ -99,12 +85,10 @@ class CourseEditViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
     
-    // ✅ 保存状态 - 使用密封类管理状态
     private val _saveState = MutableStateFlow<SaveState>(SaveState.Idle)
     val saveState: StateFlow<SaveState> = _saveState.asStateFlow()
     
     init {
-        // 从当前课表加载总周数
         viewModelScope.launch {
             try {
                 val schedule = scheduleRepository.getCurrentSchedule()
@@ -116,18 +100,13 @@ class CourseEditViewModel @Inject constructor(
             }
         }
         
-        // 加载当前课表中已有课程的颜色，用于智能分配
         viewModelScope.launch {
             try {
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 if (currentSchedule != null) {
-                    courseRepository.getAllCoursesBySchedule(currentSchedule.id)
-                        .collect { courses ->
-                            existingCoursesColors = courses.map { it.color }
-                        }
+                    existingCoursesColors = courseUseCase.getExistingCoursesColors(currentSchedule.id)
                 }
             } catch (e: Exception) {
-                // 加载失败不影响使用
             }
         }
     }
@@ -136,7 +115,7 @@ class CourseEditViewModel @Inject constructor(
         currentCourseId = courseId
         _isLoading.value = true
         viewModelScope.launch {
-            courseRepository.getCourseById(courseId)?.let { course ->
+            courseUseCase.getCourseById(courseId)?.let { course ->
                 _courseName.value = course.courseName
                 _teacher.value = course.teacher
                 _classroom.value = course.classroom
@@ -155,10 +134,6 @@ class CourseEditViewModel @Inject constructor(
         }
     }
     
-    /**
-     * 应用从课表格子传入的默认时间信息（仅用于新建课程，且只应用一次）
-     * @param courseName 预填充的课程名称，用于添加新时间段场景
-     */
     fun applyDefaultsIfNeeded(
         dayOfWeek: Int? = null,
         startSection: Int? = null,
@@ -169,12 +144,11 @@ class CourseEditViewModel @Inject constructor(
         if (currentCourseId != null || hasAppliedDefaults) return
         hasAppliedDefaults = true
         
-        // 预填充课程名称（用于添加新时间段场景）
         courseName?.let { name ->
             if (name.isNotBlank()) {
                 _courseName.value = name
                 viewModelScope.launch {
-                    _selectedColor.value = CourseColorProvider.getColorForCourse(name, existingCoursesColors)
+                    _selectedColor.value = courseUseCase.getColorForCourse(name, existingCoursesColors)
                 }
             }
         }
@@ -190,7 +164,6 @@ class CourseEditViewModel @Inject constructor(
         sectionCount?.let { count ->
             _sectionCount.value = count.coerceAtLeast(1)
         }
-        // 仅当尚未选择任何周次时，才使用默认周次
         if (weekNumber != null && weekNumber > 0 && _selectedWeeks.value.isEmpty()) {
             _selectedWeeks.value = listOf(weekNumber)
         }
@@ -200,7 +173,7 @@ class CourseEditViewModel @Inject constructor(
         _courseName.value = name
         if (currentCourseId == null && name.isNotBlank() && !isUserSelectedColor) {
             viewModelScope.launch {
-                _selectedColor.value = CourseColorProvider.getColorForCourse(name, existingCoursesColors)
+                _selectedColor.value = courseUseCase.getColorForCourse(name, existingCoursesColors)
             }
         }
     }
@@ -272,13 +245,7 @@ class CourseEditViewModel @Inject constructor(
         _showColorPicker.value = false
     }
     
-    /**
-     * 保存课程
-     * ✅ 返回结果通过 saveState Flow
-     * ✅ 添加冲突检测
-     */
     fun saveCourse() {
-        // 验证必填字段
         if (_courseName.value.isBlank()) {
             _saveState.value = SaveState.Error("请输入课程名称")
             AppLogger.e("CourseEdit", "保存失败：课程名称为空")
@@ -291,7 +258,6 @@ class CourseEditViewModel @Inject constructor(
             return
         }
         
-        // ✅ 设置保存中状态
         _saveState.value = SaveState.Saving
         
         viewModelScope.launch {
@@ -307,8 +273,7 @@ class CourseEditViewModel @Inject constructor(
                 
                 val scheduleId = currentSchedule.id
                 
-                // ✅ 检测冲突
-                val conflicts = courseRepository.detectConflictWithWeeks(
+                val conflictResult = courseUseCase.checkCourseConflict(
                     scheduleId = scheduleId,
                     dayOfWeek = _dayOfWeek.value,
                     startSection = _startSection.value,
@@ -317,9 +282,8 @@ class CourseEditViewModel @Inject constructor(
                     excludeCourseId = currentCourseId
                 )
                 
-                if (conflicts.isNotEmpty()) {
-                    val conflictNames = conflicts.joinToString(", ") { it.courseName }
-                    _saveState.value = SaveState.Error("课程时间冲突：与「$conflictNames」冲突")
+                if (conflictResult.hasConflict) {
+                    _saveState.value = SaveState.Error(conflictResult.message ?: "课程时间冲突")
                     AppLogger.e("CourseEdit", "保存失败：检测到冲突")
                     return@launch
                 }
@@ -352,20 +316,17 @@ class CourseEditViewModel @Inject constructor(
                 val courseId = currentCourseId
                 if (courseId != null) {
                     AppLogger.d("CourseEdit", "更新课程 ID: $courseId")
-                    courseRepository.updateCourse(course)
+                    courseUseCase.updateCourse(course)
                     savedCourse = course.copy(id = courseId)
-                    // ✅ 设置成功状态
                     _saveState.value = SaveState.Success("课程更新成功")
                 } else {
                     AppLogger.d("CourseEdit", "插入新课程")
-                    val newId = courseRepository.insertCourse(course)
+                    val newId = courseUseCase.insertCourse(course)
                     AppLogger.d("CourseEdit", "课程插入成功，新ID: $newId")
                     savedCourse = course.copy(id = newId)
-                    // ✅ 设置成功状态
                     _saveState.value = SaveState.Success("课程添加成功")
                 }
                 
-                // ✅ 添加：保存成功后创建/更新提醒
                 try {
                     if (savedCourse.reminderEnabled) {
                         AppLogger.d("CourseEdit", "创建课程提醒：${savedCourse.courseName}")
@@ -376,21 +337,16 @@ class CourseEditViewModel @Inject constructor(
                     }
                 } catch (e: Exception) {
                     AppLogger.e("CourseEdit", "创建提醒失败：${e.message}", e)
-                    // 提醒创建失败不影响课程保存成功
                 }
                 
                 AppLogger.d("CourseEdit", "课程保存成功")
             } catch (e: Exception) {
-                // ✅ 设置错误状态
                 _saveState.value = SaveState.Error("保存失败：${e.message ?: "未知错误"}")
                 AppLogger.e("CourseEdit", "保存课程时出错", e)
             }
         }
     }
     
-    /**
-     * 重置保存状态
-     */
     fun resetSaveState() {
         _saveState.value = SaveState.Idle
     }

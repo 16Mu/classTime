@@ -2,6 +2,7 @@ package com.wind.ggbond.classtime.data.local.converter
 
 import androidx.room.TypeConverter
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import java.time.LocalDate
 import java.time.LocalTime
@@ -10,7 +11,9 @@ import java.time.LocalTime
  * Room 类型转换器
  */
 class Converters {
-    private val gson = Gson()
+    companion object {
+        private val gson: Gson = GsonBuilder().setLenient().create()
+    }
     
     // List<Int> 转换 (用于周次列表)
     @TypeConverter

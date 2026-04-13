@@ -3,6 +3,8 @@ package com.wind.ggbond.classtime.domain.usecase
 import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.data.local.entity.CourseAdjustment
 import com.wind.ggbond.classtime.data.repository.CourseAdjustmentRepository
+import com.wind.ggbond.classtime.data.repository.CourseRepository
+import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.util.DateUtils
 import kotlinx.coroutines.flow.Flow
@@ -11,11 +13,105 @@ import javax.inject.Singleton
 
 @Singleton
 class AdjustmentUseCase @Inject constructor(
-    private val adjustmentRepository: CourseAdjustmentRepository
+    private val adjustmentRepository: CourseAdjustmentRepository,
+    private val courseRepository: CourseRepository,
+    private val alarmScheduler: IAlarmScheduler
 ) {
     
     companion object {
         private const val TAG = "AdjustmentUseCase"
+    }
+
+    data class ConflictResult(
+        val hasConflict: Boolean,
+        val message: String,
+        val conflictingCourses: List<Course> = emptyList(),
+        val conflictingAdjustments: List<CourseAdjustment> = emptyList()
+    )
+
+    suspend fun checkAdjustmentConflict(
+        scheduleId: Long,
+        weekNumber: Int,
+        dayOfWeek: Int,
+        startSection: Int,
+        sectionCount: Int,
+        excludeCourseId: Long? = null
+    ): ConflictResult {
+        val conflictingAdjustments = adjustmentRepository.checkNewTimeConflict(
+            scheduleId = scheduleId,
+            weekNumber = weekNumber,
+            dayOfWeek = dayOfWeek,
+            startSection = startSection,
+            sectionCount = sectionCount
+        )
+
+        val conflictingCourses = courseRepository.getCoursesInTimeRange(
+            scheduleId = scheduleId,
+            dayOfWeek = dayOfWeek,
+            startSection = startSection,
+            endSection = startSection + sectionCount
+        ).filter { it.weeks.contains(weekNumber) && it.id != excludeCourseId }
+
+        return if (conflictingAdjustments.isNotEmpty() || conflictingCourses.isNotEmpty()) {
+            val message = when {
+                conflictingCourses.isNotEmpty() ->
+                    "与课程《${conflictingCourses.first().courseName}》时间冲突"
+                else ->
+                    "与其他调课记录时间冲突"
+            }
+            ConflictResult(
+                hasConflict = true,
+                message = message,
+                conflictingCourses = conflictingCourses,
+                conflictingAdjustments = conflictingAdjustments
+            )
+        } else {
+            ConflictResult(hasConflict = false, message = "")
+        }
+    }
+
+    fun createAdjustment(
+        course: Course,
+        originalWeekNumber: Int,
+        newWeekNumber: Int,
+        newDayOfWeek: Int,
+        newStartSection: Int,
+        newSectionCount: Int,
+        newClassroom: String,
+        reason: String
+    ): CourseAdjustment {
+        return CourseAdjustment(
+            originalCourseId = course.id,
+            scheduleId = course.scheduleId,
+            originalWeekNumber = originalWeekNumber,
+            originalDayOfWeek = course.dayOfWeek,
+            originalStartSection = course.startSection,
+            originalSectionCount = course.sectionCount,
+            newWeekNumber = newWeekNumber,
+            newDayOfWeek = newDayOfWeek,
+            newStartSection = newStartSection,
+            newSectionCount = newSectionCount,
+            newClassroom = newClassroom,
+            reason = reason
+        )
+    }
+
+    suspend fun saveAdjustment(adjustment: CourseAdjustment): Long {
+        val savedId = adjustmentRepository.saveAdjustment(adjustment)
+        val savedAdjustment = adjustment.copy(id = savedId)
+        alarmScheduler.rescheduleRemindersForAdjustment(savedAdjustment)
+        AppLogger.d(TAG, "调课记录已保存: ID=$savedId, 课程ID=${adjustment.originalCourseId}")
+        AppLogger.d(TAG, "原时间: 第${adjustment.originalWeekNumber}周 ${DateUtils.getDayOfWeekName(adjustment.originalDayOfWeek)} 第${adjustment.originalStartSection}节")
+        AppLogger.d(TAG, "新时间: 第${adjustment.newWeekNumber}周 ${DateUtils.getDayOfWeekName(adjustment.newDayOfWeek)} 第${adjustment.newStartSection}节")
+        return savedId
+    }
+
+    suspend fun cancelAdjustment(adjustment: CourseAdjustment) {
+        adjustmentRepository.cancelAdjustment(adjustment)
+    }
+
+    suspend fun cancelAllAdjustments(adjustments: List<CourseAdjustment>) {
+        adjustments.forEach { adjustmentRepository.cancelAdjustment(it) }
     }
     
     fun getAdjustmentsBySchedule(scheduleId: Long): Flow<List<CourseAdjustment>> {

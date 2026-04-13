@@ -8,6 +8,7 @@ import com.wind.ggbond.classtime.data.datastore.DataStoreManager
 import com.wind.ggbond.classtime.data.local.entity.ClassTime
 import com.wind.ggbond.classtime.data.local.entity.Schedule
 import com.wind.ggbond.classtime.data.repository.ClassTimeRepository
+import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import javax.inject.Inject
@@ -24,10 +28,12 @@ import com.wind.ggbond.classtime.util.AppLogger
  * 上下课时间配置 ViewModel
  */
 @HiltViewModel
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ClassTimeConfigViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val classTimeRepository: ClassTimeRepository,
-    private val scheduleRepository: ScheduleRepository
+    private val scheduleRepository: ScheduleRepository,
+    private val courseRepository: CourseRepository
 ) : ViewModel() {
     
     companion object {
@@ -87,6 +93,12 @@ class ClassTimeConfigViewModel @Inject constructor(
     private val _displayMode = MutableStateFlow(DEFAULT_DISPLAY_MODE_ADAPTIVE)
     val displayMode: StateFlow<Boolean> = _displayMode.asStateFlow()
     
+    private val _maxCourseSection = MutableStateFlow(0)
+    val maxCourseSection: StateFlow<Int> = _maxCourseSection.asStateFlow()
+    
+    private val _sectionWarning = MutableStateFlow<String?>(null)
+    val sectionWarning: StateFlow<String?> = _sectionWarning.asStateFlow()
+    
     // 当前课表状态
     private val _currentSchedule = MutableStateFlow<Schedule?>(null)
     val currentSchedule: StateFlow<Schedule?> = _currentSchedule.asStateFlow()
@@ -102,6 +114,7 @@ class ClassTimeConfigViewModel @Inject constructor(
         loadClassDuration()
         loadSectionCounts()
         loadDisplayMode()
+        loadMaxCourseSection()
     }
     
     /**
@@ -142,6 +155,37 @@ class ClassTimeConfigViewModel @Inject constructor(
         viewModelScope.launch {
             val preferences = classTimeDataStore.data.first()
             _displayMode.value = preferences[DISPLAY_MODE_KEY] ?: DEFAULT_DISPLAY_MODE_ADAPTIVE
+        }
+    }
+    
+    private fun loadMaxCourseSection() {
+        viewModelScope.launch {
+            _currentSchedule
+                .flatMapLatest { schedule ->
+                    if (schedule != null) {
+                        courseRepository.getAllCoursesBySchedule(schedule.id)
+                            .map { courses ->
+                                if (courses.isEmpty()) 0
+                                else courses.maxOfOrNull { it.startSection + it.sectionCount - 1 } ?: 0
+                            }
+                    } else {
+                        flowOf(0)
+                    }
+                }
+                .collect { maxSection ->
+                    _maxCourseSection.value = maxSection
+                    checkSectionWarning()
+                }
+        }
+    }
+    
+    private fun checkSectionWarning() {
+        val totalSections = _morningSections.value + _afternoonSections.value
+        val maxSection = _maxCourseSection.value
+        if (maxSection > 0 && totalSections < maxSection) {
+            _sectionWarning.value = "当前课表存在第${maxSection}节的课程，但总节次仅设为${totalSections}节，部分课程可能无法正常显示"
+        } else {
+            _sectionWarning.value = null
         }
     }
     
@@ -305,10 +349,16 @@ class ClassTimeConfigViewModel @Inject constructor(
     
     fun updateMorningSections(sections: Int) {
         viewModelScope.launch {
+            val newTotal = sections + _afternoonSections.value
+            if (newTotal < _maxCourseSection.value) {
+                _sectionWarning.value = "当前课表存在第${_maxCourseSection.value}节的课程，总节次不能低于${_maxCourseSection.value}节"
+                return@launch
+            }
             classTimeDataStore.edit { preferences ->
                 preferences[MORNING_SECTIONS_KEY] = sections
             }
             _morningSections.value = sections
+            _sectionWarning.value = null
             regenerateClassTimes()
             autoSelectDisplayMode()
         }
@@ -316,10 +366,16 @@ class ClassTimeConfigViewModel @Inject constructor(
     
     fun updateAfternoonSections(sections: Int) {
         viewModelScope.launch {
+            val newTotal = _morningSections.value + sections
+            if (newTotal < _maxCourseSection.value) {
+                _sectionWarning.value = "当前课表存在第${_maxCourseSection.value}节的课程，总节次不能低于${_maxCourseSection.value}节"
+                return@launch
+            }
             classTimeDataStore.edit { preferences ->
                 preferences[AFTERNOON_SECTIONS_KEY] = sections
             }
             _afternoonSections.value = sections
+            _sectionWarning.value = null
             regenerateClassTimes()
             autoSelectDisplayMode()
         }

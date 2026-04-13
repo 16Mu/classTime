@@ -10,6 +10,7 @@ import com.wind.ggbond.classtime.data.model.ParsedCourse
 import com.wind.ggbond.classtime.data.repository.CourseRepository
 import com.wind.ggbond.classtime.data.repository.SchoolRepository
 import com.wind.ggbond.classtime.data.repository.ScheduleRepository
+import com.wind.ggbond.classtime.domain.usecase.ImportUseCase
 import com.wind.ggbond.classtime.service.contract.IAlarmScheduler
 import com.wind.ggbond.classtime.util.Constants
 import com.wind.ggbond.classtime.util.InputValidator
@@ -52,7 +53,8 @@ class SmartImportViewModel @Inject constructor(
     private val courseRepository: CourseRepository,
     private val scheduleRepository: ScheduleRepository,
     private val reminderScheduler: IAlarmScheduler,
-    private val extractorFactory: SchoolExtractorFactory
+    private val extractorFactory: SchoolExtractorFactory,
+    private val importUseCase: ImportUseCase
 ) : ViewModel() {
     
     private val _parseState = MutableStateFlow<ParseState>(ParseState.Idle)
@@ -107,7 +109,11 @@ class SmartImportViewModel @Inject constructor(
         val extractor = extractorFactory.detectExtractorByUrl(url)
         return extractor?.generateExtractionScript()
     }
-    
+
+    fun getExtractor(schoolId: String) = extractorFactory.getExtractor(schoolId)
+
+    fun getExtractorFactory() = extractorFactory
+
     /**
      * 使用学校专用提取器解析课程（推荐使用）
      */
@@ -718,7 +724,6 @@ class SmartImportViewModel @Inject constructor(
                 val courses = _parsedCourses.value
                 if (courses.isEmpty()) return@launch
                 
-                // 获取当前课表（包含学期时间信息）
                 val currentSchedule = scheduleRepository.getCurrentSchedule()
                 
                 if (currentSchedule == null) {
@@ -726,33 +731,34 @@ class SmartImportViewModel @Inject constructor(
                     return@launch
                 }
                 
-                // 查询已存在的课表数量，用于生成新课表名称
                 val existingSchedules = scheduleRepository.getAllSchedulesList()
                 val scheduleCount = existingSchedules.size
                 
-                // 生成新课表名称：我的课表、我的课表(2)、我的课表(3)...
                 val scheduleName = if (scheduleCount == 0) {
                     "我的课表"
                 } else {
                     "我的课表(${scheduleCount + 1})"
                 }
                 
-                // 创建新课表
                 val newSchedule = Schedule(
                     name = scheduleName,
                     schoolName = "",
                     startDate = currentSchedule.startDate,
                     endDate = currentSchedule.endDate,
                     totalWeeks = currentSchedule.totalWeeks,
-                    isCurrent = false // 不自动设置为当前课表
+                    isCurrent = false
                 )
                 
                 val scheduleId = scheduleRepository.insertSchedule(newSchedule)
                 AppLogger.d("SmartImport", "创建新课表: $scheduleName, ID: $scheduleId")
                 
-                // !!!! 这段代码在 SmartImportViewModel 中，但现在已经不用了
-                // 现在使用 ImportScheduleViewModel 的 confirmImport() 方法
-                AppLogger.e("SmartImport", "错误：这段代码不应该被执行！")
+                val conversionResult = importUseCase.convertParsedCoursesToCourses(courses, scheduleId)
+                if (conversionResult.courses.isNotEmpty()) {
+                    courseRepository.insertCourses(conversionResult.courses)
+                    AppLogger.d("SmartImport", "导入${conversionResult.courses.size}门课程成功")
+                }
+                
+                _parseState.value = ParseState.Success()
             } catch (e: Exception) {
                 AppLogger.e("SmartImport", "导入失败", e)
                 _parseState.value = ParseState.Error("导入失败：${e.message}")

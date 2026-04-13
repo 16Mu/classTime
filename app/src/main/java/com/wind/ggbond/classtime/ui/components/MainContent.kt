@@ -6,8 +6,12 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -18,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.blur
@@ -86,11 +91,13 @@ fun MainContent(
     val effectiveBlurRadius = blurRadius
     val effectiveDimAmount = dimAmount
 
-    val dynamicColorScheme = if (isDynamicThemeEnabled) {
-        if (darkTheme) backgroundThemeManager.generateDarkColorScheme(seedColor)
-        else backgroundThemeManager.generateLightColorScheme(seedColor)
-    } else {
-        null
+    val dynamicColorScheme = remember(isDynamicThemeEnabled, darkTheme, seedColor) {
+        if (isDynamicThemeEnabled) {
+            if (darkTheme) backgroundThemeManager.generateDarkColorScheme(seedColor)
+            else backgroundThemeManager.generateLightColorScheme(seedColor)
+        } else {
+            null
+        }
     }
 
     CourseScheduleTheme(
@@ -161,7 +168,7 @@ fun MainContent(
                         .background(MaterialTheme.colorScheme.background)
                 )
             }
-            
+
             when (val state = initState) {
                 is InitializationState.Loading -> {
                     LoadingScreen()
@@ -181,6 +188,23 @@ fun MainContent(
                         onRetry = onRetry
                     )
                 }
+            }
+
+            if (wallpaperEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.4f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
             }
         }
         }
@@ -247,6 +271,18 @@ private fun SuccessContent(
             val openAdjustmentManagement = intent?.getBooleanExtra("openAdjustmentManagement", false) ?: false
             if (openAdjustmentManagement) {
                 navController.navigate(Screen.AdjustmentManagement.route)
+            }
+            val courseIdFromExtra = intent?.getLongExtra("courseId", 0L) ?: 0L
+            if (courseIdFromExtra > 0L) {
+                navController.navigate(Screen.CourseDetail.createRoute(courseIdFromExtra))
+            } else {
+                val data = intent?.data
+                if (data != null && data.scheme == "classtime" && data.host == "course") {
+                    val courseIdFromUri = data.lastPathSegment?.toLongOrNull() ?: 0L
+                    if (courseIdFromUri > 0L) {
+                        navController.navigate(Screen.CourseDetail.createRoute(courseIdFromUri))
+                    }
+                }
             }
         }
 

@@ -13,6 +13,9 @@ class JHDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "jhdx"
     override val schoolName = "江汉大学"
     override val systemType = "kingosoft"
+
+    override val aliases = listOf("江汉大学", "江大")
+    override val supportedUrls = listOf("jwgl.jhun.edu.cn")
     
     companion object {
         private const val TAG = "JHDXExtractor"

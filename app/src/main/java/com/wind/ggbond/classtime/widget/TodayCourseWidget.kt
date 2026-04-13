@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -58,7 +60,6 @@ private fun TodayCourseContent(data: WidgetDisplayData) {
             .fillMaxSize()
             .background(dayNightColorProvider(day = WidgetColors.cardBgDay, night = WidgetColors.cardBgNight))
             .cornerRadius(16.dp)
-            .clickable(actionStartActivity<MainActivity>())
             .padding(12.dp)
     ) {
         HeaderRow(dateText = data.dateText, dayOfWeek = data.dayOfWeekText, count = data.courseItems.size)
@@ -85,7 +86,9 @@ private fun TodayCourseContent(data: WidgetDisplayData) {
 @Composable
 private fun HeaderRow(dateText: String, dayOfWeek: String, count: Int) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth(),
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -117,31 +120,12 @@ private fun HeaderRow(dateText: String, dayOfWeek: String, count: Int) {
 }
 
 @Composable
-private fun EmptyState(message: String) {
-    Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Spacer(modifier = GlanceModifier.height(4.dp))
-            Text(
-                text = message,
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 13.sp
-                )
-            )
-        }
-    }
-}
+private fun EmptyState(message: String) = WidgetEmptyState(
+    message = message,
+    primaryFontSize = 24f,
+    secondaryFontSize = 13f,
+    spacerHeight = 4f
+)
 
 @Composable
 private fun CourseList(courses: List<com.wind.ggbond.classtime.widget.data.WidgetCourseItem>) {
@@ -157,12 +141,15 @@ private fun CourseList(courses: List<com.wind.ggbond.classtime.widget.data.Widge
 private fun CourseItemRow(course: com.wind.ggbond.classtime.widget.data.WidgetCourseItem) {
     val color = parseCourseColor(course.color)
     val endSec = course.startSection + course.sectionCount - 1
+    val courseIdKey = ActionParameters.Key<Long>("courseId")
+    val actionParams = actionParametersOf(courseIdKey to course.courseId)
 
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
             .background(courseItemBg(isOngoing = course.isOngoing, courseColor = color))
             .cornerRadius(12.dp)
+            .clickable(actionStartActivity<MainActivity>(actionParams))
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -59,7 +61,6 @@ private fun SmartCourseContent(data: TomorrowCourseDisplayData) {
             .fillMaxSize()
             .background(dayNightColorProvider(day = WidgetColors.cardBgDay, night = WidgetColors.cardBgNight))
             .cornerRadius(16.dp)
-            .clickable(actionStartActivity<MainActivity>())
             .padding(14.dp)
     ) {
         SmartHeader(data = data)
@@ -85,7 +86,11 @@ private fun SmartCourseContent(data: TomorrowCourseDisplayData) {
 
 @Composable
 private fun SmartHeader(data: TomorrowCourseDisplayData) {
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
+    Column(
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .clickable(actionStartActivity<MainActivity>())
+    ) {
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -122,7 +127,7 @@ private fun SmartHeader(data: TomorrowCourseDisplayData) {
                 if (data.statusLabel.isNotEmpty()) {
                     Spacer(modifier = GlanceModifier.height(3.dp))
                     val statusColor = if (data.isShowingToday) {
-                        dayNightColorProvider(day = Color(0xFF4CAF50), night = Color(0xFF81C784))
+                        dayNightColorProvider(day = WidgetColors.ongoingBadgeDay, night = WidgetColors.ongoingBadgeNight)
                     } else {
                         dayNightColorProvider(day = WidgetColors.accentBgDay, night = WidgetColors.accentTextDay)
                     }
@@ -150,7 +155,7 @@ private fun SmartHeader(data: TomorrowCourseDisplayData) {
                 val badgeText = if (data.isShowingToday) "今日${data.courseItems.size}节" else "明日${data.courseItems.size}节"
                 Box(
                     modifier = GlanceModifier
-                        .background(if (!data.isShowingToday) dayNightColorProvider(day = Color(0xFFE3F2FD), night = Color(0xFF1A237E)) else dayNightColorProvider(day = WidgetColors.accentBgDay, night = WidgetColors.accentBgNight))
+                        .background(if (!data.isShowingToday) dayNightColorProvider(day = WidgetColors.tomorrowBgDay, night = WidgetColors.tomorrowBgNight) else dayNightColorProvider(day = WidgetColors.accentBgDay, night = WidgetColors.accentBgNight))
                         .cornerRadius(12.dp)
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     contentAlignment = Alignment.Center
@@ -158,7 +163,7 @@ private fun SmartHeader(data: TomorrowCourseDisplayData) {
                     Text(
                         text = badgeText,
                         style = TextStyle(
-                            color = if (!data.isShowingToday) dayNightColorProvider(day = Color(0xFF1976D2), night = Color(0xFF64B5F6)) else dayNightColorProvider(day = WidgetColors.accentTextDay, night = WidgetColors.accentTextNight),
+                            color = if (!data.isShowingToday) dayNightColorProvider(day = WidgetColors.tomorrowTextDay, night = WidgetColors.tomorrowTextNight) else dayNightColorProvider(day = WidgetColors.accentTextDay, night = WidgetColors.accentTextNight),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -170,31 +175,12 @@ private fun SmartHeader(data: TomorrowCourseDisplayData) {
 }
 
 @Composable
-private fun EmptyState(message: String) {
-    Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Spacer(modifier = GlanceModifier.height(4.dp))
-            Text(
-                text = message,
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 13.sp
-                )
-            )
-        }
-    }
-}
+private fun EmptyState(message: String) = WidgetEmptyState(
+    message = message,
+    primaryFontSize = 22f,
+    secondaryFontSize = 13f,
+    spacerHeight = 4f
+)
 
 @Composable
 private fun CourseList(courses: List<WidgetCourseItem>) {
@@ -209,10 +195,12 @@ private fun CourseList(courses: List<WidgetCourseItem>) {
 @Composable
 private fun SmartCourseItemRow(course: WidgetCourseItem) {
     val courseColor = try {
-        Color(android.graphics.Color.parseColor(course.color))
+        parseCourseColor(course.color)
     } catch (e: Exception) {
-        Color(0xFF5C6BC0)
+        WidgetColors.courseFallbackDay
     }
+    val courseIdKey = ActionParameters.Key<Long>("courseId")
+    val actionParams = actionParametersOf(courseIdKey to course.courseId)
 
     val bgColor = if (course.isOngoing) {
         dayNightColorProvider(
@@ -231,6 +219,7 @@ private fun SmartCourseItemRow(course: WidgetCourseItem) {
             .fillMaxWidth()
             .background(bgColor)
             .cornerRadius(12.dp)
+            .clickable(actionStartActivity<MainActivity>(actionParams))
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

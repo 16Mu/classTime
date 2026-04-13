@@ -37,7 +37,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private suspend fun getInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, default: Int): Int = get(key, default)
     private suspend fun setInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, value: Int) = set(key, value)
     private fun observeInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, default: Int): Flow<Int> = observe(key, default)
-    private suspend fun getStr(key: androidx.datastore.preferences.core.Preferences.Key<String>, default: String = ""): String? = get(key, default).takeIf { it.isNotEmpty() || default.isEmpty() }
+    private suspend fun getStr(key: androidx.datastore.preferences.core.Preferences.Key<String>, default: String = ""): String = get(key, default)
     private suspend fun setStr(key: androidx.datastore.preferences.core.Preferences.Key<String>, value: String?) {
         ds.edit { if (value != null) it[key] = value else it.remove(key) }
     }

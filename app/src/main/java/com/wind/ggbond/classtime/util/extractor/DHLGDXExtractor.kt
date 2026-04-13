@@ -18,6 +18,9 @@ class DHLGDXExtractor @Inject constructor() : SchoolScheduleExtractor {
     override val schoolId = "dhlgdx"
     override val schoolName = "东华理工大学"
     override val systemType = "zfsoft"
+
+    override val aliases = listOf("东华理工大学")
+    override val supportedUrls = listOf("jwc.ecut.edu.cn")
     
     companion object {
         private const val TAG = "DHLGDXExtractor"

@@ -14,17 +14,42 @@ import androidx.lifecycle.MutableLiveData
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.R
 import com.wind.ggbond.classtime.util.AppLogger
+import com.wind.ggbond.classtime.di.ApiClient
+import dagger.hilt.EntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.MessageDigest
 
 object ApkDownloadManager {
 
     private const val TAG = "ApkDownloadManager"
     private const val CHANNEL_ID = "apk_download_channel"
-    private const val NOTIFICATION_ID = 10001
+    private const val NOTIFICATION_ID = 10002
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface ApkDownloadManagerEntryPoint {
+        fun apiClient(): OkHttpClient
+    }
+
+    private fun getApiClient(context: Context): OkHttpClient {
+        return try {
+            EntryPointAccessors.fromApplication(context.applicationContext, ApkDownloadManagerEntryPoint::class.java).apiClient()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "获取ApiClient失败，使用默认客户端", e)
+            OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+        }
+    }
 
     sealed class DownloadState {
         object Idle : DownloadState()
@@ -37,29 +62,33 @@ object ApkDownloadManager {
     val downloadState: LiveData<DownloadState> = _downloadState
 
     private var downloadJob: Job? = null
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-        .build()
+    private var downloadScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun downloadApk(context: Context, url: String) {
+    fun cancel() {
+        downloadJob?.cancel()
+        downloadScope.cancel()
+        downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        _downloadState.postValue(DownloadState.Idle)
+    }
+
+    fun downloadApk(context: Context, url: String, expectedSha256: String? = null) {
         if (downloadJob?.isActive == true) return
 
         _downloadState.value = DownloadState.Downloading(0)
         createNotificationChannel(context)
         showNotification(context, 0)
 
-        downloadJob = CoroutineScope(Dispatchers.IO).launch {
+        downloadJob = downloadScope.launch {
+            val fileName = "classtime_update.apk"
+            val outputFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
             try {
-                val fileName = "classtime_update.apk"
-                val outputFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
                 if (outputFile.exists()) outputFile.delete()
 
                 val request = Request.Builder().url(url)
                     .header("User-Agent", "Mozilla/5.0 (Linux; Android 10) Classtime-App")
                     .build()
 
-                val response = client.newCall(request).execute()
+                val response = getApiClient(context).newCall(request).execute()
                 if (!response.isSuccessful) {
                     _downloadState.postValue(DownloadState.Error("下载失败: HTTP ${response.code}"))
                     withContext(Dispatchers.Main) { cancelNotification(context) }
@@ -73,31 +102,42 @@ object ApkDownloadManager {
                 }
 
                 val contentLength = body.contentLength()
-                val inputStream = body.byteStream()
-                val outputStream = FileOutputStream(outputFile)
-                val buffer = ByteArray(8192)
-                var totalRead = 0L
-                var lastProgress = -1
+                body.byteStream().use { inputStream ->
+                    FileOutputStream(outputFile).use { outputStream ->
+                        val buffer = ByteArray(8192)
+                        var totalRead = 0L
+                        var lastProgress = -1
 
-                while (true) {
-                    val read = inputStream.read(buffer)
-                    if (read == -1) break
-                    outputStream.write(buffer, 0, read)
-                    totalRead += read
+                        while (true) {
+                            val read = inputStream.read(buffer)
+                            if (read == -1) break
+                            outputStream.write(buffer, 0, read)
+                            totalRead += read
 
-                    if (contentLength > 0) {
-                        val progress = ((totalRead * 100) / contentLength).toInt()
-                        if (progress != lastProgress) {
-                            lastProgress = progress
-                            _downloadState.postValue(DownloadState.Downloading(progress))
-                            withContext(Dispatchers.Main) { showNotification(context, progress) }
+                            if (contentLength > 0) {
+                                val progress = ((totalRead * 100) / contentLength).toInt()
+                                if (progress != lastProgress) {
+                                    lastProgress = progress
+                                    _downloadState.postValue(DownloadState.Downloading(progress))
+                                    withContext(Dispatchers.Main) { showNotification(context, progress) }
+                                }
+                            }
                         }
+                        outputStream.flush()
                     }
                 }
 
-                outputStream.flush()
-                outputStream.close()
-                inputStream.close()
+                if (expectedSha256 != null) {
+                    val actualHash = computeSha256(outputFile)
+                    if (!actualHash.equals(expectedSha256, ignoreCase = true)) {
+                        outputFile.delete()
+                        AppLogger.e(TAG, "APK完整性校验失败: 期望=$expectedSha256 实际=$actualHash")
+                        _downloadState.postValue(DownloadState.Error("APK完整性校验失败，文件可能被篡改"))
+                        withContext(Dispatchers.Main) { cancelNotification(context) }
+                        return@launch
+                    }
+                    AppLogger.d(TAG, "APK完整性校验通过")
+                }
 
                 _downloadState.postValue(DownloadState.Success(outputFile))
                 withContext(Dispatchers.Main) {
@@ -105,9 +145,11 @@ object ApkDownloadManager {
                 }
                 AppLogger.d(TAG, "APK 下载完成: ${outputFile.absolutePath}")
             } catch (e: CancellationException) {
+                cleanupPartialFile(outputFile)
                 _downloadState.postValue(DownloadState.Error("下载已取消"))
                 withContext(Dispatchers.Main) { cancelNotification(context) }
             } catch (e: Exception) {
+                cleanupPartialFile(outputFile)
                 AppLogger.e(TAG, "APK 下载异常", e)
                 _downloadState.postValue(DownloadState.Error("下载失败: ${e.message}"))
                 withContext(Dispatchers.Main) { cancelNotification(context) }
@@ -116,7 +158,33 @@ object ApkDownloadManager {
     }
 
     fun resetState() {
-        _downloadState.value = DownloadState.Idle
+        _downloadState.postValue(DownloadState.Idle)
+    }
+
+    fun cancelDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        _downloadState.postValue(DownloadState.Idle)
+    }
+
+    private fun cleanupPartialFile(file: File) {
+        try {
+            if (file.exists()) file.delete()
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "清理部分文件失败: ${e.message}")
+        }
+    }
+
+    private fun computeSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use { fis ->
+            val buffer = ByteArray(8192)
+            var read: Int
+            while (fis.read(buffer).also { read = it } != -1) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun createNotificationChannel(context: Context) {

@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -37,11 +39,13 @@ import com.wind.ggbond.classtime.widget.data.TimeSlot
 class WeekGridViewWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val gridData = try {
+            AppLogger.d("WeekGridViewWidget", "开始提供小组件数据, glanceId=$id")
             WidgetDataProvider.getWeekGridView(context)
         } catch (e: Exception) {
-            AppLogger.e("WeekGridViewWidget", "加载失败", e)
+            AppLogger.e("WeekGridViewWidget", "加载失败: ${e.message}", e)
             WeekGridData.empty("数据加载失败")
         }
+        AppLogger.d("WeekGridViewWidget", "数据准备完成, grid=${gridData.grid.size}行, courses=${gridData.totalCourses}")
         provideContent {
             GlanceTheme {
                 WeekGridContent(data = gridData)
@@ -50,8 +54,7 @@ class WeekGridViewWidget : GlanceAppWidget() {
     }
 }
 
-private val WEEKDAY_LABELS = arrayOf("一", "二", "三", "四", "五")
-private val TIME_SLOT_LABELS = arrayOf("第1节", "第2节", "第3节", "第4节", "第5节")
+
 
 @Composable
 private fun WeekGridContent(data: WeekGridData) {
@@ -60,7 +63,6 @@ private fun WeekGridContent(data: WeekGridData) {
             .fillMaxSize()
             .background(dayNightColorProvider(day = WidgetColors.cardBgDay, night = WidgetColors.cardBgNight))
             .cornerRadius(16.dp)
-            .clickable(actionStartActivity<MainActivity>())
             .padding(8.dp)
     ) {
         if (data.grid.isNotEmpty()) {
@@ -80,7 +82,9 @@ private fun WeekGridContent(data: WeekGridData) {
 @Composable
 private fun WeekHeader(weekNumber: String, totalCourses: Int) {
     Row(
-        modifier = GlanceModifier.fillMaxWidth(),
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .clickable(actionStartActivity<MainActivity>()),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -129,7 +133,7 @@ private fun WeekGrid(
                 contentAlignment = Alignment.Center
             ) {
             }
-            WEEKDAY_LABELS.forEachIndexed { index, label ->
+            WidgetColors.WEEKDAY_LABELS_WORKDAY.forEachIndexed { index, label ->
                 val isToday = index + 1 == todayDow
                 Box(
                     modifier = GlanceModifier
@@ -141,7 +145,7 @@ private fun WeekGrid(
                         text = label,
                         style = TextStyle(
                             color = if (isToday) 
-                                dayNightColorProvider(day = Color(0xFF0058BC), night = Color(0xFF3A86FF))
+                                dayNightColorProvider(day = WidgetColors.todayHeaderDay, night = WidgetColors.todayHeaderNight)
                             else 
                                 dayNightColorProvider(day = WidgetColors.textTertiaryDay, night = WidgetColors.textTertiaryNight),
                             fontSize = 9.sp,
@@ -169,7 +173,7 @@ private fun WeekGrid(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = TIME_SLOT_LABELS.getOrElse(rowIndex) { "${rowIndex + 1}" },
+                        text = timeSlots.getOrElse(rowIndex) { TimeSlot("第${rowIndex + 1}节", "", "") }.label,
                         style = TextStyle(
                             color = dayNightColorProvider(day = WidgetColors.textTertiaryDay, night = WidgetColors.textTertiaryNight),
                             fontSize = 8.sp,
@@ -199,29 +203,31 @@ private fun WeekGrid(
 
 @Composable
 private fun CourseCard(course: GridCourseInfo, isToday: Boolean) {
+    val baseAlpha = if (isToday) 0.18f else 0.1f
     val backgroundColor = try {
-        Color(android.graphics.Color.parseColor(course.color)).copy(alpha = 0.1f)
+        parseCourseColor(course.color).copy(alpha = baseAlpha)
     } catch (e: Exception) {
-        Color(0xFFE8F0FE).copy(alpha = 0.1f)
+        WidgetColors.courseCardBgFallbackDay.copy(alpha = baseAlpha)
     }
     
     val borderColor = try {
-        Color(android.graphics.Color.parseColor(course.color))
+        parseCourseColor(course.color)
     } catch (e: Exception) {
-        Color(0xFF0058BC)
+        WidgetColors.courseCardBorderFallbackDay
     }
+
+    val courseIdKey = ActionParameters.Key<Long>("courseId")
+    val actionParams = actionParametersOf(courseIdKey to course.courseId)
     
     Box(
         modifier = GlanceModifier
             .width(52.dp)
             .height(40.dp)
             .background(
-                if (isToday) 
-                    dayNightColorProvider(day = backgroundColor, night = backgroundColor.copy(alpha = 0.15f))
-                else 
-                    dayNightColorProvider(day = backgroundColor, night = backgroundColor.copy(alpha = 0.15f))
+                dayNightColorProvider(day = backgroundColor, night = backgroundColor.copy(alpha = 0.15f))
             )
             .cornerRadius(4.dp)
+            .clickable(actionStartActivity<MainActivity>(actionParams))
             .padding(start = 4.dp, top = 2.dp, end = 2.dp, bottom = 2.dp)
     ) {
         Column(
@@ -268,7 +274,7 @@ private fun EmptyCell(isToday: Boolean) {
             .height(40.dp)
             .background(
                 if (isToday)
-                    dayNightColorProvider(day = Color(0xFFE8F0FE).copy(alpha = 0.3f), night = Color(0xFF1A237E).copy(alpha = 0.3f))
+                    dayNightColorProvider(day = WidgetColors.todayHighlightBgDay.copy(alpha = 0.3f), night = WidgetColors.todayHighlightBgNight.copy(alpha = 0.3f))
                 else
                     dayNightColorProvider(day = Color.Transparent, night = Color.Transparent)
             )
@@ -278,28 +284,10 @@ private fun EmptyCell(isToday: Boolean) {
 }
 
 @Composable
-private fun EmptyState(msg: String) {
-    Box(
-        modifier = GlanceModifier.fillMaxSize().padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "- -",
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptyPrimaryDay, night = WidgetColors.emptyPrimaryNight),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            Spacer(modifier = GlanceModifier.height(3.dp))
-            Text(
-                text = msg,
-                style = TextStyle(
-                    color = dayNightColorProvider(day = WidgetColors.emptySecondaryDay, night = WidgetColors.emptySecondaryNight),
-                    fontSize = 12.sp
-                )
-            )
-        }
-    }
-}
+private fun EmptyState(msg: String) = WidgetEmptyState(
+    message = msg,
+    primaryFontSize = 20f,
+    secondaryFontSize = 12f,
+    spacerHeight = 3f,
+    verticalPadding = 16f
+)

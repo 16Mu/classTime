@@ -21,6 +21,7 @@ import com.wind.ggbond.classtime.ui.components.AnnouncementDialog
 import com.wind.ggbond.classtime.ui.components.CourseDetailBottomSheet
 import com.wind.ggbond.classtime.ui.components.ScheduleQuickEditDialog
 import com.wind.ggbond.classtime.util.AnnouncementInfo
+import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.ui.theme.BackgroundThemeManager
 import kotlinx.coroutines.launch
 import android.content.Intent
@@ -195,5 +196,5 @@ fun MainScreen(
 }
 
 private fun safeOpenUrl(context: android.content.Context, url: String) {
-    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
+    try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
 }

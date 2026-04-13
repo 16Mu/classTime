@@ -24,14 +24,13 @@ interface SchoolScheduleExtractor {
      * 教务系统类型（如：强智、正方等）
      */
     val systemType: String
-    
-    /**
-     * 检测当前页面是否是课表页面
-     * 
-     * @param html 页面HTML
-     * @param url 页面URL
-     * @return 是否是课表页面
-     */
+
+    val aliases: List<String>
+        get() = emptyList()
+
+    val supportedUrls: List<String>
+        get() = emptyList()
+
     fun isSchedulePage(html: String, url: String): Boolean
     
     /**
@@ -55,6 +54,15 @@ interface SchoolScheduleExtractor {
      * 获取登录页面URL（可选）
      */
     fun getLoginUrl(): String? = null
+
+    fun getSecureLoginUrl(): String? {
+        val url = getLoginUrl() ?: return null
+        return if (url.startsWith("http://")) {
+            url.replace("http://", "https://")
+        } else {
+            url
+        }
+    }
     
     /**
      * 获取课表页面URL（可选）

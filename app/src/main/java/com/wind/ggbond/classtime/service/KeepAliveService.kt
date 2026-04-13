@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import com.wind.ggbond.classtime.MainActivity
 import com.wind.ggbond.classtime.util.AppLogger
 import com.wind.ggbond.classtime.R
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 保活前台服务
@@ -19,10 +20,8 @@ class KeepAliveService : Service() {
         private const val TAG = "KeepAliveService"
         const val CHANNEL_ID = "keep_alive_channel"
         const val NOTIFICATION_ID = 10001
+        private val _isRunning = AtomicBoolean(false)
         
-        /**
-         * 启动服务
-         */
         fun start(context: android.content.Context) {
             val intent = Intent(context, KeepAliveService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -44,19 +43,13 @@ class KeepAliveService : Service() {
          * 检查服务是否运行
          */
         fun isRunning(context: android.content.Context): Boolean {
-            val activityManager = context.getSystemService(ACTIVITY_SERVICE) as ActivityManager
-            @Suppress("DEPRECATION")
-            for (service in activityManager.getRunningServices(Integer.MAX_VALUE)) {
-                if (KeepAliveService::class.java.name == service.service.className) {
-                    return true
-                }
-            }
-            return false
+            return _isRunning.get()
         }
     }
     
     override fun onCreate() {
         super.onCreate()
+        _isRunning.set(true)
         AppLogger.d(TAG, "保活服务已创建")
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
@@ -76,18 +69,8 @@ class KeepAliveService : Service() {
     
     override fun onDestroy() {
         super.onDestroy()
-        AppLogger.d(TAG, "保活服务被销毁，尝试重启...")
-        // 服务被杀死时尝试重新启动
-        try {
-            val restartIntent = Intent(applicationContext, KeepAliveService::class.java)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                applicationContext.startForegroundService(restartIntent)
-            } else {
-                applicationContext.startService(restartIntent)
-            }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "重启保活服务失败", e)
-        }
+        _isRunning.set(false)
+        AppLogger.d(TAG, "保活服务被销毁")
     }
     
     /**

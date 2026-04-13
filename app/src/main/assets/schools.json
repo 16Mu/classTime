@@ -28,7 +28,8 @@
     "tips": "请先登录，登录成功后会自动跳转到课表查询页面",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.CQEPCExtractor"
   },
   {
     "id": "cqvtu",
@@ -68,7 +69,8 @@
     "tips": "⚠️ 需要先连接学校校园网或VPN才能访问教务系统，登录后进入课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.SQSFXYExtractor"
   },
   {
     "id": "ahkjxy",
@@ -88,7 +90,8 @@
     "tips": "登录后进入课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.AHKJXYExtractor"
   },
   {
     "id": "sdslzyxy",
@@ -108,7 +111,8 @@
     "tips": "登录后进入课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.SDSLZYXYExtractor"
   },
   {
     "id": "lnkjxy",
@@ -128,7 +132,8 @@
     "tips": "登录后进入课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.LNKJXYExtractor"
   },
   {
     "id": "cjdx",
@@ -148,7 +153,8 @@
     "tips": "登录后进入课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.CJDXExtractor"
   },
   {
     "id": "nnsfdx",
@@ -168,7 +174,8 @@
     "tips": "登录后进入学期理论课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.NNSFDXExtractor"
   },
   {
     "id": "gzhsxy",
@@ -188,7 +195,8 @@
     "tips": "登录后进入学期理论课表页面，点击【提取课程】按钮",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.GZHSXYExtractor"
   },
   {
     "id": "sdnzxy",
@@ -208,7 +216,8 @@
     "tips": "登录后进入课表页面，支持二维表、列表等多种格式",
     "defaultSemesterStartDate": "2025-09-08",
     "fallSemesterStartDate": "2025-09-08",
-    "springSemesterStartDate": "2026-03-02"
+    "springSemesterStartDate": "2026-03-02",
+    "extractorClass": "com.wind.ggbond.classtime.util.extractor.SDNZXYExtractor"
   },
   {
     "id": "kmykdx",

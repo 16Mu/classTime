@@ -69,104 +69,99 @@ class LargeTodayCourseWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    private fun setupBaseRemoteViews(
+        context: Context,
+        appWidgetId: Int
+    ): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_large_today_course)
+
+        val serviceIntent = Intent(context, LargeTodayCourseWidgetService::class.java).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
+        }
+        views.setRemoteAdapter(R.id.lv_courses, serviceIntent)
+        views.setEmptyView(R.id.lv_courses, R.id.empty_container)
+
+        val mainPendingIntent = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.header_container, mainPendingIntent)
+
+        val itemClickPendingIntent = PendingIntent.getActivity(
+            context, 1,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+        views.setPendingIntentTemplate(R.id.lv_courses, itemClickPendingIntent)
+
+        val refreshPendingIntent = PendingIntent.getBroadcast(
+            context, 2,
+            Intent(context, LargeTodayCourseWidgetProvider::class.java).apply { action = ACTION_REFRESH },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        views.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent)
+
+        return views
+    }
+
+    private fun showErrorState(
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        views: RemoteViews,
+        message: String
+    ) {
+        views.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
+        views.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)
+        views.setTextViewText(R.id.tv_empty_message, message)
+        appWidgetManager.updateAppWidget(appWidgetId, views)
+    }
+
     private fun updateAppWidget(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int
     ) {
-        try {
-            val views = RemoteViews(context.packageName, R.layout.widget_large_today_course)
-
-            val serviceIntent = Intent(context, LargeTodayCourseWidgetService::class.java).apply {
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                data = Uri.parse(toUri(Intent.URI_INTENT_SCHEME))
-            }
-            views.setRemoteAdapter(R.id.lv_courses, serviceIntent)
-            views.setEmptyView(R.id.lv_courses, R.id.empty_container)
-
-            val mainIntent = Intent(context, MainActivity::class.java)
-            val mainPendingIntent = PendingIntent.getActivity(
-                context,
-                0,
-                mainIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.header_container, mainPendingIntent)
-
-            val itemClickIntent = Intent(context, MainActivity::class.java)
-            val itemClickPendingIntent = PendingIntent.getActivity(
-                context,
-                1,
-                itemClickIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-            )
-            views.setPendingIntentTemplate(R.id.lv_courses, itemClickPendingIntent)
-
-            val refreshIntent = Intent(context, LargeTodayCourseWidgetProvider::class.java).apply {
-                action = ACTION_REFRESH
-            }
-            val refreshPendingIntent = PendingIntent.getBroadcast(
-                context,
-                2,
-                refreshIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent)
-
-            appWidgetManager.updateAppWidget(appWidgetId, views)
-
-            scope.launch {
-                try {
-                    val displayData = WidgetDataProvider.getTodayCourses(context)
-
-                    val headerViews = RemoteViews(context.packageName, R.layout.widget_large_today_course)
-                    headerViews.setRemoteAdapter(R.id.lv_courses, serviceIntent)
-                    headerViews.setEmptyView(R.id.lv_courses, R.id.empty_container)
-                    headerViews.setOnClickPendingIntent(R.id.header_container, mainPendingIntent)
-                    headerViews.setPendingIntentTemplate(R.id.lv_courses, itemClickPendingIntent)
-                    headerViews.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent)
-
-                    headerViews.setTextViewText(R.id.tv_date, displayData.dateText)
-                    headerViews.setTextViewText(R.id.tv_day_of_week, displayData.dayOfWeekText)
-                    headerViews.setTextViewText(R.id.tv_week_number, displayData.weekNumberText)
-
-                    if (displayData.courseItems.isNotEmpty()) {
-                        headerViews.setTextViewText(R.id.tv_course_count, "${displayData.courseItems.size}节课")
-                        headerViews.setViewVisibility(R.id.tv_course_count, android.view.View.VISIBLE)
-                        headerViews.setViewVisibility(R.id.lv_courses, android.view.View.VISIBLE)
-                        headerViews.setViewVisibility(R.id.empty_container, android.view.View.GONE)
-                    } else {
-                        headerViews.setViewVisibility(R.id.tv_course_count, android.view.View.GONE)
-                        headerViews.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
-                        headerViews.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)
-                        headerViews.setTextViewText(
-                            R.id.tv_empty_message,
-                            displayData.emptyMessage ?: "今日无课程"
-                        )
-                    }
-
-                    appWidgetManager.updateAppWidget(appWidgetId, headerViews)
-                    appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lv_courses)
-                } catch (e: Exception) {
-                    AppLogger.e("LargeTodayWidgetProvider", "异步更新异常", e)
-                    val errorViews = RemoteViews(context.packageName, R.layout.widget_large_today_course)
-                    errorViews.setRemoteAdapter(R.id.lv_courses, serviceIntent)
-                    errorViews.setEmptyView(R.id.lv_courses, R.id.empty_container)
-                    errorViews.setOnClickPendingIntent(R.id.header_container, mainPendingIntent)
-                    errorViews.setOnClickPendingIntent(R.id.btn_refresh, refreshPendingIntent)
-                    errorViews.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
-                    errorViews.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)
-                    errorViews.setTextViewText(R.id.tv_empty_message, "数据加载失败，请点击刷新")
-                    appWidgetManager.updateAppWidget(appWidgetId, errorViews)
-                }
-            }
+        val views = try {
+            setupBaseRemoteViews(context, appWidgetId)
         } catch (e: Exception) {
-            AppLogger.e("LargeTodayWidgetProvider", "updateAppWidget 异常", e)
+            AppLogger.e("LargeTodayWidgetProvider", "setupBaseRemoteViews 异常", e)
             val errorViews = RemoteViews(context.packageName, R.layout.widget_large_today_course)
-            errorViews.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
-            errorViews.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)
-            errorViews.setTextViewText(R.id.tv_empty_message, "小组件加载失败")
-            appWidgetManager.updateAppWidget(appWidgetId, errorViews)
+            showErrorState(appWidgetManager, appWidgetId, errorViews, "小组件加载失败")
+            return
+        }
+
+        appWidgetManager.updateAppWidget(appWidgetId, views)
+
+        scope.launch {
+            try {
+                val displayData = WidgetDataProvider.getTodayCourses(context)
+                val headerViews = setupBaseRemoteViews(context, appWidgetId)
+
+                headerViews.setTextViewText(R.id.tv_date, displayData.dateText)
+                headerViews.setTextViewText(R.id.tv_day_of_week, displayData.dayOfWeekText)
+                headerViews.setTextViewText(R.id.tv_week_number, displayData.weekNumberText)
+
+                if (displayData.courseItems.isNotEmpty()) {
+                    headerViews.setTextViewText(R.id.tv_course_count, "${displayData.courseItems.size}节课")
+                    headerViews.setViewVisibility(R.id.tv_course_count, android.view.View.VISIBLE)
+                    headerViews.setViewVisibility(R.id.lv_courses, android.view.View.VISIBLE)
+                    headerViews.setViewVisibility(R.id.empty_container, android.view.View.GONE)
+                } else {
+                    headerViews.setViewVisibility(R.id.tv_course_count, android.view.View.GONE)
+                    headerViews.setViewVisibility(R.id.lv_courses, android.view.View.GONE)
+                    headerViews.setViewVisibility(R.id.empty_container, android.view.View.VISIBLE)
+                    headerViews.setTextViewText(R.id.tv_empty_message, displayData.emptyMessage ?: "今日无课程")
+                }
+
+                appWidgetManager.updateAppWidget(appWidgetId, headerViews)
+                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lv_courses)
+            } catch (e: Exception) {
+                AppLogger.e("LargeTodayWidgetProvider", "异步更新异常", e)
+                val errorViews = setupBaseRemoteViews(context, appWidgetId)
+                showErrorState(appWidgetManager, appWidgetId, errorViews, "数据加载失败，请点击刷新")
+            }
         }
     }
 

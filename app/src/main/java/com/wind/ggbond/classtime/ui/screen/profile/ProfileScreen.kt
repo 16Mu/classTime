@@ -37,6 +37,7 @@ import com.wind.ggbond.classtime.service.ApkDownloadManager
 import com.wind.ggbond.classtime.util.AppLogger
 import android.net.Uri
 import java.io.File
+import kotlinx.coroutines.launch
 
 private fun formatVersionName(raw: String): String {
     val cleaned = raw.removePrefix("v")
@@ -54,6 +55,8 @@ fun ProfileScreen(
     val compactModeEnabled by settingsViewModel.compactModeEnabled.collectAsState()
     val showWeekendEnabled by settingsViewModel.showWeekendEnabled.collectAsState()
     val glassEffectEnabled by settingsViewModel.glassEffectEnabled.collectAsState()
+    val desktopModeEnabled by settingsViewModel.desktopModeEnabled.collectAsState()
+    val isWallpaperSet by settingsViewModel.isWallpaperSet.collectAsState()
     val reminderEnabled by settingsViewModel.reminderEnabled.collectAsState()
     val defaultReminderMinutes by settingsViewModel.defaultReminderMinutes.collectAsState()
     val updateState by updateViewModel.updateState.collectAsState()
@@ -62,6 +65,8 @@ fun ProfileScreen(
     val haptic = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
     val pendingInstallFile = remember { mutableStateOf<File?>(null) }
+    val scope = rememberCoroutineScope()
+    var showGlassEffectDisableDialog by remember { mutableStateOf(false) }
 
     val installPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -115,7 +120,24 @@ fun ProfileScreen(
             item { ProfileSectionTitle("显示偏好") }
             item { ProfileSwitchItem(Icons.Default.ViewCompact, "紧凑模式", "收缩空白节次，放大有课内容", compactModeEnabled, hapticToggle { settingsViewModel.updateCompactModeEnabled(it) }) }
             item { ProfileSwitchItem(Icons.Default.Weekend, "显示周末", if (showWeekendEnabled) "周一到周日" else "周一到周五", showWeekendEnabled, hapticToggle { settingsViewModel.updateShowWeekendEnabled(it) }) }
-            item { ProfileSwitchItem(Icons.Default.BlurOn, "半透明效果", if (glassEffectEnabled) "已开启，底部栏和按钮使用半透明背景" else "已关闭，所有组件使用不透明背景", glassEffectEnabled, hapticToggle { settingsViewModel.updateGlassEffectEnabled(it) }) }
+            item { ProfileSwitchItem(Icons.Default.BlurOn, "壁纸透视",
+                when {
+                    desktopModeEnabled -> "桌面模式下自动开启，无法手动关闭"
+                    glassEffectEnabled -> "已开启，组件背景半透明，壁纸可见"
+                    else -> "已关闭，所有组件使用不透明背景"
+                },
+                glassEffectEnabled,
+                onCheckedChange = { newValue ->
+                    if (desktopModeEnabled) {
+                        scope.launch { snackbarHostState.showSnackbar("桌面模式开启时无法关闭壁纸透视，请先关闭桌面模式") }
+                    } else if (!newValue && isWallpaperSet) {
+                        showGlassEffectDisableDialog = true
+                    } else {
+                        settingsViewModel.updateGlassEffectEnabled(newValue)
+                    }
+                },
+                enabled = !desktopModeEnabled
+            ) }
             item { ProfileNavigateItem(Icons.Default.Wallpaper, "背景与主题", "自定义背景图片、视频和动态配色", hapticClick { navController.navigate(Screen.BackgroundSettings.route) }) }
             item { ProfileNavigateItem(Icons.Default.Palette, "课程颜色设置", "主题色调、随机配色、手动选色", hapticClick { navController.navigate(Screen.CourseColorSettings.route) }) }
             item { HorizontalDivider(Modifier.padding(vertical = 8.dp)) }
@@ -161,6 +183,23 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(hapticClick { settingsViewModel.hideClearDataDialog() }) { Text("取消") }
+            }
+        )
+    }
+
+    if (showGlassEffectDisableDialog) {
+        AlertDialog(
+            onDismissRequest = { showGlassEffectDisableDialog = false },
+            title = { Text("关闭壁纸透视") },
+            text = { Text("关闭壁纸透视后，壁纸将不可见。确定要关闭吗？") },
+            confirmButton = {
+                TextButton(hapticClick {
+                    settingsViewModel.updateGlassEffectEnabled(false)
+                    showGlassEffectDisableDialog = false
+                }) { Text("关闭", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(hapticClick { showGlassEffectDisableDialog = false }) { Text("取消") }
             }
         )
     }
@@ -310,9 +349,11 @@ private fun ProfileNavigateItem(icon: ImageVector, title: String, subtitle: Stri
 }
 
 @Composable
-private fun ProfileSwitchItem(icon: ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    ProfileRowContent(icon, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.primary, title, subtitle) {
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+private fun ProfileSwitchItem(icon: ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    ProfileRowContent(icon, MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.primary, title, subtitle,
+        titleColor = if (!enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
+    ) {
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 

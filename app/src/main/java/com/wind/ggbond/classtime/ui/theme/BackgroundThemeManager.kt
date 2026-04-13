@@ -78,7 +78,7 @@ class BackgroundThemeManager @Inject constructor(
         }
     }
     
-    suspend fun addBackgroundScheme(scheme: BackgroundScheme): Boolean {
+    suspend fun addBackgroundScheme(scheme: BackgroundScheme, setActive: Boolean = false): Boolean {
         var result = false
         dataStore.edit { preferences ->
             val json = preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY]
@@ -99,8 +99,8 @@ class BackgroundThemeManager @Inject constructor(
             val newJson = BackgroundScheme.toJsonArray(schemes)
             preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY] = newJson
 
-            if (schemes.size == 1) {
-                preferences[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] = 0
+            if (setActive || schemes.size == 1) {
+                preferences[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] = if (setActive) schemes.size - 1 else 0
                 preferences[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY] = true
                 preferences[DataStoreManager.SettingsKeys.SEED_COLOR_KEY] = scheme.seedColor
             }
@@ -112,37 +112,8 @@ class BackgroundThemeManager @Inject constructor(
 
     suspend fun addAndActivateBackgroundScheme(
         scheme: BackgroundScheme,
-        setActive: Boolean = true
-    ): Boolean {
-        var result = false
-        dataStore.edit { preferences ->
-            val json = preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY]
-            val schemes = BackgroundScheme.fromJsonArray(json).toMutableList()
-
-            if (schemes.size >= DataStoreManager.SettingsKeys.MAX_BACKGROUNDS_COUNT) {
-                AppLogger.w(TAG, "addAndActivateScheme: max limit reached (${DataStoreManager.SettingsKeys.MAX_BACKGROUNDS_COUNT})")
-                return@edit
-            }
-
-            if (schemes.any { it.uri == scheme.uri && it.uri.isNotEmpty() }) {
-                AppLogger.w(TAG, "addAndActivateScheme: duplicate URI, skipping")
-                return@edit
-            }
-
-            schemes.add(scheme)
-            val newJson = BackgroundScheme.toJsonArray(schemes)
-            preferences[DataStoreManager.SettingsKeys.BACKGROUNDS_JSON_KEY] = newJson
-
-            if (setActive) {
-                preferences[DataStoreManager.SettingsKeys.ACTIVE_BACKGROUND_INDEX_KEY] = schemes.size - 1
-                preferences[DataStoreManager.SettingsKeys.SEED_COLOR_KEY] = scheme.seedColor
-                preferences[DataStoreManager.SettingsKeys.USE_DYNAMIC_THEME_KEY] = true
-            }
-
-            result = true
-        }
-        return result
-    }
+        activate: Boolean = true
+    ): Boolean = addBackgroundScheme(scheme, setActive = activate)
     
     suspend fun removeBackgroundScheme(index: Int) {
         dataStore.edit { preferences ->
@@ -366,16 +337,25 @@ class BackgroundThemeManager @Inject constructor(
     suspend fun extractSeedColorFromUri(uri: Uri): Int = withContext(Dispatchers.IO) {
         try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                if (bitmap == null) {
-                    AppLogger.e(TAG, "extractSeedColorFromUri: decode failed")
-                    return@withContext DEFAULT_SEED_COLOR
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
                 }
-                try {
-                    extractSeedColorFromBitmap(bitmap)
-                } finally {
-                    if (!bitmap.isRecycled) bitmap.recycle()
-                }
+                BitmapFactory.decodeStream(inputStream, null, options)
+                options.inSampleSize = calculateInSampleSize(options, 100, 100)
+                options.inJustDecodeBounds = false
+
+                context.contentResolver.openInputStream(uri)?.use { sampleStream ->
+                    val bitmap = BitmapFactory.decodeStream(sampleStream, null, options)
+                    if (bitmap == null) {
+                        AppLogger.e(TAG, "extractSeedColorFromUri: decode failed")
+                        return@withContext DEFAULT_SEED_COLOR
+                    }
+                    try {
+                        extractSeedColorFromBitmap(bitmap)
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                    }
+                } ?: DEFAULT_SEED_COLOR
             } ?: run {
                 AppLogger.e(TAG, "extractSeedColorFromUri: cannot open stream")
                 DEFAULT_SEED_COLOR
@@ -384,6 +364,20 @@ class BackgroundThemeManager @Inject constructor(
             AppLogger.e(TAG, "extractSeedColorFromUri exception", e)
             DEFAULT_SEED_COLOR
         }
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
     
     fun generateLightColorScheme(seedColor: Int, style: PaletteStyle = PaletteStyle.TonalSpot): androidx.compose.material3.ColorScheme {
@@ -425,7 +419,7 @@ class BackgroundThemeManager @Inject constructor(
             AppLogger.e(TAG, "extractSeedColorFromVideo exception", e)
             DEFAULT_SEED_COLOR
         } finally {
-            try { retriever.release() } catch (_: Exception) {}
+            try { retriever.release() } catch (e: Exception) { AppLogger.e("Safety", "操作异常", e) }
         }
     }
 
@@ -508,17 +502,26 @@ class BackgroundThemeManager @Inject constructor(
 
             try {
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    if (bitmap == null) {
-                        emit(DEFAULT_OVERLAY_CONFIG)
-                        return@flow
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
                     }
+                    BitmapFactory.decodeStream(inputStream, null, options)
+                    options.inSampleSize = calculateInSampleSize(options, 100, 100)
+                    options.inJustDecodeBounds = false
 
-                    try {
-                        emit(calculateSmartOverlay(bitmap))
-                    } finally {
-                        if (!bitmap.isRecycled) bitmap.recycle()
-                    }
+                    context.contentResolver.openInputStream(uri)?.use { sampleStream ->
+                        val bitmap = BitmapFactory.decodeStream(sampleStream, null, options)
+                        if (bitmap == null) {
+                            emit(DEFAULT_OVERLAY_CONFIG)
+                            return@flow
+                        }
+
+                        try {
+                            emit(calculateSmartOverlay(bitmap))
+                        } finally {
+                            if (!bitmap.isRecycled) bitmap.recycle()
+                        }
+                    } ?: emit(DEFAULT_OVERLAY_CONFIG)
                 } ?: emit(DEFAULT_OVERLAY_CONFIG)
             } catch (e: Exception) {
                 AppLogger.e(TAG, "getSmartOverlayConfig exception", e)

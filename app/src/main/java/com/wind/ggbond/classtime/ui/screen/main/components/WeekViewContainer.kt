@@ -94,7 +94,7 @@ fun WeekViewContainer(
             val weekNumber = page + 1
             val examsForWeek by viewModel.examsForCurrentWeek.collectAsState()
             
-            val coursesForWeek = remember(allCourses.size, adjustments.size, weekNumber) {
+            val coursesForWeek = remember(allCourses, adjustments, weekNumber) {
                 viewModel.getCoursesForWeek(weekNumber)
             }
             

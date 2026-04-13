@@ -36,4 +36,17 @@ object WidgetColors {
     val warningTextDay = Color(0xFF8D6E63); val warningTextNight = Color(0xFFFFCC80)
     val emptyPrimaryDay = Color(0xFFD7C3B0); val emptyPrimaryNight = Color(0xFF5D4037)
     val emptySecondaryDay = Color(0xFF8D6E63); val emptySecondaryNight = Color(0xFF6D4C41)
+
+    val courseFallbackDay = Color(0xFF5C6BC0); val courseFallbackNight = Color(0xFF5C6BC0)
+    val courseCardBgFallbackDay = Color(0xFFE8F0FE); val courseCardBgFallbackNight = Color(0xFFE8F0FE)
+    val courseCardBorderFallbackDay = Color(0xFF0058BC); val courseCardBorderFallbackNight = Color(0xFF0058BC)
+    val todayHeaderDay = Color(0xFF0058BC); val todayHeaderNight = Color(0xFF3A86FF)
+    val todayHighlightBgDay = Color(0xFFE8F0FE); val todayHighlightBgNight = Color(0xFF1A237E)
+    val todayHighlightTextDay = Color(0xFF1565C0); val todayHighlightTextNight = Color(0xFF64B5F6)
+    val tomorrowBgDay = Color(0xFFE3F2FD); val tomorrowBgNight = Color(0xFF1A237E)
+    val tomorrowTextDay = Color(0xFF1976D2); val tomorrowTextNight = Color(0xFF64B5F6)
+    val ongoingBadgeDay = Color(0xFF4CAF50); val ongoingBadgeNight = Color(0xFF81C784)
+
+    val WEEKDAY_LABELS_FULL = arrayOf("一", "二", "三", "四", "五", "六", "日")
+    val WEEKDAY_LABELS_WORKDAY = arrayOf("一", "二", "三", "四", "五")
 }
