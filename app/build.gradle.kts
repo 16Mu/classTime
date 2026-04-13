@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,16 +8,35 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists() && keystorePropertiesFile.isFile && keystorePropertiesFile.canRead()) {
+    try {
+        keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    } catch (e: Exception) {
+        logger.warn("Failed to load keystore properties: ${e.message}")
+    }
+}
+
 android {
     namespace = "com.wind.ggbond.classtime"
     compileSdk = 34
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+            storeFile = keystoreProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+            storePassword = keystoreProperties.getProperty("storePassword")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.wind.ggbond.classtime"
         minSdk = 26
         targetSdk = 34
-        versionCode = 37
-        versionName = "v1.2.2-[GGBond]-[Wind]-[Release]"
+        versionCode = 39
+        versionName = "v1.2.3-[GGBond]-[Wind]-[Release]"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -35,6 +56,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -135,7 +157,10 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    
+
+    // JExcelAPI (xls parsing - lightweight, ~180KB, no dependencies)
+    implementation("net.sourceforge.jexcelapi:jxl:2.6.12")
+
     // Jsoup (HTML parsing)
     implementation("org.jsoup:jsoup:1.17.1")
     
@@ -178,6 +203,8 @@ dependencies {
     testImplementation("app.cash.turbine:turbine:1.0.0")
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
     testImplementation("io.kotest:kotest-property:5.9.1")
+    testImplementation("org.apache.poi:poi:5.2.5")
+    testImplementation("org.apache.poi:poi-ooxml:5.2.5")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
