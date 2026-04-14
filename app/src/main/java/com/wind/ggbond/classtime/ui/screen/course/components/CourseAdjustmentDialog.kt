@@ -23,7 +23,7 @@ import com.wind.ggbond.classtime.data.local.entity.Course
 import com.wind.ggbond.classtime.util.DateUtils
 
 /**
- * 临时调课对话�?- 紧凑布局版本
+ * 临时调课对话框 - 紧凑布局版本
  * 重构目标：避免页面滚动，所有内容在一屏内显示
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,10 +51,10 @@ fun CourseAdjustmentDialog(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
-    
-    // 周次选择器状�?
+
+    // 周次选择器状态
     var showWeekPicker by remember { mutableStateOf(false) }
-    
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -70,7 +70,7 @@ fun CourseAdjustmentDialog(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // 标题�?- 紧凑设计
+                // 标题区 - 紧凑设计
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -95,15 +95,15 @@ fun CourseAdjustmentDialog(
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            Icons.Default.Close, 
+                            Icons.Default.Close,
                             contentDescription = "关闭",
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 // 课程信息 - 单行紧凑显示
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -130,25 +130,25 @@ fun CourseAdjustmentDialog(
                         )
                         // 原始时间信息
                         Text(
-                            text = "��${currentWeekNumber}�� ${DateUtils.getDayOfWeekName(course.dayOfWeek)} ��${course.startSection}��",
+                            text = "第${currentWeekNumber}周 ${DateUtils.getDayOfWeekName(course.dayOfWeek)} 第${course.startSection}节",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
-                // 调整后安�?- 紧凑布局
+
+                // 调整后安排 - 紧凑布局
                 Text(
-                    text = "������",
+                    text = "调整后安排",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 // 第一行：周次 + 节次选择（横向排列）
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -174,7 +174,7 @@ fun CourseAdjustmentDialog(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "��${newWeekNumber}��",
+                                    text = "第${newWeekNumber}周",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -187,8 +187,8 @@ fun CourseAdjustmentDialog(
                             )
                         }
                     }
-                    
-                    // 开始节�?- 下拉选择
+
+                    // 开始节次 - 下拉选择
                     var expandedStart by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(
                         expanded = expandedStart,
@@ -214,7 +214,7 @@ fun CourseAdjustmentDialog(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = "��${newStartSection}-${newStartSection + newSectionCount - 1}��",
+                                        text = "第${newStartSection}-${newStartSection + newSectionCount - 1}节",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -233,7 +233,7 @@ fun CourseAdjustmentDialog(
                         ) {
                             (1..12).forEach { section ->
                                 DropdownMenuItem(
-                                    text = { Text("��$section �ڿ�ʼ") },
+                                    text = { Text("第$section 节开始") },
                                     onClick = {
                                         onNewStartSectionChange(section)
                                         expandedStart = false
@@ -243,15 +243,15 @@ fun CourseAdjustmentDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(10.dp))
-                
-                // 星期选择 - 单行7�?
+
+                // 星期选择 - 单行7列
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    listOf("һ", "��", "��", "��", "��", "��", "��").forEachIndexed { index, day ->
+                    listOf("一", "二", "三", "四", "五", "六", "日").forEachIndexed { index, day ->
                         val dayOfWeek = index + 1
                         val isSelected = newDayOfWeek == dayOfWeek
                         Box(
@@ -280,9 +280,9 @@ fun CourseAdjustmentDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(10.dp))
-                
+
                 // 教室输入 - 单行紧凑
                 OutlinedTextField(
                     value = newClassroom,
@@ -302,7 +302,7 @@ fun CourseAdjustmentDialog(
                     shape = RoundedCornerShape(10.dp),
                     textStyle = MaterialTheme.typography.bodyMedium
                 )
-                
+
                 // 冲突提示 - 仅在有冲突时显示
                 if (hasConflict) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -330,9 +330,9 @@ fun CourseAdjustmentDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // 按钮 - 紧凑设计
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -371,7 +371,7 @@ fun CourseAdjustmentDialog(
                             Spacer(modifier = Modifier.width(6.dp))
                         }
                         Text(
-                            if (isSaving) "������..." else "ȷ��",
+                            if (isSaving) "保存中..." else "确认",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -379,8 +379,8 @@ fun CourseAdjustmentDialog(
             }
         }
     }
-    
-    // 周次选择对话�?
+
+    // 周次选择对话框
     if (showWeekPicker) {
         WeekPickerDialog(
             currentWeek = newWeekNumber,
@@ -395,7 +395,7 @@ fun CourseAdjustmentDialog(
 }
 
 /**
- * 周次选择对话�?
+ * 周次选择对话框
  */
 @Composable
 fun WeekPickerDialog(
@@ -423,16 +423,16 @@ fun WeekPickerDialog(
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onWeekSelected(week) }
                             .background(
-                                if (week == currentWeek) 
-                                    MaterialTheme.colorScheme.primaryContainer 
-                                else 
+                                if (week == currentWeek)
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
                                     MaterialTheme.colorScheme.surface
                             )
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "��$week ��",
+                            text = "第$week 周",
                             style = MaterialTheme.typography.bodyLarge,
                             color = if (week == currentWeek)
                                 MaterialTheme.colorScheme.onPrimaryContainer
@@ -467,7 +467,7 @@ fun WeekPickerDialog(
 }
 
 /**
- * 信息行组�?
+ * 信息行组件
  */
 @Composable
 private fun InfoRow(label: String, value: String) {
@@ -489,4 +489,3 @@ private fun InfoRow(label: String, value: String) {
         )
     }
 }
-
