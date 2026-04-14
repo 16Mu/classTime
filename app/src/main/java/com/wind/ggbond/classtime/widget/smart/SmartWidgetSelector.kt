@@ -59,7 +59,7 @@ data class SmartWidgetOption(
     val description: String,
     val isRecommended: Boolean = false,
     val isFavorite: Boolean = false,
-    val icon: String = "ð±"
+    val icon: String = "\uD83D\uDCF1"
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,20 +70,20 @@ fun SmartWidgetSelector(
 ) {
     val context = LocalContext.current
     val prefsManager = remember { WidgetPreferencesManager.getInstance(context) }
-    
+
     var recommendedType by remember { mutableStateOf<WidgetType?>(null) }
     var favoriteTypes by remember { mutableStateOf<List<String>>(emptyList()) }
-    
+
     val favoriteTypesState by prefsManager.getFavoriteWidgetTypes()
         .collectAsState(initial = emptyList())
-    
+
     LaunchedEffect(Unit) {
         launch {
             recommendedType = prefsManager.getRecommendedWidgetType()
         }
         launch { favoriteTypes = favoriteTypesState }
     }
-    
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -101,7 +101,7 @@ fun SmartWidgetSelector(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 val type = recommendedType
                 if (type != null) {
                     Text(
@@ -118,12 +118,12 @@ fun SmartWidgetSelector(
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // 推荐的 Widget 选项列表
         val widgetOptions = getWidgetOptions(recommendedType, favoriteTypes)
-        
+
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth()
@@ -140,9 +140,9 @@ fun SmartWidgetSelector(
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(20.dp))
-        
+
         // 快速操作区
         QuickActionsSection(
             context = context,
@@ -209,15 +209,15 @@ private fun WidgetOptionCard(
                         .clickable { onToggleFavorite() }
                 )
             }
-            
+
             // Widget 图标/预览
             Text(
                 text = option.icon,
                 fontSize = 40.sp
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // 标题
             Text(
                 text = option.title,
@@ -225,9 +225,9 @@ private fun WidgetOptionCard(
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             // 描述
             Text(
                 text = option.description,
@@ -236,11 +236,11 @@ private fun WidgetOptionCard(
                 textAlign = TextAlign.Center,
                 maxLines = 2
             )
-            
+
             // 推荐标签
             if (option.isRecommended) {
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Box(
                     modifier = Modifier
                         .background(
@@ -250,16 +250,16 @@ private fun WidgetOptionCard(
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "✨ 推荐",
+                        text = "\u2728 推荐",
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // 添加按钮
             Box(
                 modifier = Modifier
@@ -304,7 +304,7 @@ private fun QuickActionsSection(
     val compatibilityInfo = remember {
         WidgetPinHelper.getDeviceCompatibilityReport()
     }
-    
+
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -313,9 +313,9 @@ private fun QuickActionsSection(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -324,29 +324,28 @@ private fun QuickActionsSection(
             QuickActionButton(
                 title = "一键添加",
                 subtitle = "使用推荐的小组件",
-                icon = "⚡",
+                icon = "\u26A1",
                 onClick = onQuickAddRecommended,
                 modifier = Modifier.weight(1f)
             )
-            
+
             // 手动添加引导
             QuickActionButton(
                 title = "手动添加",
                 subtitle = "按步骤操作",
-                icon = "ð",
+                icon = "\uD83D\uDCCB",
                 onClick = onOpenSettings,
                 modifier = Modifier.weight(1f)
             )
-            
+
             // 设备兼容性信息
             QuickActionButton(
                 title = "设备信息",
                 subtitle = "${compatibilityInfo.compatibilityLevel}",
                 icon = when (compatibilityInfo.compatibilityLevel) {
-                    WidgetPinHelper.CompatibilityLevel.HIGH -> "â"
-                    WidgetPinHelper.CompatibilityLevel.MEDIUM -> "⚠️"
-                    WidgetPinHelper.CompatibilityLevel.LOW -> "❌"
-                    // else -> "❓"
+                    WidgetPinHelper.CompatibilityLevel.HIGH -> "\u2705"
+                    WidgetPinHelper.CompatibilityLevel.MEDIUM -> "\u26A0\uFE0F"
+                    WidgetPinHelper.CompatibilityLevel.LOW -> "\u274C"
                 },
                 onClick = {},
                 enabled = false,
@@ -393,16 +392,16 @@ private fun QuickActionButton(
                 text = icon,
                 fontSize = 28.sp
             )
-            
+
             Spacer(modifier = Modifier.height(6.dp))
-            
+
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
-            
+
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
@@ -426,7 +425,7 @@ private fun getWidgetOptions(
             description = "显示下一节课程信息及倒计时",
             isRecommended = recommendedType == WidgetType.NEXT_CLASS,
             isFavorite = favoriteTypes.contains("next_class"),
-            icon = "⏰"
+            icon = "\u23F0"
         ),
         SmartWidgetOption(
             type = WidgetType.TODAY_COURSE,
@@ -434,7 +433,7 @@ private fun getWidgetOptions(
             description = "查看今天所有课程的完整安排",
             isRecommended = recommendedType == WidgetType.TODAY_COURSE,
             isFavorite = favoriteTypes.contains("today_course"),
-            icon = "📅"
+            icon = "\uD83D\uDCC5"
         ),
         SmartWidgetOption(
             type = WidgetType.COMPACT_LIST,
@@ -442,7 +441,7 @@ private fun getWidgetOptions(
             description = "节省空间显示课程列表，适合小屏",
             isRecommended = recommendedType == WidgetType.COMPACT_LIST,
             isFavorite = favoriteTypes.contains("compact_list"),
-            icon = "📋"
+            icon = "\uD83D\uDCCB"
         ),
         SmartWidgetOption(
             type = WidgetType.WEEK_OVERVIEW,
@@ -450,7 +449,7 @@ private fun getWidgetOptions(
             description = "一周课程总览，方便规划复习",
             isRecommended = recommendedType == WidgetType.WEEK_OVERVIEW,
             isFavorite = favoriteTypes.contains("week_overview"),
-            icon = "📊"
+            icon = "\uD83D\uDCCA"
         ),
         SmartWidgetOption(
             type = WidgetType.LARGE_TODAY_COURSE,
@@ -458,7 +457,7 @@ private fun getWidgetOptions(
             description = "4x4大尺寸显示更多课程详情",
             isRecommended = recommendedType == WidgetType.LARGE_TODAY_COURSE,
             isFavorite = favoriteTypes.contains("large_today_course"),
-            icon = "📖"
+            icon = "\uD83D\uDCD6"
         )
     ).sortedByDescending { it.isRecommended || it.isFavorite }
 }
